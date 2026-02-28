@@ -1,0 +1,27 @@
+{
+  "name": "maimaipadfrontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "axios": "^1.13.2",
+    "echarts": "^5.5.0",
+    "element-plus": "^2.13.0",
+    "cropperjs": "^1.6.2",
+    "monaco-editor": "^0.52.0",
+    "pinia": "^2.1.7",
+    "tippy.js": "^6.3.7",
+    "vue": "^3.5.24",
+    "vue-router": "^4.6.4",
+    "vue3-calendar-heatmap": "^2.0.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.1",
+    "vite": "^7.2.4"
+  }
+}

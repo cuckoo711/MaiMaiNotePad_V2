@@ -1,0 +1,30 @@
+[
+    {
+        "name": "超级管理员",
+        "key": "superadmin",
+        "sort": 1,
+        "status": true,
+        "remark": "拥有系统全部权限，可管理所有模块"
+    },
+    {
+        "name": "管理员",
+        "key": "admin",
+        "sort": 2,
+        "status": true,
+        "remark": "系统管理权限，可管理用户、角色、菜单等系统模块"
+    },
+    {
+        "name": "内容审核员",
+        "key": "reviewer",
+        "sort": 3,
+        "status": true,
+        "remark": "内容审核权限，可审核知识库、人设卡、评论等内容"
+    },
+    {
+        "name": "普通用户",
+        "key": "user",
+        "sort": 4,
+        "status": true,
+        "remark": "普通用户权限，可创建和管理自己的内容"
+    }
+]

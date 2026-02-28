@@ -1,0 +1,58 @@
+[
+    {
+        "name": "麦麦笔记本",
+        "key": "mainotebook",
+        "sort": 1,
+        "owner": "",
+        "phone": "",
+        "email": "",
+        "status": true,
+        "parent": null,
+        "children": [
+            {
+                "name": "技术部",
+                "key": "technology",
+                "sort": 1,
+                "owner": "",
+                "phone": "",
+                "email": "",
+                "status": true,
+                "parent": 1,
+                "children": []
+            },
+            {
+                "name": "运营部",
+                "key": "operation",
+                "sort": 2,
+                "owner": "",
+                "phone": "",
+                "email": "",
+                "status": true,
+                "parent": 1,
+                "children": []
+            },
+            {
+                "name": "内容部",
+                "key": "content",
+                "sort": 3,
+                "owner": "",
+                "phone": "",
+                "email": "",
+                "status": true,
+                "parent": 1,
+                "children": []
+            },
+            {
+                "name": "注册用户",
+                "key": "registered_users",
+                "sort": 4,
+                "owner": "",
+                "phone": "",
+                "email": "",
+                "status": true,
+                "parent": 1,
+                "children": []
+            }
+        ]
+    }
+]
