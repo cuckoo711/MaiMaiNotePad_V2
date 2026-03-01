@@ -2,11 +2,14 @@ import { defineAsyncComponent, AsyncComponentLoader } from 'vue';
 export let pluginsAll: any = [];
 // 扫描插件目录并注册插件
 export const scanAndInstallPlugins = (app: any) => {
+	// 排除 api.ts 文件，只扫描组件文件
 	const components = import.meta.glob('./**/*.ts');
 	const pluginNames = new Set();
 	// 遍历对象并注册异步组件
 	for (const [key, value] of Object.entries(components)) {
 		const name = key.slice(key.lastIndexOf('/') + 1, key.lastIndexOf('.'));
+		// 如果文件名是 api，则跳过注册，避免与业务 api 冲突
+		if (name === 'api') continue;
 		app.component(name, defineAsyncComponent(value as AsyncComponentLoader));
 		const pluginsName = key.match(/\/([^\/]*)\//)?.[1];
 		pluginNames.add(pluginsName);

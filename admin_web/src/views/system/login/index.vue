@@ -146,6 +146,7 @@ const siteBg = computed(() => {
 // 页面加载时
 onMounted(() => {
 	NextLoading.done();
+  systemConfigStore.getSystemConfigs()
 });
 </script>
 

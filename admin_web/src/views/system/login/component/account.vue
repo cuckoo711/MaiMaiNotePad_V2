@@ -130,17 +130,16 @@ export default defineComponent({
 			loginApi.getCaptcha().then((ret: any) => {
 				state.ruleForm.captchaImgBase = ret.data.image_base;
 				state.ruleForm.captchaKey = ret.data.key;
+			}).catch((err: any) => {
+				console.error('Failed to get captcha:', err);
 			});
 		};
 		const applyBtnClick = async () => {
 			window.open(getBaseURL('/api/system/apply_for_trial/'));
 		};
-    const refreshCaptcha = async () => {
-			state.ruleForm.captcha=''
-			loginApi.getCaptcha().then((ret: any) => {
-				state.ruleForm.captchaImgBase = ret.data.image_base;
-				state.ruleForm.captchaKey = ret.data.key;
-			});
+		const refreshCaptcha = async () => {
+			state.ruleForm.captcha = '';
+			await getCaptcha();
 		};
 		const loginClick = async () => {
 			if (!formRef.value) return

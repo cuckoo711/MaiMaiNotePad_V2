@@ -53,7 +53,7 @@ app.use(eIconPicker, {
 pinia.use(piniaPersist);
 directive(app);
 other.elSvg(app);
-
+RegisterPermission(app);
 
 app.use(VXETable)
 app.use(pinia)
