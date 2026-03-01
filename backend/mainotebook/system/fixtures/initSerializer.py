@@ -195,8 +195,25 @@ class RoleMenuInitSerializer(CustomModelSerializer):
 
     def update(self, instance, validated_data):
         init_data = self.initial_data
-        role_id = Role.objects.filter(key=init_data['role__key']).first()
-        menu_id = Menu.objects.filter(web_path=init_data['menu__web_path'], component_name=init_data['menu__component_name']).first()
+        role_key = init_data.get('role__key')
+        menu_web_path = init_data.get('menu__web_path')
+        menu_component_name = init_data.get('menu__component_name', '')
+        
+        # 查询角色
+        role_id = Role.objects.filter(key=role_key).first()
+        if not role_id:
+            raise serializers.ValidationError(f"角色不存在: role__key={role_key}")
+        
+        # 查询菜单
+        menu_id = Menu.objects.filter(
+            web_path=menu_web_path, 
+            component_name=menu_component_name
+        ).first()
+        if not menu_id:
+            raise serializers.ValidationError(
+                f"菜单不存在: menu__web_path={menu_web_path}, menu__component_name={menu_component_name}"
+            )
+        
         validated_data['role'] = role_id
         validated_data['menu'] = menu_id
         return super().update(instance, validated_data)
@@ -204,8 +221,25 @@ class RoleMenuInitSerializer(CustomModelSerializer):
 
     def create(self, validated_data):
         init_data = self.initial_data
-        role_id = Role.objects.filter(key=init_data['role__key']).first()
-        menu_id = Menu.objects.filter(web_path=init_data['menu__web_path'], component_name=init_data['menu__component_name']).first()
+        role_key = init_data.get('role__key')
+        menu_web_path = init_data.get('menu__web_path')
+        menu_component_name = init_data.get('menu__component_name', '')
+        
+        # 查询角色
+        role_id = Role.objects.filter(key=role_key).first()
+        if not role_id:
+            raise serializers.ValidationError(f"角色不存在: role__key={role_key}")
+        
+        # 查询菜单
+        menu_id = Menu.objects.filter(
+            web_path=menu_web_path, 
+            component_name=menu_component_name
+        ).first()
+        if not menu_id:
+            raise serializers.ValidationError(
+                f"菜单不存在: menu__web_path={menu_web_path}, menu__component_name={menu_component_name}"
+            )
+        
         validated_data['role'] = role_id
         validated_data['menu'] = menu_id
         return super().create(validated_data)
@@ -232,8 +266,19 @@ class RoleMenuButtonInitSerializer(CustomModelSerializer):
 
     def update(self, instance, validated_data):
         init_data = self.initial_data
-        role_id = Role.objects.filter(key=init_data['role__key']).first()
-        menu_button_id = MenuButton.objects.filter(value=init_data['menu_button__value']).first()
+        role_key = init_data.get('role__key')
+        menu_button_value = init_data.get('menu_button__value')
+        
+        # 查询角色
+        role_id = Role.objects.filter(key=role_key).first()
+        if not role_id:
+            raise serializers.ValidationError(f"角色不存在: role__key={role_key}")
+        
+        # 查询菜单按钮
+        menu_button_id = MenuButton.objects.filter(value=menu_button_value).first()
+        if not menu_button_id:
+            raise serializers.ValidationError(f"菜单按钮不存在: menu_button__value={menu_button_value}")
+        
         validated_data['role'] = role_id
         validated_data['menu_button'] = menu_button_id
         instance = super().create(validated_data)
@@ -242,8 +287,18 @@ class RoleMenuButtonInitSerializer(CustomModelSerializer):
     
     def create(self, validated_data):
         init_data = self.initial_data
-        role_id = Role.objects.filter(key=init_data['role__key']).first()
-        menu_button_id = MenuButton.objects.filter(value=init_data['menu_button__value']).first()
+        role_key = init_data.get('role__key')
+        menu_button_value = init_data.get('menu_button__value')
+        
+        # 查询角色
+        role_id = Role.objects.filter(key=role_key).first()
+        if not role_id:
+            raise serializers.ValidationError(f"角色不存在: role__key={role_key}")
+        
+        # 查询菜单按钮
+        menu_button_id = MenuButton.objects.filter(value=menu_button_value).first()
+        if not menu_button_id:
+            raise serializers.ValidationError(f"菜单按钮不存在: menu_button__value={menu_button_value}")
         validated_data['role'] = role_id
         validated_data['menu_button'] = menu_button_id
         instance = super().create(validated_data)

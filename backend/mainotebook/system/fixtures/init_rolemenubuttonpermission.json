@@ -263,8 +263,5 @@
     {"role__key": "user", "menu_button__value": "persona_card:Create", "data_range": 4},
     {"role__key": "user", "menu_button__value": "persona_card:Update", "data_range": 4},
     {"role__key": "user", "menu_button__value": "persona_card:Delete", "data_range": 4},
-    {"role__key": "user", "menu_button__value": "comment:List", "data_range": 4},
-
-    {"role__key": "guest", "menu_button__value": "knowledge_base:List", "data_range": 0},
-    {"role__key": "guest", "menu_button__value": "persona_card:List", "data_range": 0}
+    {"role__key": "user", "menu_button__value": "comment:List", "data_range": 4}
 ]

@@ -29,7 +29,7 @@ function truncateText(text: string, maxLength: number = 80): string {
  * 创建审核管理 CRUD 配置
  * 审核模块为只读列表 + 自定义行操作（通过/拒绝/退回），不支持新增和编辑
  */
-export const createCrudOptions = function ({ crudExpose }: CreateCrudOptionsProps): CreateCrudOptionsRet {
+export const createCrudOptions = function ({ crudExpose, context }: CreateCrudOptionsProps): CreateCrudOptionsRet {
 	// 分页查询请求 — 适配后端 {items, total, page, page_size} 格式
 	const pageRequest = async (query: any) => {
 		// query 已经过全局 transformQuery 转换为 { page, limit, ...form }
@@ -69,6 +69,47 @@ export const createCrudOptions = function ({ crudExpose }: CreateCrudOptionsProp
 					view: { show: false },
 					edit: { show: false },
 					remove: { show: false },
+					approve: {
+						text: '通过',
+						type: 'text',
+						style: { color: '#67c23a' },
+						show: auth('review:Approve'),
+						click: (ctx: any) => context.handleApprove(ctx.row),
+					},
+					reject: {
+						text: '拒绝',
+						type: 'text',
+						style: { color: '#f56c6c' },
+						show: auth('review:Reject'),
+						click: (ctx: any) => context.handleReject(ctx.row),
+					},
+					return: {
+						text: '退回',
+						type: 'text',
+						style: { color: '#e6a23c' },
+						show: auth('review:Return'),
+						click: (ctx: any) => context.handleReturn(ctx.row),
+					},
+					detail: {
+						text: '详情',
+						type: 'text',
+						click: (ctx: any) => context.handleViewDetail(ctx.row),
+					},
+					aiReview: {
+						text: 'AI 审核',
+						type: 'text',
+						style: { color: '#409eff' },
+						show: auth('review:AIReview'),
+						// disabled: (ctx: any) => context.aiReviewRowLoading[ctx.row.id],
+						// loading: (ctx: any) => context.aiReviewRowLoading[ctx.row.id],
+						click: (ctx: any) => context.handleAIReview(ctx.row),
+					},
+					report: {
+						text: '查看报告',
+						type: 'text',
+						style: { color: '#909399' },
+						click: (ctx: any) => context.handleViewReport(ctx.row),
+					}
 				},
 			},
 			// 搜索区域配置
@@ -120,15 +161,6 @@ export const createCrudOptions = function ({ crudExpose }: CreateCrudOptionsProp
 					column: {
 						minWidth: 180,
 						showOverflowTooltip: true,
-					},
-					form: { show: false },
-				},
-				description: {
-					title: '描述',
-					column: {
-						minWidth: 200,
-						showOverflowTooltip: true,
-						formatter: ({ value }: any) => truncateText(value, 60),
 					},
 					form: { show: false },
 				},

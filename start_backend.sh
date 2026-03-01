@@ -293,14 +293,84 @@ wait_for_healthy() {
 start_docker_services() {
     header "启动 Docker 服务"
 
-    # 如果容器都在运行，跳过
-    if docker ps --format '{{.Names}}' | grep -q "^${PG_CONTAINER}$" && \
-       docker ps --format '{{.Names}}' | grep -q "^${REDIS_CONTAINER}$"; then
+    # 1. 检查容器状态
+    local pg_exists=false
+    local redis_exists=false
+    local pg_status="not_found"
+    local redis_status="not_found"
+
+    if docker inspect "$PG_CONTAINER" &>/dev/null; then
+        pg_exists=true
+        pg_status="$(docker inspect --format='{{.State.Status}}' "$PG_CONTAINER" 2>/dev/null)"
+    fi
+
+    if docker inspect "$REDIS_CONTAINER" &>/dev/null; then
+        redis_exists=true
+        redis_status="$(docker inspect --format='{{.State.Status}}' "$REDIS_CONTAINER" 2>/dev/null)"
+    fi
+
+    # 如果都正在运行，检查是否属于当前 Compose 项目（可选，这里简单处理：只要运行就认为正常）
+    if [[ "$pg_status" == "running" && "$redis_status" == "running" ]]; then
         success "PostgreSQL 和 Redis 容器已在运行"
+        
+        # 即使容器在运行，也需要读取密码供后续使用
+        # 确保变量已初始化
+        PG_PASSWORD="${PG_PASSWORD:-}"
+        REDIS_PASSWORD="${REDIS_PASSWORD:-}"
+
+        if [[ -z "${PG_PASSWORD:-}" ]]; then
+            # 从 env.py 中读取已有密码（如果存在）
+            if [[ -f "$ENV_FILE" ]]; then
+                PG_PASSWORD="$("$PYTHON_CMD" -c "
+import sys; sys.path.insert(0, '$BACKEND_DIR')
+try:
+    from conf.env import DATABASE_PASSWORD; print(DATABASE_PASSWORD)
+except: pass
+" 2>/dev/null || echo "")"
+                REDIS_PASSWORD="$("$PYTHON_CMD" -c "
+import sys; sys.path.insert(0, '$BACKEND_DIR')
+try:
+    from conf.env import REDIS_PASSWORD; print(REDIS_PASSWORD)
+except: pass
+" 2>/dev/null || echo "")"
+            fi
+        fi
+        
         return
     fi
 
+    # 如果有任何一个存在（无论是否运行），提示用户处理冲突
+    if [[ "$pg_exists" == "true" || "$redis_exists" == "true" ]]; then
+        warn "检测到容器已存在但状态不一致（可能导致命名冲突）："
+        if [[ "$pg_exists" == "true" ]]; then
+            info "  - PostgreSQL ($PG_CONTAINER): $pg_status"
+        else
+            info "  - PostgreSQL ($PG_CONTAINER): 未找到"
+        fi
+        if [[ "$redis_exists" == "true" ]]; then
+            info "  - Redis      ($REDIS_CONTAINER): $redis_status"
+        else
+            info "  - Redis      ($REDIS_CONTAINER): 未找到"
+        fi
+        
+        echo ""
+        warn "如果启动失败（Error response from daemon: Conflict），建议选择重建。"
+        echo -n "  是否删除旧容器并重新启动？(y/n) [默认 y]: "
+        read -r reply
+        if [[ "$reply" == "y" || "$reply" == "Y" || -z "$reply" ]]; then
+            info "正在删除旧容器..."
+            docker rm -f "$PG_CONTAINER" "$REDIS_CONTAINER" 2>/dev/null || true
+            success "旧容器已删除"
+        else
+            info "尝试保留现有容器..."
+        fi
+    fi
+
     # 生成或读取密码
+    # 确保变量已初始化
+    PG_PASSWORD="${PG_PASSWORD:-}"
+    REDIS_PASSWORD="${REDIS_PASSWORD:-}"
+
     if [[ -z "${PG_PASSWORD:-}" ]]; then
         # 从 env.py 中读取已有密码（如果存在）
         if [[ -f "$ENV_FILE" ]]; then
@@ -335,7 +405,7 @@ except: pass
 
     # 等待 PostgreSQL
     info "等待 PostgreSQL 就绪..."
-    if wait_for_healthy "$PG_CONTAINER" 30; then
+    if wait_for_healthy "$PG_CONTAINER" 15; then
         success "PostgreSQL 已就绪"
     elif docker exec "$PG_CONTAINER" pg_isready -U mai_notebook -d mai_notebook &>/dev/null; then
         success "PostgreSQL 已就绪"
@@ -398,6 +468,7 @@ run_migrations() {
 
 init_data() {
     header "初始化系统数据"
+    "$PYTHON_CMD" "$BACKEND_DIR/manage.py" init_area
     "$PYTHON_CMD" "$BACKEND_DIR/manage.py" init -y
     success "系统数据初始化完成"
 }

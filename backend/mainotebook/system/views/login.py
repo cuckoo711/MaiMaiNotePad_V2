@@ -96,6 +96,13 @@ class LoginSerializer(TokenObtainPairSerializer):
             raise CustomValidationError("您登录的账号存在多个,请联系管理员检查登录账号唯一性")
         if not user.is_active:
             raise CustomValidationError("账号已被锁定,联系管理员解锁")
+            
+        # 检查是否为超级管理员或员工，只有这些角色才能登录管理后台
+        # is_superuser: 超级管理员
+        # is_staff: 职员（可登录后台）
+        if not (user.is_superuser or user.is_staff):
+            raise CustomValidationError("普通用户禁止登录管理后台")
+            
         try:
             # 必须重置用户名为username,否则使用邮箱手机号登录会提示密码错误
             attrs['username'] = user.username

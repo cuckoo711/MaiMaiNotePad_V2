@@ -14,6 +14,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from openai import OpenAI
 
+from mainotebook.utils.json_helper import extract_json
+
 logger = logging.getLogger(__name__)
 
 
@@ -272,20 +274,29 @@ class ModerationService:
 
         "knowledge": """
 特定审核规则（知识库）：
-- 知识库内容通常为教育性、参考性资料，应更加宽容
-- 允许包含学术性讨论、历史事件描述、科学知识等
-- 重点关注是否有恶意篡改知识、传播虚假信息的意图
-- 对于引用性内容（如百科、教材摘录），即使涉及敏感话题也应宽容
-- 不允许以知识库为名传播违规内容""",
+- 知识库是教育性、参考性资料，允许包含各类内容的客观描述和解释
+- 允许包含色情、暴力、政治等敏感话题的学术性讨论、历史事件描述、科学知识
+- 允许引用、解释、分析这些内容，只要目的是教育、科普、学术研究
+- 重点审核是否有原则性错误的解释，如：
+  - 美化、鼓吹违法犯罪行为
+  - 传播明显错误的价值观（如种族歧视、性别歧视）
+  - 篡改历史事实、传播阴谋论
+  - 教唆他人实施违法行为的具体方法
+- 对于中性的知识性内容（如医学解剖、历史战争、法律条文），即使涉及敏感话题也应宽容
+- 只有当内容明确带有恶意引导、价值观扭曲时才标记为违规""",
 
         "persona": """
 特定审核规则（人设卡）：
-- 人设卡描述虚构角色的性格、背景、对话风格
-- 允许角色设定中包含复杂的性格特征和背景故事
-- 重点关注是否有引导 AI 生成违规内容的意图
-- 不允许设定明确违规的角色行为（如色情角色、暴力角色）
-- 对于文学性、创作性的角色描述应更加宽容
-- 角色的对话示例需要审核是否包含违规内容""",
+- 人设卡描述虚构角色的性格、背景、对话风格，允许包含复杂的角色设定
+- 允许角色背景中包含敏感话题（如犯罪经历、暴力遭遇、政治立场）作为角色塑造
+- 允许角色对话示例中包含粗俗语言、争议性观点，只要是角色性格的合理表现
+- 重点审核是否有教唆他人进行违法犯罪的设定，如：
+  - 角色设定为引导用户实施犯罪（如"教你制作炸弹的专家"）
+  - 角色对话示例中明确鼓励用户违法（如"我会帮你策划抢劫"）
+  - 角色价值观设定为反社会、反人类（如"以杀人为乐的变态"）
+  - 角色设定为传播极端思想、煽动仇恨
+- 对于文学性、戏剧性的角色描写（如反派角色、悲剧人物），即使包含负面内容也应宽容
+- 只有当角色设定明确意图引导 AI 生成违法、有害内容时才标记为违规""",
     }
 
     def __init__(
@@ -339,7 +350,7 @@ class ModerationService:
         text: str,
         text_type: str = "comment",
         temperature: float = 0.1,
-        max_tokens: int = 500,
+        max_tokens: int = 2048,
         source: Optional[str] = None,
         content_id: Optional[str] = None,
         user=None,
@@ -376,7 +387,7 @@ class ModerationService:
         system_prompt = self._get_system_prompt(text_type)
 
         # 最多尝试所有模型各一次
-        max_attempts = self.model_pool.model_count
+        max_attempts = self.model_pool.model_count * 3
         last_error = None
 
         for attempt in range(max_attempts):
@@ -387,7 +398,7 @@ class ModerationService:
             # 如果模型在冷却中且这是最后的选择，短暂等待
             if not self.model_pool.is_available(model_name):
                 logger.info("等待模型 %s 冷却结束...", model_name)
-                time.sleep(2)
+                time.sleep(5)
 
             start_time = time.monotonic()
             try:
@@ -413,7 +424,7 @@ class ModerationService:
                 logger.debug("模型 %s 原始输出: %s", model_name, output)
 
                 # 解析 JSON 结果
-                result = json.loads(output)
+                result = extract_json(output)
 
                 if not self._validate_result(result):
                     logger.error("模型 %s 输出格式不符合要求: %s", model_name, result)
@@ -445,30 +456,17 @@ class ModerationService:
                 )
                 return result
 
-            except json.JSONDecodeError as e:
+            except (json.JSONDecodeError, ValueError) as e:
                 latency_ms = int((time.monotonic() - start_time) * 1000)
                 logger.error(
                     "模型 %s JSON 解析失败: %s, 原始输出: %s",
                     model_name, e, output if 'output' in locals() else 'N/A',
                 )
-                result = self._get_default_unknown_result()
-                result['_meta'] = {
-                    'model_name': model_name,
-                    'api_provider': 'siliconflow',
-                    'temperature': temperature,
-                    'prompt_tokens': 0,
-                    'completion_tokens': 0,
-                    'total_tokens': 0,
-                    'latency_ms': latency_ms,
-                    'raw_output': output if 'output' in locals() else None,
-                    'is_success': False,
-                    'error_message': f"JSON 解析失败: {e}",
-                }
-                ModerationService.save_moderation_log(
-                    result=result, source=log_source, text_type=text_type,
-                    input_text=text, content_id=content_id, user=user,
-                )
-                return result
+                # JSON 解析失败不代表模型不可用，不标记限速，但记录错误并继续尝试下一个模型
+                # (或者也可以选择直接返回错误，取决于策略。这里选择尝试下一个模型可能更好，或者直接返回错误)
+                # 为了稳健性，JSON解析失败视为该模型本次调用失败，尝试下一个模型
+                last_error = e
+                continue
 
             except Exception as e:
                 latency_ms = int((time.monotonic() - start_time) * 1000)
@@ -482,7 +480,7 @@ class ModerationService:
                         "模型 %s 触发 429 限速（第 %d/%d 次尝试），切换下一个模型",
                         model_name, attempt + 1, max_attempts,
                     )
-                    # 记录限速日志，is_success=True 表示不计入失败率
+                    # 记录限速日志
                     rate_limit_result = self._get_default_unknown_result()
                     rate_limit_result['_meta'] = {
                         'model_name': model_name,
@@ -504,12 +502,13 @@ class ModerationService:
                     last_error = e
                     continue  # 切换到下一个模型
 
-                # 非 429 错误，直接返回
+                # 非 429 错误（如网络超时、API 500 等），也记录日志并尝试切换下一个模型
                 logger.error(
                     "模型 %s 审核异常: %s", model_name, e, exc_info=True,
                 )
-                result = self._get_default_unknown_result()
-                result['_meta'] = {
+                # 记录异常日志
+                error_result = self._get_default_unknown_result()
+                error_result['_meta'] = {
                     'model_name': model_name,
                     'api_provider': 'siliconflow',
                     'temperature': temperature,
@@ -522,13 +521,14 @@ class ModerationService:
                     'error_message': error_str,
                 }
                 ModerationService.save_moderation_log(
-                    result=result, source=log_source, text_type=text_type,
+                    result=error_result, source=log_source, text_type=text_type,
                     input_text=text, content_id=content_id, user=user,
                 )
-                return result
+                last_error = e
+                continue # 继续尝试下一个模型，而不是直接返回错误
 
-        # 所有模型都被限速，返回默认结果
-        logger.error("所有模型均被限速，无法完成审核: %s", last_error)
+        # 所有模型都尝试失败（被限速或报错）
+        logger.error("所有模型均不可用（限速或异常），最后一次错误: %s", last_error)
         result = self._get_default_unknown_result()
         result['_meta'] = {
             'model_name': 'all_rate_limited',

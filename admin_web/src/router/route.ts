@@ -105,14 +105,14 @@ export const staticRoutes: Array<RouteRecordRaw> = [
 			title: '登录',
 		},
 	},
-	{
-		path: '/register',
-		name: 'register',
-		component: () => import('/@/views/system/register/index.vue'),
-		meta: {
-			title: '注册',
-		},
-	},
+	// {
+	// 	path: '/register',
+	// 	name: 'register',
+	// 	component: () => import('/@/views/system/register/index.vue'),
+	// 	meta: {
+	// 		title: '注册',
+	// 	},
+	// },
 	{
 		path: '/verify-email',
 		name: 'verifyEmail',

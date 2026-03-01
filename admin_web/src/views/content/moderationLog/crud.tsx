@@ -82,6 +82,7 @@ export const createCrudOptions = function ({ crudExpose }: CreateCrudOptionsProp
 						align: 'center',
 					},
 					form: { show: false },
+					viewForm: { show: true },
 				},
 				decision: {
 					title: '审核决策',
@@ -100,6 +101,19 @@ export const createCrudOptions = function ({ crudExpose }: CreateCrudOptionsProp
 						align: 'center',
 					},
 					form: { show: false },
+					viewForm: { show: true },
+				},
+				confidence: {
+					title: '置信度',
+					column: { show: false },
+					form: { show: false },
+					viewForm: { show: true },
+				},
+				violation_types: {
+					title: '违规类型',
+					column: { show: false },
+					form: { show: false },
+					viewForm: { show: true },
 				},
 				input_text: {
 					title: '审核文本',
@@ -116,6 +130,32 @@ export const createCrudOptions = function ({ crudExpose }: CreateCrudOptionsProp
 						formatter: ({ value }: any) => truncateText(value, 60),
 					},
 					form: { show: false },
+					viewForm: {
+						show: true,
+						component: {
+							type: 'textarea',
+							autosize: { minRows: 3, maxRows: 10 },
+							readonly: true,
+						},
+					},
+				},
+				input_text_length: {
+					title: '文本长度',
+					column: { show: false },
+					form: { show: false },
+					viewForm: { show: true },
+				},
+				text_type: {
+					title: '文本类型',
+					column: { show: false },
+					form: { show: false },
+					viewForm: { show: true },
+				},
+				content_id: {
+					title: '关联内容ID',
+					column: { show: false },
+					form: { show: false },
+					viewForm: { show: true },
 				},
 				user_name: {
 					title: '触发用户',
@@ -124,6 +164,7 @@ export const createCrudOptions = function ({ crudExpose }: CreateCrudOptionsProp
 						formatter: ({ value }: any) => value || '-',
 					},
 					form: { show: false },
+					viewForm: { show: true },
 				},
 				model_name: {
 					title: '模型',
@@ -133,6 +174,31 @@ export const createCrudOptions = function ({ crudExpose }: CreateCrudOptionsProp
 						showOverflowTooltip: true,
 					},
 					form: { show: false },
+					viewForm: { show: true },
+				},
+				api_provider: {
+					title: 'API 提供商',
+					column: { show: false },
+					form: { show: false },
+					viewForm: { show: true },
+				},
+				temperature: {
+					title: '温度参数',
+					column: { show: false },
+					form: { show: false },
+					viewForm: { show: true },
+				},
+				prompt_tokens: {
+					title: '提示词 Token',
+					column: { show: false },
+					form: { show: false },
+					viewForm: { show: true },
+				},
+				completion_tokens: {
+					title: '生成 Token',
+					column: { show: false },
+					form: { show: false },
+					viewForm: { show: true },
 				},
 				total_tokens: {
 					title: 'Token 消耗',
@@ -142,6 +208,7 @@ export const createCrudOptions = function ({ crudExpose }: CreateCrudOptionsProp
 						formatter: ({ value }: any) => value ?? 0,
 					},
 					form: { show: false },
+					viewForm: { show: true },
 				},
 				latency_ms: {
 					title: '耗时(ms)',
@@ -151,6 +218,7 @@ export const createCrudOptions = function ({ crudExpose }: CreateCrudOptionsProp
 						formatter: ({ value }: any) => value ?? 0,
 					},
 					form: { show: false },
+					viewForm: { show: true },
 				},
 				is_success: {
 					title: '调用状态',
@@ -167,6 +235,33 @@ export const createCrudOptions = function ({ crudExpose }: CreateCrudOptionsProp
 						align: 'center',
 					},
 					form: { show: false },
+					viewForm: { show: true },
+				},
+				raw_output: {
+					title: '模型原始输出',
+					column: { show: false },
+					form: { show: false },
+					viewForm: {
+						show: true,
+						component: {
+							type: 'textarea',
+							autosize: { minRows: 2, maxRows: 8 },
+							readonly: true,
+						},
+					},
+				},
+				error_message: {
+					title: '错误信息',
+					column: { show: false },
+					form: { show: false },
+					viewForm: {
+						show: true,
+						component: {
+							type: 'textarea',
+							autosize: { minRows: 2, maxRows: 6 },
+							readonly: true,
+						},
+					},
 				},
 				...commonCrudConfig({
 					create_datetime: {

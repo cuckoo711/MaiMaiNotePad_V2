@@ -100,64 +100,8 @@
 					<span v-else style="color: #c0c4cc; font-size: 12px">未审核</span>
 				</template>
 
-				<!-- 自定义行操作 -->
-				<template #row-handle="{ row }">
-					<el-button
-						v-if="auth('review:Approve')"
-						type="text"
-						size="small"
-						style="color: #67c23a"
-						@click="handleApprove(row)"
-					>
-						通过
-					</el-button>
-					<el-button
-						v-if="auth('review:Reject')"
-						type="text"
-						size="small"
-						style="color: #f56c6c"
-						@click="handleReject(row)"
-					>
-						拒绝
-					</el-button>
-					<el-button
-						v-if="auth('review:Return')"
-						type="text"
-						size="small"
-						style="color: #e6a23c"
-						@click="handleReturn(row)"
-					>
-						退回
-					</el-button>
-					<el-button
-						type="text"
-						size="small"
-						@click="handleViewDetail(row)"
-					>
-						详情
-					</el-button>
-					<!-- AI 审核按钮：仅对待审核状态的内容显示 -->
-					<el-button
-						v-if="auth('review:AIReview')"
-						type="text"
-						size="small"
-						style="color: #409eff"
-						:loading="aiReviewRowLoading[row.id]"
-						:disabled="aiReviewRowLoading[row.id]"
-						@click="handleAIReview(row)"
-					>
-						AI 审核
-					</el-button>
-					<!-- 查看 AI 审核报告 -->
-					<el-button
-						type="text"
-						size="small"
-						style="color: #909399"
-						@click="handleViewReport(row)"
-					>
-						查看报告
-					</el-button>
-				</template>
+				<!-- 自定义行操作 - 已移动到 crud.tsx 配置中 -->
+				<!-- <template #row-handle="{ row }"> ... </template> -->
 			</fs-crud>
 		</el-card>
 
@@ -424,11 +368,17 @@ import dayjs from 'dayjs';
 import { formatSelectionText } from '/@/composables/content/useBatchOperation';
 
 // ==================== CRUD 初始化 ====================
+// 注意：crudRef/crudBinding 必须先定义，但在 setup 中使用 createCrudOptions 时需要传入 context (即 handlers)
+// 而 handlers 定义在后，所以需要分步处理：
+// 1. 定义 ref
 const crudRef = ref();
 const crudBinding = ref();
 const { crudExpose } = useExpose({ crudRef, crudBinding });
-const { crudOptions } = createCrudOptions({ crudExpose });
-const { resetCrudOptions } = useCrud({ crudExpose, crudOptions });
+
+// 2. 预先定义 resetCrudOptions，稍后初始化
+let resetCrudOptions: any;
+
+// ... handlers 定义 ...
 
 // ==================== 统计数据 ====================
 const stats = reactive<api.ReviewStats>({
@@ -754,7 +704,7 @@ const handleBatchReject = async () => {
 					return true;
 				},
 			}
-		);
+		) as any;
 		reason = value;
 	} catch {
 		return;
@@ -774,20 +724,24 @@ const handleBatchReject = async () => {
 };
 
 // ==================== 批量结果展示 ====================
-const showBatchResult = (result: api.BatchOperationResponse, operationName: string) => {
-	if (result.fail_count === 0) {
-		ElMessage.success(`${operationName}完成：${result.success_count} 条记录操作成功`);
-	} else if (result.success_count === 0) {
-		ElMessage.error(`${operationName}失败：${result.fail_count} 条记录操作失败`);
+const showBatchResult = (result: any, operationName: string) => {
+	const failCount = result.fail_count || 0;
+	const successCount = result.success_count || 0;
+	const failures = result.failures || [];
+
+	if (failCount === 0) {
+		ElMessage.success(`${operationName}完成：${successCount} 条记录操作成功`);
+	} else if (successCount === 0) {
+		ElMessage.error(`${operationName}失败：${failCount} 条记录操作失败`);
 	} else {
 		ElMessage.warning(
-			`${operationName}完成：${result.success_count} 条成功，${result.fail_count} 条失败`
+			`${operationName}完成：${successCount} 条成功，${failCount} 条失败`
 		);
 	}
-	// 显示失败详情
-	if (result.failures && result.failures.length > 0) {
-		const failDetails = result.failures
-			.map((f) => `ID: ${f.id}，原因: ${f.reason}`)
+
+	if (failures.length > 0) {
+		const failDetails = failures
+			.map((f: any) => `ID: ${f.id}，原因: ${f.reason}`)
 			.join('\n');
 		ElMessageBox.alert(`失败记录详情：\n${failDetails}`, '操作结果详情', {
 			type: 'warning',
@@ -795,6 +749,26 @@ const showBatchResult = (result: api.BatchOperationResponse, operationName: stri
 		});
 	}
 };
+
+// ==================== CRUD 初始化 ====================
+// 将 createCrudOptions 移动到所有 handler 定义之后，避免变量提升问题
+// const crudRef = ref();
+// const crudBinding = ref();
+// const { crudExpose } = useExpose({ crudRef, crudBinding });
+const { crudOptions } = createCrudOptions({
+	crudExpose,
+	context: {
+		handleApprove,
+		handleReject,
+		handleReturn,
+		handleViewDetail,
+		handleAIReview,
+		handleViewReport,
+		aiReviewRowLoading,
+	},
+});
+const { resetCrudOptions: reset } = useCrud({ crudExpose, crudOptions });
+resetCrudOptions = reset;
 
 // ==================== 生命周期 ====================
 onMounted(() => {

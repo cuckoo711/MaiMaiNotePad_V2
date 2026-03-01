@@ -1,0 +1,114 @@
+[
+    {
+        "model": "content.AIModel",
+        "fields": {
+            "name": "THUDM/glm-4-9b-chat",
+            "provider": "siliconflow",
+            "parameter_size": 9.0,
+            "max_context_length": 131072,
+            "priority": 0,
+            "is_enabled": true,
+            "rpm_limit": 1000,
+            "tpm_limit": 50000,
+            "cooldown_seconds": 65
+        }
+    },
+    {
+        "model": "content.AIModel",
+        "fields": {
+            "name": "THUDM/GLM-Z1-9B-0414",
+            "provider": "siliconflow",
+            "parameter_size": 9.0,
+            "max_context_length": 131072,
+            "priority": 1,
+            "is_enabled": true,
+            "rpm_limit": 1000,
+            "tpm_limit": 50000,
+            "cooldown_seconds": 65
+        }
+    },
+    {
+        "model": "content.AIModel",
+        "fields": {
+            "name": "THUDM/GLM-4.1V-9B-Thinking",
+            "provider": "siliconflow",
+            "parameter_size": 9.0,
+            "max_context_length": 65536,
+            "priority": 2,
+            "is_enabled": true,
+            "rpm_limit": 1000,
+            "tpm_limit": 50000,
+            "cooldown_seconds": 65
+        }
+    },
+    {
+        "model": "content.AIModel",
+        "fields": {
+            "name": "THUDM/GLM-4-9B-0414",
+            "provider": "siliconflow",
+            "parameter_size": 9.0,
+            "max_context_length": 32768,
+            "priority": 3,
+            "is_enabled": true,
+            "rpm_limit": 1000,
+            "tpm_limit": 50000,
+            "cooldown_seconds": 65
+        }
+    },
+    {
+        "model": "content.AIModel",
+        "fields": {
+            "name": "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B",
+            "provider": "siliconflow",
+            "parameter_size": 8.0,
+            "max_context_length": 131072,
+            "priority": 4,
+            "is_enabled": true,
+            "rpm_limit": 1000,
+            "tpm_limit": 50000,
+            "cooldown_seconds": 65
+        }
+    },
+    {
+        "model": "content.AIModel",
+        "fields": {
+            "name": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+            "provider": "siliconflow",
+            "parameter_size": 7.0,
+            "max_context_length": 131072,
+            "priority": 5,
+            "is_enabled": true,
+            "rpm_limit": 1000,
+            "tpm_limit": 50000,
+            "cooldown_seconds": 65
+        }
+    },
+    {
+        "model": "content.AIModel",
+        "fields": {
+            "name": "Qwen/Qwen2.5-Coder-7B-Instruct",
+            "provider": "siliconflow",
+            "parameter_size": 7.0,
+            "max_context_length": 32768,
+            "priority": 6,
+            "is_enabled": true,
+            "rpm_limit": 1000,
+            "tpm_limit": 50000,
+            "cooldown_seconds": 65
+        }
+    },
+    {
+        "model": "content.AIModel",
+        "fields": {
+            "name": "Qwen/Qwen2.5-7B-Instruct",
+            "provider": "siliconflow",
+            "parameter_size": 7.0,
+            "max_context_length": 32768,
+            "priority": 7,
+            "is_enabled": true,
+            "rpm_limit": 1000,
+            "tpm_limit": 50000,
+            "cooldown_seconds": 65
+        }
+    }
+]

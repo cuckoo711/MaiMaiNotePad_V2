@@ -58,9 +58,5 @@
     {"role__key": "user", "menu__web_path": "/content", "menu__component_name": ""},
     {"role__key": "user", "menu__web_path": "/content/knowledge-base", "menu__component_name": "contentKnowledgeBase"},
     {"role__key": "user", "menu__web_path": "/content/persona-card", "menu__component_name": "contentPersonaCard"},
-    {"role__key": "user", "menu__web_path": "/content/comment", "menu__component_name": "contentComment"},
-
-    {"role__key": "guest", "menu__web_path": "/content", "menu__component_name": ""},
-    {"role__key": "guest", "menu__web_path": "/content/knowledge-base", "menu__component_name": "contentKnowledgeBase"},
-    {"role__key": "guest", "menu__web_path": "/content/persona-card", "menu__component_name": "contentPersonaCard"}
+    {"role__key": "user", "menu__web_path": "/content/comment", "menu__component_name": "contentComment"}
 ]

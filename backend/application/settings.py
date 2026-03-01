@@ -28,7 +28,7 @@ from conf.env import *
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "LWU{@>sbp$Yz9y/+%<%F*[0~?b@G4(^@a{(!?}E,{Z%0`K!Id,"
+SECRET_KEY = "e5&h9%GS]}p!8)TPi?jo%_]=|0ZThWb*qIo>g/*,pe/1=AhzhM"
 # 初始化 plugins 插件路径到环境变量中
 PLUGINS_PATH = os.path.join(BASE_DIR, "plugins")
 if os.path.isdir(PLUGINS_PATH):

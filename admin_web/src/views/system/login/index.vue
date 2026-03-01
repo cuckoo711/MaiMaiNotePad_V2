@@ -48,14 +48,14 @@
             <OAuth2 />
 						
 						<!-- 登录/注册切换链接 -->
-						<div class="login-register-link" v-if="userInfos.pwd_change_count!==0">
-							<a v-if="!state.showRegister" @click="state.showRegister = true; state.tabsActiveName = 'register'">
-								没有账号？立即注册
-							</a>
-							<a v-else @click="state.showRegister = false; state.tabsActiveName = 'account'">
-								已有账号？去登录
-							</a>
-						</div>
+<!--						<div class="login-register-link" v-if="userInfos.pwd_change_count!==0">-->
+<!--							<a v-if="!state.showRegister" @click="state.showRegister = true; state.tabsActiveName = 'register'">-->
+<!--								没有账号？立即注册-->
+<!--							</a>-->
+<!--							<a v-else @click="state.showRegister = false; state.tabsActiveName = 'account'">-->
+<!--								已有账号？去登录-->
+<!--							</a>-->
+<!--						</div>-->
 
             <!--						<Scan v-if="state.isScan" />-->
 <!--						<div class="login-content-main-sacn" @click="state.isScan = !state.isScan">-->

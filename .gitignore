@@ -61,6 +61,7 @@ backend/conf/*
 *.sqlite3
 *.db
 db.sqlite3
+backend/sqls/
 
 # ==================== 媒体文件 ====================
 backend/media/

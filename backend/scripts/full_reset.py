@@ -49,6 +49,10 @@ MEDIA_DIR = os.path.join(BASE_DIR, "media")
 LOGS_DIR = os.path.join(BASE_DIR, "logs")
 SETTINGS_FILE = os.path.join(BASE_DIR, "application", "settings.py")
 
+# 将 BASE_DIR 添加到 Python 路径，确保可以导入 application 模块
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
 # 迁移文件排除目录
 MIGRATION_EXCLUDE_DIRS = {"venv", ".venv", "node_modules", "__pycache__"}
 
@@ -307,12 +311,12 @@ def run_migrations() -> bool:
     try:
         os.environ.setdefault("DJANGO_SETTINGS_MODULE", "application.settings")
 
-        ret = os.system(f'cd "{BASE_DIR}" && python manage.py makemigrations')
+        ret = os.system(f'cd "{BASE_DIR}" && "{sys.executable}" manage.py makemigrations')
         if ret != 0:
             print("  ❌ makemigrations 失败")
             return False
 
-        ret = os.system(f'cd "{BASE_DIR}" && python manage.py migrate')
+        ret = os.system(f'cd "{BASE_DIR}" && "{sys.executable}" manage.py migrate')
         if ret != 0:
             print("  ❌ migrate 失败")
             return False

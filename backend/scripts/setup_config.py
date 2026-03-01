@@ -90,6 +90,62 @@ def generate_password(length: int = 32) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
+# ==================== 配置读取 ====================
+
+def read_existing_config() -> dict:
+    """读取现有配置文件中的配置"""
+    config = {}
+    if not ENV_FILE.exists():
+        return config
+
+    try:
+        # 简单解析 env.py 文件
+        # 注意：这里不使用 import，而是直接解析文本，避免执行代码
+        content = ENV_FILE.read_text(encoding="utf-8")
+        for line in content.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            
+            if "=" in line:
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                
+                if key == "EMAIL_HOST":
+                    config["email_host"] = value
+                elif key == "EMAIL_PORT":
+                    config["email_port"] = value
+                elif key == "EMAIL_USE_TLS":
+                    config["email_use_tls"] = value
+                elif key == "EMAIL_HOST_USER":
+                    config["email_user"] = value
+                elif key == "EMAIL_HOST_PASSWORD":
+                    config["email_password"] = value
+                elif key == "DEFAULT_FROM_EMAIL":
+                    config["email_from"] = value
+                elif key == "SILICONFLOW_API_KEY":
+                    # 处理 os.getenv 形式
+                    if "os.getenv" in value:
+                        # 提取默认值: os.getenv("KEY", "VALUE")
+                        parts = value.split(",")
+                        if len(parts) > 1:
+                            config["ai_api_key"] = parts[1].strip().strip(")").strip('"').strip("'")
+                    else:
+                        config["ai_api_key"] = value
+                elif key == "FRONTEND_URL":
+                    config["frontend_url"] = value
+                elif key == "DEBUG":
+                    config["debug"] = value
+                elif key == "DATABASE_PASSWORD":
+                    config["pg_password"] = value
+                elif key == "REDIS_PASSWORD":
+                    config["redis_password"] = value
+    except Exception as e:
+        warn(f"读取现有配置失败: {e}")
+    
+    return config
+
 # ==================== 交互式输入 ====================
 
 def prompt_input(label: str, default: str = "") -> str:
@@ -127,32 +183,60 @@ def confirm(msg: str) -> bool:
             return False
 
 
-def interactive_config() -> dict:
+def interactive_config(existing_config: dict = None) -> dict:
     """交互式收集配置信息
 
     用户可以无限次重新输入，直到确认为止。
 
+    Args:
+        existing_config: 现有配置字典，用于默认值
+
     Returns:
         dict: 配置字典
     """
+    if existing_config is None:
+        existing_config = {}
+
     while True:
         print(f"\n{Colors.CYAN}--- 邮件 SMTP 配置 ---{Colors.NC}")
         print("  （用于发送注册验证码邮件，可留空稍后在 conf/env.py 中配置）")
-        email_host = prompt_input("SMTP 服务器地址", "smtp.qq.com")
-        email_port = prompt_input("SMTP 端口", "587")
-        email_use_tls = prompt_input("启用 TLS (true/false)", "true")
-        email_user = prompt_input("发件人邮箱")
-        email_password = prompt_input("邮箱密码/授权码")
-        email_from = prompt_input("发件人显示地址", email_user)
+        
+        default_host = existing_config.get("email_host", "smtp.qq.com")
+        email_host = prompt_input("SMTP 服务器地址", default_host)
+        
+        default_port = existing_config.get("email_port", "587")
+        email_port = prompt_input("SMTP 端口", default_port)
+        
+        default_tls = existing_config.get("email_use_tls", "true")
+        email_use_tls = prompt_input("启用 TLS (true/false)", str(default_tls).lower())
+        
+        default_user = existing_config.get("email_user", "")
+        email_user = prompt_input("发件人邮箱", default_user)
+        
+        default_pass = existing_config.get("email_password", "")
+        # 密码特殊处理：如果不输入且有默认值，则保留默认值
+        pass_prompt = f"邮箱密码/授权码 [{'******' if default_pass else ''}]"
+        email_password = input(f"  {pass_prompt}: ").strip()
+        if not email_password and default_pass:
+            email_password = default_pass
+            
+        default_from = existing_config.get("email_from", email_user)
+        email_from = prompt_input("发件人显示地址", default_from)
 
         print(f"\n{Colors.CYAN}--- AI 内容审核配置 ---{Colors.NC}")
         print("  （硅基流动 API Key，用于 AI 自动审核，可留空跳过）")
         print("  （获取地址: https://cloud.siliconflow.cn/）")
-        ai_api_key = prompt_input("硅基流动 API Key", "")
+        
+        default_ai_key = existing_config.get("ai_api_key", "")
+        ai_api_key = prompt_input("硅基流动 API Key", default_ai_key)
 
         print(f"\n{Colors.CYAN}--- 其他配置 ---{Colors.NC}")
-        frontend_url = prompt_input("前端地址", "http://localhost:5173")
-        debug_mode = prompt_input("调试模式 (true/false)", "true")
+        
+        default_frontend = existing_config.get("frontend_url", "http://localhost:5173")
+        frontend_url = prompt_input("前端地址", default_frontend)
+        
+        default_debug = existing_config.get("debug", "true")
+        debug_mode = prompt_input("调试模式 (true/false)", str(default_debug).lower())
 
         # 展示配置摘要
         print(f"\n{Colors.YELLOW}--- 配置确认 ---{Colors.NC}")
@@ -169,13 +253,13 @@ def interactive_config() -> dict:
             return {
                 "email_host": email_host,
                 "email_port": email_port,
-                "email_use_tls": email_use_tls.lower() == "true",
+                "email_use_tls": str(email_use_tls).lower() == "true",
                 "email_user": email_user,
                 "email_password": email_password,
                 "email_from": email_from,
                 "ai_api_key": ai_api_key,
                 "frontend_url": frontend_url,
-                "debug": debug_mode.lower() == "true",
+                "debug": str(debug_mode).lower() == "true",
             }
         print("\n  好的，请重新输入配置。\n")
 
@@ -283,18 +367,24 @@ def main() -> None:
         return
 
     # 确定密码
-    pg_password = args.pg_pass or generate_password()
-    redis_password = args.redis_pass or generate_password()
+    # 如果传入了密码，使用传入的；否则先尝试从现有配置读取；最后再生成随机的
+    existing_config = read_existing_config()
+    
+    pg_password = args.pg_pass or existing_config.get("pg_password") or generate_password()
+    redis_password = args.redis_pass or existing_config.get("redis_password") or generate_password()
 
     print(f"\n{Colors.CYAN}{'=' * 50}")
     print("  麦麦笔记本 · 配置生成向导")
     print(f"{'=' * 50}{Colors.NC}")
+    
+    if existing_config:
+        info("检测到现有配置文件，已加载默认值")
 
-    info(f"PostgreSQL 密码: {pg_password[:8]}...（已自动生成）")
-    info(f"Redis 密码:      {redis_password[:8]}...（已自动生成）")
+    info(f"PostgreSQL 密码: {pg_password[:8]}...（已自动生成或保留）")
+    info(f"Redis 密码:      {redis_password[:8]}...（已自动生成或保留）")
 
     # 交互式收集其他配置
-    config = interactive_config()
+    config = interactive_config(existing_config)
 
     # 写入配置文件
     write_env_file(pg_password, redis_password, config)
