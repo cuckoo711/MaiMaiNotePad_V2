@@ -231,6 +231,25 @@ export const createCrudOptions = function ({ crudExpose }: CreateCrudOptionsProp
 					},
 					form: { show: false },
 				},
+				moderation_status: {
+					title: '审核状态',
+					search: {
+						show: true,
+					},
+					type: 'dict-select',
+					dict: dict({
+						data: [
+							{ label: '通过', value: 'approved' },
+							{ label: '拒绝', value: 'rejected' },
+							{ label: '待审核', value: 'pending' },
+							{ label: '未审核', value: 'none' },
+						],
+					}),
+					column: {
+						minWidth: 100,
+					},
+					form: { show: false },
+				},
 				...commonCrudConfig({
 					create_datetime: {
 						table: true,

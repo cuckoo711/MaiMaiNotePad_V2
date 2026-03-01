@@ -157,11 +157,10 @@ class KnowledgeBaseCreateSerializer(CustomModelSerializer):
         return value
     
     def create(self, validated_data):
-        """创建知识库，自动设置上传者和审核状态
+        """创建知识库，自动设置上传者
         
-        根据 is_public 决定审核状态：
-        - is_public=True: 进入审核流程（is_pending=True）
-        - is_public=False 或未传: 私有（is_pending=False）
+        新创建的知识库统一为私有未审核状态。
+        如果用户选择了公开，由 perform_create 调用 submit_for_review 统一走审核流程。
         
         Args:
             validated_data: 验证后的数据
@@ -173,10 +172,10 @@ class KnowledgeBaseCreateSerializer(CustomModelSerializer):
         if request and request.user.is_authenticated:
             validated_data['uploader'] = request.user
         
-        # 私有内容不需要审核
-        is_public = validated_data.get('is_public', False)
-        if not is_public:
-            validated_data['is_pending'] = False
+        # 新创建的知识库统一为非待审核状态，审核由 submit_for_review 统一触发
+        validated_data['is_pending'] = False
+        # 暂存用户选择的公开意图，创建时先设为私有
+        validated_data['is_public'] = False
         
         return super().create(validated_data)
 

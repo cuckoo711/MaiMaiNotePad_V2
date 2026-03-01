@@ -295,6 +295,7 @@ import {
   getKnowledgeBaseDetail,
   updateKnowledgeBase,
   deleteKnowledgeBase,
+  submitKnowledgeBase,
   addFilesToKnowledgeBase,
   deleteFileFromKnowledgeBase
 } from '@/api/knowledge'
@@ -486,14 +487,12 @@ const requestPublish = async (kb) => {
     return
   }
   try {
-    const response = await updateKnowledgeBase(kb.id, {
-      is_pending: true
-    })
-    if (response.success) {
+    const response = await submitKnowledgeBase(kb.id)
+    if (response && response.success) {
       showSuccessNotification(response.message || '已提交公开申请，等待审核')
       fetchKnowledge()
     } else {
-      showErrorNotification(response.message || '提交公开申请失败')
+      showErrorNotification((response && response.message) || '提交公开申请失败')
     }
   } catch (error) {
     showApiErrorNotification(error, '提交公开申请失败')

@@ -14,4 +14,5 @@ class ContentConfig(AppConfig):
     
     def ready(self):
         """应用就绪时执行的初始化操作"""
-        pass
+        # 注册 AIModel 的 post_save/post_delete signal，自动重算优先级
+        import mainotebook.content.views.ai_model  # noqa: F401

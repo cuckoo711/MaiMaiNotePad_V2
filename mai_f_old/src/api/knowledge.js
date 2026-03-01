@@ -65,6 +65,11 @@ export const deleteKnowledgeBase = (kb_id) => {
   return apiClient.delete(`/content/knowledge/${kb_id}/`)
 }
 
+// 提交知识库审核（申请公开到知识库广场）
+export const submitKnowledgeBase = (kb_id) => {
+  return apiClient.post(`/content/knowledge/${kb_id}/submit/`)
+}
+
 // 为知识库追加文件
 export const addFilesToKnowledgeBase = (kb_id, files) => {
   const formData = new FormData()

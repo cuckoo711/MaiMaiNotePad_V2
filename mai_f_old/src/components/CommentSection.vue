@@ -359,7 +359,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { ElMessageBox } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
@@ -651,12 +651,15 @@ const handleSubmit = async () => {
     const response = error && error.response
     const data = response && response.data
     const rawMessage =
+      (data && data.msg) ||
       (data && data.message) ||
       (data && data.error && data.error.message) ||
       ''
-    if (rawMessage && rawMessage.includes('麦麦')) {
-      await ElMessageBox.alert(rawMessage, '通知', {
-        confirmButtonText: '知道了'
+    // AI 审核拒绝或特殊提示，使用弹窗展示
+    if (rawMessage && (rawMessage.includes('内容审核') || rawMessage.includes('麦麦'))) {
+      await ElMessageBox.alert(rawMessage, '提示', {
+        confirmButtonText: '知道了',
+        type: 'warning'
       })
     } else {
       showApiErrorNotification(error, '发表评论失败')
@@ -720,12 +723,15 @@ const handleSubmitReply = async () => {
     const response = error && error.response
     const data = response && response.data
     const rawMessage =
+      (data && data.msg) ||
       (data && data.message) ||
       (data && data.error && data.error.message) ||
       ''
-    if (rawMessage && rawMessage.includes('麦麦')) {
-      await ElMessageBox.alert(rawMessage, '通知', {
-        confirmButtonText: '知道了'
+    // AI 审核拒绝或特殊提示，使用弹窗展示
+    if (rawMessage && (rawMessage.includes('内容审核') || rawMessage.includes('麦麦'))) {
+      await ElMessageBox.alert(rawMessage, '提示', {
+        confirmButtonText: '知道了',
+        type: 'warning'
       })
     } else {
       showApiErrorNotification(error, '发送回复失败')
@@ -815,6 +821,22 @@ const handleReact = async (item, action) => {
     reactingIds.value.delete(item.id)
   }
 }
+
+// 监听快捷回复触发的评论更新事件，自动刷新评论列表
+const onCommentUpdated = (event) => {
+  const detail = event.detail || {}
+  if (detail.targetId === props.targetId && detail.targetType === props.targetType) {
+    fetchComments()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('comment-updated', onCommentUpdated)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('comment-updated', onCommentUpdated)
+})
 
 watch(
   () => [props.targetType, props.targetId],

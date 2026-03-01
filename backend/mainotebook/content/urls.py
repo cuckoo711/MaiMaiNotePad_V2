@@ -23,7 +23,9 @@ from mainotebook.content.views import (
     ReviewViewSet,
     StarViewSet,
     UserExtensionViewSet,
-    AdminExtensionViewSet
+    AdminExtensionViewSet,
+    ModerationLogViewSet,
+    AIModelViewSet,
 )
 from mainotebook.content.views.moderation import check_content, health_check
 
@@ -112,6 +114,24 @@ router.register(r'users', UserExtensionViewSet, basename='user-extension')
 # - PUT /api/content/admin/users/{id}/role/ - 修改用户角色
 # - GET /api/content/admin/users/{id}/status/ - 获取用户状态
 router.register(r'admin/users', AdminExtensionViewSet, basename='admin-extension')
+
+# 注册 AI 审核日志视图集
+# Django 路径: /api/content/moderation-logs/*
+# 提供的端点：
+# - GET /api/content/moderation-logs/ - 获取审核日志列表
+# - GET /api/content/moderation-logs/{id}/ - 获取审核日志详情
+# - GET /api/content/moderation-logs/stats/ - 获取审核统计数据
+router.register(r'moderation-logs', ModerationLogViewSet, basename='moderation-log')
+
+# 注册 AI 审核模型管理视图集
+# Django 路径: /api/content/ai-models/*
+# 提供的端点：
+# - GET /api/content/ai-models/ - 获取模型列表
+# - POST /api/content/ai-models/ - 新增模型
+# - GET /api/content/ai-models/{id}/ - 获取模型详情
+# - PUT /api/content/ai-models/{id}/ - 更新模型
+# - DELETE /api/content/ai-models/{id}/ - 删除模型
+router.register(r'ai-models', AIModelViewSet, basename='ai-model')
 
 # URL 模式
 # 注意：路由器会自动生成标准的 REST 端点

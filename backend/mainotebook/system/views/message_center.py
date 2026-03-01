@@ -222,6 +222,16 @@ class MessageCenterViewSet(CustomModelViewSet):
     # 前台用户可能没有部门，禁用后台数据级权限过滤，避免返回 400
     extra_filter_class = []
 
+    def get_permissions(self):
+        """根据 action 动态返回权限类
+        
+        retrieve 操作（标记已读）只需要登录即可，普通用户也能使用。
+        其他操作走默认的 dvadmin 按钮权限检查。
+        """
+        if self.action == 'retrieve':
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
     def get_queryset(self):
         """管理端 list 只返回当前用户创建的消息"""
         if self.action == 'list':
@@ -270,15 +280,28 @@ class MessageCenterViewSet(CustomModelViewSet):
     @action(methods=['GET'], detail=False, permission_classes=[IsAuthenticated])
     def get_self_receive(self, request):
         """获取当前用户接收到的消息
-        
+
         查询逻辑（动态匹配，不依赖中间表）：
         - target_type=0: 通过中间表关联的指定用户消息
         - target_type=1: 当前用户的角色匹配 target_role
         - target_type=2: 当前用户的部门匹配 target_dept
         - target_type=3: 系统通知，所有用户可见
+
+        支持按 message_type 过滤（可选查询参数）。
         """
         self_user_id = self.request.user.id
         queryset = self._get_user_visible_queryset(self_user_id)
+
+        # 按消息类型过滤（可选，支持逗号分隔的多个值，如 message_type=1,2）
+        message_type = request.query_params.get('message_type')
+        if message_type is not None and message_type != '':
+            try:
+                type_list = [int(t.strip()) for t in message_type.split(',') if t.strip()]
+                if type_list:
+                    queryset = queryset.filter(message_type__in=type_list)
+            except (ValueError, TypeError):
+                pass
+
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = MessageCenterTargetUserListSerializer(page, many=True, request=request)

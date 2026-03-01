@@ -9,27 +9,31 @@ export const useMessageStore = defineStore('messages', {
     loaded: false,
     page: 1,
     pageSize: 20,
+    hasMore: true,
     byType: {
       notification: {
         items: [],
         loading: false,
         loaded: false,
         page: 1,
-        pageSize: 20
+        pageSize: 20,
+        hasMore: true
       },
       like: {
         items: [],
         loading: false,
         loaded: false,
         page: 1,
-        pageSize: 20
+        pageSize: 20,
+        hasMore: true
       },
       comment: {
         items: [],
         loading: false,
         loaded: false,
         page: 1,
-        pageSize: 20
+        pageSize: 20,
+        hasMore: true
       }
     }
   }),
@@ -46,12 +50,18 @@ export const useMessageStore = defineStore('messages', {
       }
       this.loading = true
       try {
+        // 强制刷新时重置分页
+        if (force) {
+          this.page = 1
+          this.hasMore = true
+        }
         const response = await getMessages(this.page, this.pageSize)
         if (response && response.success) {
           const rawData = response.data
-          // 后端分页返回 data 可能是数组或 { data: [...], total: ... }
-          this.items = Array.isArray(rawData) ? rawData : (rawData?.data || [])
+          const newItems = Array.isArray(rawData) ? rawData : (rawData?.data || [])
+          this.items = newItems
           this.loaded = true
+          this.hasMore = newItems.length >= this.pageSize
         } else {
           showErrorNotification((response && response.msg) || '获取消息列表失败')
         }
@@ -62,7 +72,20 @@ export const useMessageStore = defineStore('messages', {
       }
     },
     async refreshMessages() {
+      // 刷新时重置分页状态
+      this.page = 1
+      this.hasMore = true
       await this.fetchMessages(true)
+      // 同时刷新各分类 tab 中已加载过的数据，确保消息列表实时更新
+      const typeKeys = Object.keys(this.byType)
+      const tasks = typeKeys
+        .filter((key) => this.byType[key].loaded)
+        .map((key) => {
+          this.byType[key].page = 1
+          this.byType[key].hasMore = true
+          return this.fetchMessagesByType(key, true)
+        })
+      await Promise.all(tasks)
     },
     async fetchMessagesByType(type, force = false) {
       const key = type || 'notification'
@@ -75,16 +98,65 @@ export const useMessageStore = defineStore('messages', {
       }
       bucket.loading = true
       try {
-        const response = await getMessagesByType(key === 'notification' ? 'direct' : key === 'like' ? 'reaction' : 'comment', bucket.page, bucket.pageSize)
+        // 强制刷新时重置分页
+        if (force) {
+          bucket.page = 1
+          bucket.hasMore = true
+        }
+        // 映射前端 tab 名称到后端 message_type 编号
+        // 0=系统通知, 1=评论, 2=回复, 3=点赞, 4=审核
+        const typeMap = {
+          notification: '0,4', // 系统通知 + 审核通知
+          like: '3',           // 点赞
+          comment: '1,2'       // 评论 + 回复
+        }
+        const messageType = typeMap[key] || '0'
+        const response = await getMessagesByType(messageType, bucket.page, bucket.pageSize)
         if (response && response.success) {
           const rawData = response.data
-          bucket.items = Array.isArray(rawData) ? rawData : (rawData?.data || [])
+          const newItems = Array.isArray(rawData) ? rawData : (rawData?.data || [])
+          bucket.items = newItems
           bucket.loaded = true
+          bucket.hasMore = newItems.length >= bucket.pageSize
         } else {
           showErrorNotification((response && response.msg) || '获取消息列表失败')
         }
       } catch (error) {
         showApiErrorNotification(error, '获取消息列表失败，请检查网络连接')
+      } finally {
+        bucket.loading = false
+      }
+    },
+    async loadMoreByType(type) {
+      /**
+       * 滚动到底部时加载下一页消息
+       */
+      const key = type || 'notification'
+      const bucket = this.byType[key]
+      if (!bucket || bucket.loading || !bucket.hasMore) {
+        return
+      }
+      bucket.loading = true
+      try {
+        const typeMap = {
+          notification: '0,4',
+          like: '3',
+          comment: '1,2'
+        }
+        const messageType = typeMap[key] || '0'
+        const nextPage = bucket.page + 1
+        const response = await getMessagesByType(messageType, nextPage, bucket.pageSize)
+        if (response && response.success) {
+          const rawData = response.data
+          const newItems = Array.isArray(rawData) ? rawData : (rawData?.data || [])
+          if (newItems.length > 0) {
+            bucket.items.push(...newItems)
+            bucket.page = nextPage
+          }
+          bucket.hasMore = newItems.length >= bucket.pageSize
+        }
+      } catch (error) {
+        showApiErrorNotification(error, '加载更多消息失败')
       } finally {
         bucket.loading = false
       }
@@ -103,6 +175,15 @@ export const useMessageStore = defineStore('messages', {
           })
         )
         await Promise.all(tasks)
+        // 同步更新各分类 tab 中对应消息的已读状态
+        const readIds = new Set(unreadMessages.filter((m) => m.is_read).map((m) => m.id))
+        for (const bucket of Object.values(this.byType)) {
+          for (const item of bucket.items) {
+            if (readIds.has(item.id)) {
+              item.is_read = true
+            }
+          }
+        }
       } catch (error) {
         showApiErrorNotification(error, '一键标记已读失败，请检查网络连接')
       }

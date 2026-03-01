@@ -1598,6 +1598,12 @@
                         "method": 0
                     },
                     {
+                        "name": "查看详情",
+                        "value": "comment:View",
+                        "api": "/api/content/comments/{id}/",
+                        "method": 0
+                    },
+                    {
                         "name": "删除",
                         "value": "comment:Delete",
                         "api": "/api/content/comments/{id}/admin_delete/",
@@ -1608,6 +1614,12 @@
                         "value": "comment:Ban",
                         "api": "/api/content/comments/{id}/ban_user/",
                         "method": 1
+                    },
+                    {
+                        "name": "导出",
+                        "value": "comment:Export",
+                        "api": "/api/content/comments/export_data/",
+                        "method": 0
                     }
                 ]
             },
@@ -1654,6 +1666,86 @@
                         "value": "review:Stats",
                         "api": "/api/content/review/stats/",
                         "method": 0
+                    },
+                    {
+                        "name": "AI审核",
+                        "value": "review:AIReview",
+                        "api": "/api/content/review/{id}/ai_review/",
+                        "method": 1
+                    }
+                ]
+            },
+            {
+                "name": "AI审核日志",
+                "icon": "ele-Document",
+                "sort": 5,
+                "is_link": false,
+                "is_catalog": false,
+                "web_path": "/content/moderation-log",
+                "component": "content/moderationLog/index",
+                "component_name": "contentModerationLog",
+                "status": true,
+                "cache": true,
+                "visible": true,
+                "children": [],
+                "menu_button": [
+                    {
+                        "name": "查询",
+                        "value": "moderationLog:List",
+                        "api": "/api/content/moderation-logs/",
+                        "method": 0
+                    },
+                    {
+                        "name": "查看详情",
+                        "value": "moderationLog:View",
+                        "api": "/api/content/moderation-logs/{id}/",
+                        "method": 0
+                    },
+                    {
+                        "name": "统计",
+                        "value": "moderationLog:Stats",
+                        "api": "/api/content/moderation-logs/stats/",
+                        "method": 0
+                    }
+                ]
+            },
+            {
+                "name": "AI模型管理",
+                "icon": "ele-Cpu",
+                "sort": 6,
+                "is_link": false,
+                "is_catalog": false,
+                "web_path": "/content/ai-model",
+                "component": "content/aiModel/index",
+                "component_name": "contentAiModel",
+                "status": true,
+                "cache": true,
+                "visible": true,
+                "children": [],
+                "menu_button": [
+                    {
+                        "name": "查询",
+                        "value": "aiModel:List",
+                        "api": "/api/content/ai-models/",
+                        "method": 0
+                    },
+                    {
+                        "name": "新增",
+                        "value": "aiModel:Create",
+                        "api": "/api/content/ai-models/",
+                        "method": 1
+                    },
+                    {
+                        "name": "编辑",
+                        "value": "aiModel:Update",
+                        "api": "/api/content/ai-models/{id}/",
+                        "method": 2
+                    },
+                    {
+                        "name": "删除",
+                        "value": "aiModel:Delete",
+                        "api": "/api/content/ai-models/{id}/",
+                        "method": 3
                     }
                 ]
             }

@@ -144,14 +144,14 @@
                   </el-button>
                 </div>
               </div>
-              <div class="message-list-body">
+              <div class="message-list-body" ref="messageListBodyRef" @scroll="handleMessageListScroll">
                 <el-tabs v-model="activeMessageTab" class="message-tabs" @tab-change="handleMessageTabChange">
                   <el-tab-pane label="通知" name="notification">
-                    <div v-if="messageLoading" class="message-loading">
+                    <div v-if="notificationMessagesLoading && notificationMessages.length === 0" class="message-loading">
                       加载中...
                     </div>
                     <div
-                      v-for="msg in messages"
+                      v-for="msg in notificationMessages"
                       :key="msg.id"
                       class="message-item"
                       :class="{ 'is-unread': !msg.is_read }"
@@ -168,12 +168,18 @@
                         {{ formatMessageTime(msg.create_datetime) }}
                       </div>
                     </div>
-                    <div v-if="!messageLoading && messages.length === 0" class="message-empty">
+                    <div v-if="notificationMessagesLoading && notificationMessages.length > 0" class="message-load-more">
+                      加载中...
+                    </div>
+                    <div v-if="!notificationMessagesLoading && !notificationHasMore && notificationMessages.length > 0" class="message-no-more">
+                      没有更多了
+                    </div>
+                    <div v-if="!notificationMessagesLoading && notificationMessages.length === 0" class="message-empty">
                       暂无消息
                     </div>
                   </el-tab-pane>
                   <el-tab-pane label="点赞" name="like">
-                    <div v-if="likeMessagesLoading" class="message-loading">
+                    <div v-if="likeMessagesLoading && likeMessages.length === 0" class="message-loading">
                       加载中...
                     </div>
                     <div
@@ -194,12 +200,18 @@
                         {{ formatMessageTime(msg.create_datetime) }}
                       </div>
                     </div>
+                    <div v-if="likeMessagesLoading && likeMessages.length > 0" class="message-load-more">
+                      加载中...
+                    </div>
+                    <div v-if="!likeMessagesLoading && !likeHasMore && likeMessages.length > 0" class="message-no-more">
+                      没有更多了
+                    </div>
                     <div v-if="!likeMessagesLoading && likeMessages.length === 0" class="message-empty">
                       暂无点赞消息
                     </div>
                   </el-tab-pane>
                   <el-tab-pane label="评论" name="comment">
-                    <div v-if="commentMessagesLoading" class="message-loading">
+                    <div v-if="commentMessagesLoading && commentMessages.length === 0" class="message-loading">
                       加载中...
                     </div>
                     <div
@@ -219,6 +231,12 @@
                       <div class="message-meta">
                         {{ formatMessageTime(msg.create_datetime) }}
                       </div>
+                    </div>
+                    <div v-if="commentMessagesLoading && commentMessages.length > 0" class="message-load-more">
+                      加载中...
+                    </div>
+                    <div v-if="!commentMessagesLoading && !commentHasMore && commentMessages.length > 0" class="message-no-more">
+                      没有更多了
                     </div>
                     <div v-if="!commentMessagesLoading && commentMessages.length === 0" class="message-empty">
                       暂无评论消息
@@ -241,6 +259,30 @@
               </div>
               <div class="message-dialog-body">
                 {{ selectedMessage.content }}
+              </div>
+              <!-- 评论/回复类消息的快捷回复区域 -->
+              <div v-if="isCommentMessage" class="message-quick-reply">
+                <div class="quick-reply-label">快捷回复</div>
+                <el-input
+                  v-model="replyContent"
+                  type="textarea"
+                  :rows="2"
+                  :maxlength="500"
+                  show-word-limit
+                  placeholder="输入回复内容..."
+                  :disabled="replySubmitting"
+                />
+                <div class="quick-reply-actions">
+                  <el-button
+                    type="primary"
+                    size="small"
+                    :loading="replySubmitting"
+                    :disabled="!replyContent.trim()"
+                    @click="handleQuickReply"
+                  >
+                    发送回复
+                  </el-button>
+                </div>
               </div>
             </div>
             <template #footer>
@@ -381,12 +423,13 @@ import { storeToRefs } from 'pinia'
 import { useRouter, useRoute } from 'vue-router'
 import { UserFilled, Collection, Fold, Expand, Bell, RefreshRight, Check, StarFilled } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
-import { handleApiError, showApiErrorNotification } from '@/utils/api'
+import { handleApiError, showApiErrorNotification, showSuccessNotification, showErrorNotification } from '@/utils/api'
 import websocket from '@/utils/websocket'
 import { useUserStore } from '@/stores/user'
 import { useMessageStore } from '@/stores/messages'
 import { useConnectionStore } from '@/stores/connection'
 import { getMyDashboardStats, getMyDashboardTrends } from '@/api/stats'
+import { createComment } from '@/api/comments'
 import { apiBase } from '@/api/index'
 
 const router = useRouter()
@@ -395,7 +438,7 @@ const userStore = useUserStore()
 const messageStore = useMessageStore()
 const connectionStore = useConnectionStore()
 const { user, isAdmin } = storeToRefs(userStore)
-const { items: messages, unreadCount, byType, loading: messageLoading } = storeToRefs(messageStore)
+const { items: allMessages, unreadCount, byType, loading: messageLoading } = storeToRefs(messageStore)
 const { isOnline } = storeToRefs(connectionStore)
 let messagePollTimer = null
 const isCollapsed = ref(false)
@@ -411,6 +454,7 @@ const messagePopoverVisible = ref(false)
 const messageDialogVisible = ref(false)
 const selectedMessage = ref(null)
 const activeMessageTab = ref('notification')
+const messageListBodyRef = ref(null)
 const myDataVisible = ref(false)
 const dashboardLoading = ref(false)
 const dashboardStats = ref(null)
@@ -418,15 +462,25 @@ const dashboardTrends = ref(null)
 const trendChartRef = ref(null)
 let trendChartInstance = null
 
+// 快捷回复相关状态
+const replyContent = ref('')
+const replySubmitting = ref(false)
+
 const userAvatar = computed(() => {
   return resolveAvatarUrl(user.value)
+})
+
+// 当前 tab 对应的消息列表
+const activeTabMessages = computed(() => {
+  const tab = activeMessageTab.value
+  return byType.value[tab]?.items || []
 })
 
 const currentMessageIndex = computed(() => {
   if (!selectedMessage.value) {
     return -1
   }
-  return messages.value.findIndex((item) => item.id === selectedMessage.value.id)
+  return activeTabMessages.value.findIndex((item) => item.id === selectedMessage.value.id)
 })
 
 const hasPrevMessage = computed(() => {
@@ -434,13 +488,18 @@ const hasPrevMessage = computed(() => {
 })
 
 const hasNextMessage = computed(() => {
-  return currentMessageIndex.value >= 0 && currentMessageIndex.value < messages.value.length - 1
+  return currentMessageIndex.value >= 0 && currentMessageIndex.value < activeTabMessages.value.length - 1
 })
 
 const likeMessages = computed(() => byType.value.like.items || [])
 const likeMessagesLoading = computed(() => byType.value.like.loading)
 const commentMessages = computed(() => byType.value.comment.items || [])
 const commentMessagesLoading = computed(() => byType.value.comment.loading)
+const notificationMessages = computed(() => byType.value.notification.items || [])
+const notificationMessagesLoading = computed(() => byType.value.notification.loading)
+const notificationHasMore = computed(() => byType.value.notification.hasMore)
+const likeHasMore = computed(() => byType.value.like.hasMore)
+const commentHasMore = computed(() => byType.value.comment.hasMore)
 
 const resolveAvatarUrl = (userData) => {
   if (!userData || !userData.id) {
@@ -521,10 +580,17 @@ const handleMarkAllRead = async () => {
 }
 
 const handleMessageTabChange = async (name) => {
-  if (name === 'notification') {
-    await messageStore.fetchMessages()
-  } else {
-    await messageStore.fetchMessagesByType(name)
+  await messageStore.fetchMessagesByType(name)
+}
+
+// 消息列表滚动到底部时加载下一页
+const handleMessageListScroll = (e) => {
+  const el = e.target
+  if (!el) return
+  // 距离底部 50px 以内触发加载
+  const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50
+  if (nearBottom) {
+    messageStore.loadMoreByType(activeMessageTab.value)
   }
 }
 
@@ -544,21 +610,23 @@ const handleMessageClick = async (msg) => {
   messagePopoverVisible.value = false
   selectedMessage.value = msg
   messageDialogVisible.value = true
+  replyContent.value = ''
 
   await messageStore.markRead(msg)
 }
 
 const showMessageAtIndex = async (index) => {
-  if (index < 0 || index >= messages.value.length) {
+  if (index < 0 || index >= activeTabMessages.value.length) {
     return
   }
-  const msg = messages.value[index]
+  const msg = activeTabMessages.value[index]
   if (!msg) {
     return
   }
   messagePopoverVisible.value = false
   selectedMessage.value = msg
   messageDialogVisible.value = true
+  replyContent.value = ''
 
   await messageStore.markRead(msg)
 }
@@ -577,6 +645,64 @@ const handleShowNextMessage = () => {
   }
   const targetIndex = currentMessageIndex.value + 1
   showMessageAtIndex(targetIndex)
+}
+
+// 判断当前消息是否为评论/回复类型（可快捷回复）
+const isCommentMessage = computed(() => {
+  if (!selectedMessage.value) {
+    return false
+  }
+  const mt = selectedMessage.value.message_type
+  // message_type 1=评论, 2=回复
+  return (mt === 1 || mt === 2) && selectedMessage.value.extra_data && selectedMessage.value.extra_data.comment_id
+})
+
+const handleQuickReply = async () => {
+  if (!replyContent.value.trim() || !selectedMessage.value) {
+    return
+  }
+  const extra = selectedMessage.value.extra_data
+  if (!extra || !extra.comment_id) {
+    return
+  }
+  const mt = selectedMessage.value.message_type
+  replySubmitting.value = true
+  try {
+    // 构建回复 payload，区分评论通知和回复通知
+    // parent 始终指向根评论（树形结构挂载点）
+    // reply_to 指向被回复的具体评论（显示"回复 @xxx"）
+    const payload = {
+      target_id: extra.target_id,
+      target_type: extra.target_type,
+      content: replyContent.value.trim(),
+    }
+    if (mt === 2) {
+      // 回复通知：root_comment_id 是根评论，reply_id 是触发通知的回复
+      payload.parent = extra.root_comment_id || extra.comment_id
+      payload.reply_to = extra.reply_id || extra.comment_id
+    } else {
+      // 评论通知（message_type=1）：comment_id 就是根评论
+      payload.parent = extra.comment_id
+      payload.reply_to = extra.comment_id
+    }
+    const resp = await createComment(payload)
+    if (resp && (resp.code === 2000 || resp.success)) {
+      replyContent.value = ''
+      messageDialogVisible.value = false
+      showSuccessNotification('回复成功')
+      // 通知评论区刷新（如果当前页面有评论区组件）
+      window.dispatchEvent(new CustomEvent('comment-updated', {
+        detail: { targetId: extra.target_id, targetType: extra.target_type }
+      }))
+    } else {
+      showErrorNotification(resp?.msg || '回复失败')
+    }
+  } catch (error) {
+    const msg = error?.response?.data?.msg || error?.message || '回复失败，请稍后重试'
+    showErrorNotification(msg)
+  } finally {
+    replySubmitting.value = false
+  }
 }
 
 const toggleCollapse = () => {
@@ -600,7 +726,8 @@ onMounted(() => {
   checkAutoCollapse()
   window.addEventListener('resize', checkAutoCollapse)
   getUserInfo()
-  messageStore.fetchMessages()
+  messageStore.fetchMessages()  // 获取全部消息用于未读计数
+  messageStore.fetchMessagesByType('notification')  // 加载通知 tab 数据
   websocket.subscribeStatus((status) => {
     connectionStore.setStatus(status)
     if (status === 'open' || status === 'message') {
@@ -734,18 +861,11 @@ watch(
     if (!visible) {
       return
     }
-    if (activeMessageTab.value === 'notification') {
-      if (messages.value.length === 0 && !messageStore.loading) {
-        messageStore.fetchMessages()
-      }
-    } else if (activeMessageTab.value === 'like') {
-      if (!byType.value.like.loaded && !byType.value.like.loading) {
-        messageStore.fetchMessagesByType('like')
-      }
-    } else if (activeMessageTab.value === 'comment') {
-      if (!byType.value.comment.loaded && !byType.value.comment.loading) {
-        messageStore.fetchMessagesByType('comment')
-      }
+    // 打开弹窗时，按当前 tab 加载对应类型的消息
+    const tab = activeMessageTab.value
+    const bucket = byType.value[tab]
+    if (bucket && !bucket.loaded && !bucket.loading) {
+      messageStore.fetchMessagesByType(tab)
     }
   }
 )
@@ -945,6 +1065,25 @@ watch(
   max-height: 360px;
   padding: 8px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
+}
+
+.message-list-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.message-list-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.message-list-body::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border-radius: 4px;
+}
+
+.message-list-body::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted-text-color);
 }
 
 .message-item {
@@ -1016,6 +1155,14 @@ watch(
   color: var(--muted-text-color);
 }
 
+.message-load-more,
+.message-no-more {
+  padding: 8px 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted-text-color);
+}
+
 .message-dialog-content {
   display: flex;
   flex-direction: column;
@@ -1030,9 +1177,48 @@ watch(
 .message-dialog-body {
   font-size: 14px;
   line-height: 1.6;
-  height: 260px;
+  min-height: 80px;
+  max-height: 50vh;
   overflow-y: auto;
   white-space: pre-wrap;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
+}
+
+.message-dialog-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.message-dialog-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.message-dialog-body::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border-radius: 4px;
+}
+
+.message-dialog-body::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted-text-color);
+}
+
+.message-quick-reply {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quick-reply-label {
+  font-size: 13px;
+  color: var(--muted-text-color);
+}
+
+.quick-reply-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .message-dialog-footer {

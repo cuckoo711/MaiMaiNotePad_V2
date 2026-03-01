@@ -109,11 +109,17 @@ class KnowledgeBaseViewSet(CustomModelViewSet):
         return KnowledgeBase.objects.all()
     
     def perform_create(self, serializer):
-        """创建知识库后处理上传的文件，公开内容自动触发 AI 审核
+        """创建知识库后处理上传的文件，用户选择公开时自动提交审核
+
+        创建流程统一为：先创建私有知识库 → 处理文件 → 如果用户选择了公开则调用
+        submit_for_review 走统一审核流程，确保审核入口唯一，避免重复通知。
 
         Args:
             serializer: 知识库创建序列化器
         """
+        # 记录用户是否选择了公开（serializer 已将 is_public 统一设为 False）
+        want_public = str(self.request.data.get('is_public', '')).lower() == 'true'
+
         knowledge_base = serializer.save()
 
         # 处理上传的文件
@@ -134,12 +140,18 @@ class KnowledgeBaseViewSet(CustomModelViewSet):
                 f"用户 {self.request.user.id} 创建知识库 {knowledge_base.id} "
                 f"时上传文件: {file_info['original_name']}"
             )
-        
-        # 公开内容自动触发 AI 审核
-        if knowledge_base.is_public and knowledge_base.is_pending:
-            from mainotebook.content.tasks import auto_review_task
-            auto_review_task.delay(str(knowledge_base.id), 'knowledge')
-            logger.info(f"知识库 {knowledge_base.id} 已触发 AI 自动审核")
+
+        # 用户选择公开时，通过 submit_for_review 统一走审核流程
+        if want_public:
+            try:
+                KnowledgeBaseService.submit_for_review(
+                    knowledge_base, self.request.user
+                )
+                logger.info(f"知识库 {knowledge_base.id} 创建时选择公开，已提交审核")
+            except Exception as e:
+                logger.warning(
+                    f"知识库 {knowledge_base.id} 创建时自动提交审核失败: {e}"
+                )
     
     @swagger_auto_schema(
         operation_summary='获取当前用户的知识库列表',

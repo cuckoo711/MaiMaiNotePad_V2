@@ -20,6 +20,8 @@
     {"role__key": "superadmin", "menu__web_path": "/content/persona-card", "menu__component_name": "contentPersonaCard"},
     {"role__key": "superadmin", "menu__web_path": "/content/comment", "menu__component_name": "contentComment"},
     {"role__key": "superadmin", "menu__web_path": "/content/review", "menu__component_name": "contentReview"},
+    {"role__key": "superadmin", "menu__web_path": "/content/moderation-log", "menu__component_name": "contentModerationLog"},
+    {"role__key": "superadmin", "menu__web_path": "/content/ai-model", "menu__component_name": "contentAiModel"},
 
     {"role__key": "admin", "menu__web_path": "/system", "menu__component_name": ""},
     {"role__key": "admin", "menu__web_path": "/user", "menu__component_name": "user"},
@@ -42,13 +44,17 @@
     {"role__key": "admin", "menu__web_path": "/content/persona-card", "menu__component_name": "contentPersonaCard"},
     {"role__key": "admin", "menu__web_path": "/content/comment", "menu__component_name": "contentComment"},
     {"role__key": "admin", "menu__web_path": "/content/review", "menu__component_name": "contentReview"},
+    {"role__key": "admin", "menu__web_path": "/content/moderation-log", "menu__component_name": "contentModerationLog"},
+    {"role__key": "admin", "menu__web_path": "/content/ai-model", "menu__component_name": "contentAiModel"},
 
     {"role__key": "reviewer", "menu__web_path": "/content", "menu__component_name": ""},
     {"role__key": "reviewer", "menu__web_path": "/content/knowledge-base", "menu__component_name": "contentKnowledgeBase"},
     {"role__key": "reviewer", "menu__web_path": "/content/persona-card", "menu__component_name": "contentPersonaCard"},
     {"role__key": "reviewer", "menu__web_path": "/content/comment", "menu__component_name": "contentComment"},
     {"role__key": "reviewer", "menu__web_path": "/content/review", "menu__component_name": "contentReview"},
+    {"role__key": "reviewer", "menu__web_path": "/content/moderation-log", "menu__component_name": "contentModerationLog"},
 
+    {"role__key": "user", "menu__web_path": "/messageCenter", "menu__component_name": "messageCenter"},
     {"role__key": "user", "menu__web_path": "/content", "menu__component_name": ""},
     {"role__key": "user", "menu__web_path": "/content/knowledge-base", "menu__component_name": "contentKnowledgeBase"},
     {"role__key": "user", "menu__web_path": "/content/persona-card", "menu__component_name": "contentPersonaCard"},

@@ -49,12 +49,12 @@ class CommentSerializer(CustomModelSerializer):
         fields = [
             'id', 'user', 'user_name', 'user_avatar', 'target_id',
             'target_type', 'parent', 'reply_to', 'reply_to_name',
-            'content', 'is_deleted',
+            'content', 'is_deleted', 'moderation_status',
             'like_count', 'dislike_count', 'create_datetime',
             'update_datetime', 'replies', 'is_liked', 'my_reaction'
         ]
         read_only_fields = [
-            'id', 'like_count', 'dislike_count', 
+            'id', 'like_count', 'dislike_count', 'moderation_status',
             'create_datetime', 'update_datetime', 'user'
         ]
     
@@ -165,13 +165,16 @@ class CommentCreateSerializer(CustomModelSerializer):
         return value
     
     def validate_parent(self, value):
-        """验证父评论
+        """验证父评论，并自动修正为根评论以保持两层结构
+        
+        如果传入的 parent 本身不是根评论（即它也有 parent），
+        则沿 parent 链向上查找真正的根评论，确保评论树只有两层。
         
         Args:
             value: 父评论对象
             
         Returns:
-            Comment: 验证通过的父评论对象
+            Comment: 验证通过的根评论对象
             
         Raises:
             serializers.ValidationError: 当父评论不存在或已被删除时
@@ -184,6 +187,19 @@ class CommentCreateSerializer(CustomModelSerializer):
             # 验证父评论是否真实存在于数据库中
             if not Comment.objects.filter(id=value.id, is_deleted=False).exists():
                 raise serializers.ValidationError("父评论不存在")
+            
+            # 自动修正：如果 parent 不是根评论，沿链向上找到根评论
+            current = value
+            max_depth = 10  # 防止无限循环
+            while current.parent_id and max_depth > 0:
+                parent = Comment.objects.filter(
+                    id=current.parent_id, is_deleted=False
+                ).first()
+                if not parent:
+                    break
+                current = parent
+                max_depth -= 1
+            value = current
         
         return value
     
@@ -220,16 +236,52 @@ class CommentCreateSerializer(CustomModelSerializer):
         return attrs
     
     def create(self, validated_data):
-        """创建评论，自动设置用户
+        """创建评论，自动设置用户并执行 AI 内容审核
+        
+        评论内容会经过 AI 审核：
+        - AI 通过或不确定：正常创建并展示
+        - AI 拒绝：抛出异常，不创建评论
         
         Args:
             validated_data: 验证后的数据
             
         Returns:
             Comment: 创建的评论实例
+            
+        Raises:
+            serializers.ValidationError: 当评论被 AI 审核拒绝时
         """
         request = self.context.get('request')
         if request and hasattr(request, 'user') and request.user:
             validated_data['user'] = request.user
+        
+        # AI 内容审核
+        from mainotebook.content.services.comment_service import CommentService
+        current_user = validated_data.get('user')
+        moderation_status, moderation_detail = CommentService._moderate_content(
+            validated_data.get('content', ''),
+            user=current_user,
+        )
+        
+        if moderation_status == 'rejected':
+            # 将违规类型翻译为中文展示
+            violation_label_map = {
+                'porn': '色情内容',
+                'politics': '涉政内容',
+                'abuse': '辱骂内容',
+            }
+            import logging
+            _logger = logging.getLogger(__name__)
+            _logger.info("评论审核拒绝详情: %s", moderation_detail)
+            violation_types = moderation_detail.get('violation_types', [])
+            violation_labels = [violation_label_map.get(v, v) for v in violation_types]
+            if violation_labels:
+                msg = f"您的评论未通过内容审核（违规类型：{'、'.join(violation_labels)}），请修改后重试"
+            else:
+                msg = "您的评论未通过内容审核，请修改后重试"
+            raise serializers.ValidationError(msg)
+        
+        validated_data['moderation_status'] = moderation_status
+        validated_data['moderation_detail'] = moderation_detail
         
         return super().create(validated_data)

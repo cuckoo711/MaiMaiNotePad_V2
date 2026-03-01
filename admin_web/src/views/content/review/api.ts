@@ -40,12 +40,13 @@ export interface BatchOperationResponse {
  * 审核统计数据接口
  */
 export interface ReviewStats {
-	pending_total: number;
+	pending_count: number;
 	pending_knowledge: number;
 	pending_persona: number;
 	approved_today: number;
 	rejected_today: number;
-	approval_rate: number;
+	pass_rate: number;
+	ai_auto_approved_count: number;
 }
 
 export const apiPrefix = '/api/content/review/';

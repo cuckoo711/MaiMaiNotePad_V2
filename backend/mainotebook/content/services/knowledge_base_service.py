@@ -201,3 +201,13 @@ class KnowledgeBaseService:
             target_id=str(knowledge_base.id),
             target_type='knowledge'
         ).update(status='pending')
+
+        # 触发 AI 自动审核异步任务
+        try:
+            from mainotebook.content.tasks import auto_review_task
+            auto_review_task.delay(str(knowledge_base.id), 'knowledge')
+        except Exception:
+            import logging
+            logging.getLogger(__name__).warning(
+                "触发 AI 自动审核任务失败: knowledge_base_id=%s", knowledge_base.id
+            )

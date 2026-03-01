@@ -126,22 +126,10 @@ class ReviewViewSet(viewsets.ViewSet):
             Response: 批准操作的响应
         """
         try:
-            # 获取内容类型
-            content_type = request.data.get('content_type')
-            if not content_type:
-                return ErrorResponse(
-                    msg="缺少 content_type 参数",
-                    code=400,
-                    status=http_status.HTTP_400_BAD_REQUEST
-                )
+            serializer = ReviewActionSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
             
-            # 验证内容类型
-            if content_type not in ['knowledge', 'persona']:
-                return ErrorResponse(
-                    msg="无效的 content_type，必须是 knowledge 或 persona",
-                    code=400,
-                    status=http_status.HTTP_400_BAD_REQUEST
-                )
+            content_type = serializer.validated_data['content_type']
             
             # 调用服务层批准内容
             ReviewService.approve_content(
@@ -184,39 +172,14 @@ class ReviewViewSet(viewsets.ViewSet):
             Response: 拒绝操作的响应
         """
         try:
-            # 验证请求数据
             serializer = ReviewActionSerializer(
                 data=request.data,
                 context={'action': 'reject'}
             )
             serializer.is_valid(raise_exception=True)
             
-            # 获取内容类型和拒绝原因
-            content_type = request.data.get('content_type')
+            content_type = serializer.validated_data['content_type']
             reason = serializer.validated_data.get('reason', '')
-            
-            # 校验 reason 长度
-            if reason and len(reason) > 500:
-                return ErrorResponse(
-                    msg="拒绝原因不能超过 500 个字符",
-                    code=400,
-                    status=http_status.HTTP_400_BAD_REQUEST
-                )
-            
-            if not content_type:
-                return ErrorResponse(
-                    msg="缺少 content_type 参数",
-                    code=400,
-                    status=http_status.HTTP_400_BAD_REQUEST
-                )
-            
-            # 验证内容类型
-            if content_type not in ['knowledge', 'persona']:
-                return ErrorResponse(
-                    msg="无效的 content_type，必须是 knowledge 或 persona",
-                    code=400,
-                    status=http_status.HTTP_400_BAD_REQUEST
-                )
             
             # 调用服务层拒绝内容
             ReviewService.reject_content(
@@ -260,28 +223,11 @@ class ReviewViewSet(viewsets.ViewSet):
             Response: 退回操作的响应
         """
         try:
-            # 验证请求数据
             serializer = ReviewActionSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             
-            # 获取内容类型和退回原因
-            content_type = request.data.get('content_type')
+            content_type = serializer.validated_data['content_type']
             reason = serializer.validated_data.get('reason', '')
-            
-            if not content_type:
-                return ErrorResponse(
-                    msg="缺少 content_type 参数",
-                    code=400,
-                    status=http_status.HTTP_400_BAD_REQUEST
-                )
-            
-            # 验证内容类型
-            if content_type not in ['knowledge', 'persona']:
-                return ErrorResponse(
-                    msg="无效的 content_type，必须是 knowledge 或 persona",
-                    code=400,
-                    status=http_status.HTTP_400_BAD_REQUEST
-                )
             
             # 调用服务层退回内容
             ReviewService.return_content(
@@ -548,6 +494,22 @@ class ReviewViewSet(viewsets.ViewSet):
                     msg="内容不在待审核状态",
                     code=400,
                     status=http_status.HTTP_400_BAD_REQUEST
+                )
+
+            # 检查是否有正在进行中的 AI 审核（2 分钟内已创建过报告）
+            from django.utils import timezone
+            from datetime import timedelta
+            recent_cutoff = timezone.now() - timedelta(minutes=2)
+            recent_report = ReviewReport.objects.filter(
+                content_id=pk,
+                content_type=content_type,
+                create_datetime__gte=recent_cutoff,
+            ).exists()
+            if recent_report:
+                return ErrorResponse(
+                    msg="该内容的 AI 审核正在进行中或刚刚完成，请稍后再试",
+                    code=409,
+                    status=http_status.HTTP_409_CONFLICT
                 )
 
             # 调度 Celery 异步任务

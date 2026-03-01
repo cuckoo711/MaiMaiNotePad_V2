@@ -11,6 +11,8 @@ from .review import ReviewViewSet
 from .star import StarViewSet
 from .user_extension import UserExtensionViewSet
 from .admin_extension import AdminExtensionViewSet
+from .moderation_log import ModerationLogViewSet
+from .ai_model import AIModelViewSet
 
 __all__ = [
     'KnowledgeBaseViewSet',
@@ -20,4 +22,6 @@ __all__ = [
     'StarViewSet',
     'UserExtensionViewSet',
     'AdminExtensionViewSet',
+    'ModerationLogViewSet',
+    'AIModelViewSet',
 ]

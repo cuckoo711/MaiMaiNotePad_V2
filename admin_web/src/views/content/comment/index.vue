@@ -40,6 +40,31 @@
 					</el-tag>
 				</template>
 
+				<template #cell_moderation_status="scope">
+					<el-tag
+						v-if="scope.row.moderation_status === 'approved'"
+						type="success"
+						size="small"
+					>
+						通过
+					</el-tag>
+					<el-tag
+						v-else-if="scope.row.moderation_status === 'rejected'"
+						type="danger"
+						size="small"
+					>
+						拒绝
+					</el-tag>
+					<el-tag
+						v-else-if="scope.row.moderation_status === 'pending'"
+						type="warning"
+						size="small"
+					>
+						待审核
+					</el-tag>
+					<span v-else style="color: #c0c4cc; font-size: 12px">未审核</span>
+				</template>
+
 				<template #row-handle="{ row }">
 					<el-button
 						v-if="auth('comment:List')"
@@ -106,6 +131,33 @@
 					<el-tag :type="currentComment?.is_deleted ? 'danger' : 'success'" size="small">
 						{{ currentComment?.is_deleted ? '已删除' : '正常' }}
 					</el-tag>
+				</el-descriptions-item>
+				<el-descriptions-item label="AI审核状态">
+					<el-tag
+						v-if="currentComment?.moderation_status === 'approved'"
+						type="success"
+						size="small"
+					>
+						通过
+					</el-tag>
+					<el-tag
+						v-else-if="currentComment?.moderation_status === 'rejected'"
+						type="danger"
+						size="small"
+					>
+						拒绝
+					</el-tag>
+					<el-tag
+						v-else-if="currentComment?.moderation_status === 'pending'"
+						type="warning"
+						size="small"
+					>
+						待审核
+					</el-tag>
+					<span v-else style="color: #c0c4cc">未审核</span>
+				</el-descriptions-item>
+				<el-descriptions-item v-if="currentComment?.moderation_detail" label="审核详情">
+					<div style="white-space: pre-wrap; word-break: break-all;">{{ currentComment?.moderation_detail }}</div>
 				</el-descriptions-item>
 				<el-descriptions-item label="创建时间">{{ formatDateTime(currentComment?.create_datetime) }}</el-descriptions-item>
 			</el-descriptions>

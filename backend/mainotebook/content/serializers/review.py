@@ -57,6 +57,10 @@ class ReviewActionSerializer(serializers.Serializer):
     用于审核操作（批准、拒绝、退回）的请求数据验证。
     """
     
+    content_type = serializers.ChoiceField(
+        choices=['knowledge', 'persona'],
+        help_text="内容类型：knowledge（知识库）或 persona（人设卡）"
+    )
     reason = serializers.CharField(
         required=False,
         allow_blank=True,

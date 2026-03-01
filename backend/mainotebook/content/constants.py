@@ -51,6 +51,17 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 # 评论长度限制
 MAX_COMMENT_LENGTH = 500
 
+# 评论审核状态
+COMMENT_STATUS_APPROVED = 'approved'
+COMMENT_STATUS_REJECTED = 'rejected'
+COMMENT_STATUS_UNCERTAIN = 'uncertain'
+
+COMMENT_MODERATION_STATUSES = [
+    (COMMENT_STATUS_APPROVED, 'AI 审核通过'),
+    (COMMENT_STATUS_REJECTED, 'AI 审核拒绝'),
+    (COMMENT_STATUS_UNCERTAIN, 'AI 审核不确定'),
+]
+
 # 错误消息
 ERROR_MESSAGES = {
     'permission_denied': '您没有权限执行此操作',
@@ -66,4 +77,5 @@ ERROR_MESSAGES = {
     'toml_missing': '人设卡必须包含 bot_config.toml 文件',
     'toml_multiple': '人设卡只能包含一个 bot_config.toml 文件',
     'toml_invalid': 'TOML 文件格式错误',
+    'comment_rejected': '您的评论未通过内容审核，请修改后重试',
 }

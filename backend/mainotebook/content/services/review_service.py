@@ -418,11 +418,17 @@ class ReviewService:
         
         pass_rate = (approved_count / total_reviewed * 100) if total_reviewed > 0 else 0
         
+        # AI 接管并通过的数量（ReviewReport 中 decision 为 auto_approved 的记录数）
+        ai_auto_approved_count = ReviewReport.objects.filter(
+            decision='auto_approved'
+        ).count()
+        
         return {
             'pending_count': pending_knowledge + pending_persona,
             'pending_knowledge': pending_knowledge,
             'pending_persona': pending_persona,
             'approved_today': approved_today,
             'rejected_today': rejected_today,
-            'pass_rate': round(pass_rate, 2)
+            'pass_rate': round(pass_rate, 2),
+            'ai_auto_approved_count': ai_auto_approved_count,
         }

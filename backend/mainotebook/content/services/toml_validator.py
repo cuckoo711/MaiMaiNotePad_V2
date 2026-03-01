@@ -3,8 +3,11 @@
 本模块提供 TOML 配置文件的验证功能，用于验证人设卡的 bot_config.toml 文件。
 """
 
+import os
 import tomllib
 from typing import Tuple
+
+from django.conf import settings
 
 
 class TOMLValidator:
@@ -29,6 +32,10 @@ class TOMLValidator:
             ...     print(f"验证失败: {error_msg}")
         """
         try:
+            # 如果是相对路径，拼接 MEDIA_ROOT 得到绝对路径
+            if not os.path.isabs(file_path):
+                file_path = os.path.join(settings.MEDIA_ROOT, file_path)
+
             # 读取文件内容（tomllib 需要二进制模式）
             with open(file_path, 'rb') as f:
                 content = f.read()
@@ -36,12 +43,21 @@ class TOMLValidator:
             # 解析 TOML
             config = tomllib.loads(content.decode('utf-8'))
             
+            # 查找 version 字段：支持顶层和常见子字段（inner/meta/card）
+            version = config.get('version')
+            if version is None:
+                for section in ('inner', 'meta', 'card', 'Inner', 'Meta', 'Card'):
+                    sub = config.get(section)
+                    if isinstance(sub, dict) and 'version' in sub:
+                        version = sub['version']
+                        break
+            
             # 验证必需字段
-            if 'version' not in config:
+            if version is None:
                 return False, "缺少必需字段: version"
             
             # 验证字段类型
-            if not isinstance(config['version'], str):
+            if not isinstance(version, str):
                 return False, "version 字段必须是字符串类型"
             
             return True, ""
@@ -76,12 +92,21 @@ class TOMLValidator:
             # 解析 TOML
             config = tomllib.loads(content)
             
+            # 查找 version 字段：支持顶层和常见子字段（inner/meta/card）
+            version = config.get('version')
+            if version is None:
+                for section in ('inner', 'meta', 'card', 'Inner', 'Meta', 'Card'):
+                    sub = config.get(section)
+                    if isinstance(sub, dict) and 'version' in sub:
+                        version = sub['version']
+                        break
+            
             # 验证必需字段
-            if 'version' not in config:
+            if version is None:
                 return False, "缺少必需字段: version"
             
             # 验证字段类型
-            if not isinstance(config['version'], str):
+            if not isinstance(version, str):
                 return False, "version 字段必须是字符串类型"
             
             return True, ""

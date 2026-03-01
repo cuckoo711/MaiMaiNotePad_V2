@@ -1,47 +1,39 @@
 <template>
 	<fs-page>
 		<!-- 审核统计卡片 -->
-		<el-row :gutter="16" style="margin-bottom: 16px">
-			<el-col :span="4">
-				<el-card shadow="hover" class="stat-card">
-					<div class="stat-label">待审核总数</div>
-					<div class="stat-value">{{ stats.pending_total }}</div>
-				</el-card>
-			</el-col>
-			<el-col :span="4">
-				<el-card shadow="hover" class="stat-card">
-					<div class="stat-label">待审核知识库</div>
-					<div class="stat-value" style="color: #409eff">{{ stats.pending_knowledge }}</div>
-				</el-card>
-			</el-col>
-			<el-col :span="4">
-				<el-card shadow="hover" class="stat-card">
-					<div class="stat-label">待审核人设卡</div>
-					<div class="stat-value" style="color: #e6a23c">{{ stats.pending_persona }}</div>
-				</el-card>
-			</el-col>
-			<el-col :span="4">
-				<el-card shadow="hover" class="stat-card">
-					<div class="stat-label">今日已通过</div>
-					<div class="stat-value" style="color: #67c23a">{{ stats.approved_today }}</div>
-				</el-card>
-			</el-col>
-			<el-col :span="4">
-				<el-card shadow="hover" class="stat-card">
-					<div class="stat-label">今日已拒绝</div>
-					<div class="stat-value" style="color: #f56c6c">{{ stats.rejected_today }}</div>
-				</el-card>
-			</el-col>
-			<el-col :span="4">
-				<el-card shadow="hover" class="stat-card">
-					<div class="stat-label">通过率(30天)</div>
-					<div class="stat-value" style="color: #909399">{{ stats.approval_rate }}%</div>
-				</el-card>
-			</el-col>
-		</el-row>
+		<div class="stat-row">
+			<el-card shadow="hover" class="stat-card">
+				<div class="stat-label">待审核总数</div>
+				<div class="stat-value">{{ stats.pending_count }}</div>
+			</el-card>
+			<el-card shadow="hover" class="stat-card">
+				<div class="stat-label">待审核知识库</div>
+				<div class="stat-value" style="color: #409eff">{{ stats.pending_knowledge }}</div>
+			</el-card>
+			<el-card shadow="hover" class="stat-card">
+				<div class="stat-label">待审核人设卡</div>
+				<div class="stat-value" style="color: #e6a23c">{{ stats.pending_persona }}</div>
+			</el-card>
+			<el-card shadow="hover" class="stat-card">
+				<div class="stat-label">今日已通过</div>
+				<div class="stat-value" style="color: #67c23a">{{ stats.approved_today }}</div>
+			</el-card>
+			<el-card shadow="hover" class="stat-card">
+				<div class="stat-label">今日已拒绝</div>
+				<div class="stat-value" style="color: #f56c6c">{{ stats.rejected_today }}</div>
+			</el-card>
+			<el-card shadow="hover" class="stat-card">
+				<div class="stat-label">通过率(30天)</div>
+				<div class="stat-value" style="color: #909399">{{ stats.pass_rate }}%</div>
+			</el-card>
+			<el-card shadow="hover" class="stat-card">
+				<div class="stat-label">AI 接管数</div>
+				<div class="stat-value" style="color: #409eff">{{ stats.ai_auto_approved_count }}</div>
+			</el-card>
+		</div>
 
 		<!-- 审核列表 -->
-		<el-card>
+		<el-card class="crud-card">
 			<fs-crud ref="crudRef" v-bind="crudBinding" @selection-change="handleSelectionChange">
 				<!-- 操作栏右侧按钮 -->
 				<template #actionbar-right>
@@ -150,7 +142,8 @@
 						type="text"
 						size="small"
 						style="color: #409eff"
-						:loading="aiReviewLoading"
+						:loading="aiReviewRowLoading[row.id]"
+						:disabled="aiReviewRowLoading[row.id]"
 						@click="handleAIReview(row)"
 					>
 						AI 审核
@@ -252,7 +245,7 @@
 		</el-dialog>
 
 		<!-- AI 审核报告对话框 -->
-		<el-dialog v-model="reportDialogVisible" title="AI 审核报告" width="700px">
+		<el-dialog v-model="reportDialogVisible" title="AI 审核报告" width="800px">
 			<template v-if="currentReport">
 				<el-descriptions :column="2" border>
 					<el-descriptions-item label="内容名称" :span="2">
@@ -283,7 +276,7 @@
 							size="small"
 							style="margin-right: 4px"
 						>
-							{{ vt }}
+							{{ violationLabelMap[vt] || vt }}
 						</el-tag>
 						<span v-if="!currentReport.violation_types?.length">无</span>
 					</el-descriptions-item>
@@ -298,46 +291,72 @@
 					<el-table :data="reportParts" border size="small" row-key="part_name" :default-expand-all="false">
 						<el-table-column type="expand">
 							<template #default="{ row }">
-								<div v-if="row.segments && row.segments.length" style="padding: 8px 16px">
-									<el-table :data="row.segments" size="small" border>
-										<el-table-column label="分段" width="70" align="center">
-											<template #default="{ row: seg }">
-												#{{ seg.segment_index ?? '-' }}
-											</template>
-										</el-table-column>
-										<el-table-column label="摘要" min-width="200">
-											<template #default="{ row: seg }">
-												{{ seg.text_summary || '-' }}
-											</template>
-										</el-table-column>
-										<el-table-column label="置信度" width="160" align="center">
-											<template #default="{ row: seg }">
-												<el-progress
-													:percentage="Number((seg.confidence * 100).toFixed(1))"
-													:color="confidenceColor(seg.confidence)"
-													:stroke-width="12"
-													:text-inside="true"
-													style="width: 120px"
-												/>
-											</template>
-										</el-table-column>
-										<el-table-column label="违规类型" min-width="120">
-											<template #default="{ row: seg }">
-												<el-tag
-													v-for="vt in seg.violation_types"
-													:key="vt"
-													type="danger"
-													size="small"
-													style="margin-right: 4px"
-												>
-													{{ vt }}
-												</el-tag>
-												<span v-if="!seg.violation_types?.length">无</span>
-											</template>
-										</el-table-column>
-									</el-table>
+								<div style="padding: 8px 16px">
+									<!-- 违规片段 -->
+									<div v-if="row.flagged_content" style="margin-bottom: 12px">
+										<div style="font-weight: 600; margin-bottom: 4px; color: #f56c6c">违规片段：</div>
+										<div style="background: #fef0f0; border: 1px solid #fde2e2; border-radius: 4px; padding: 8px 12px; white-space: pre-wrap; word-break: break-all; color: #f56c6c; font-size: 13px">
+											{{ row.flagged_content }}
+										</div>
+									</div>
+									<!-- 模型原始输出 -->
+									<div v-if="row.raw_output" style="margin-bottom: 12px">
+										<div style="font-weight: 600; margin-bottom: 4px; color: #909399">模型原始输出：</div>
+										<div style="background: #f5f7fa; border: 1px solid #e4e7ed; border-radius: 4px; padding: 8px 12px; white-space: pre-wrap; word-break: break-all; font-family: monospace; font-size: 12px; color: #606266; max-height: 200px; overflow-y: auto">
+											{{ row.raw_output }}
+										</div>
+									</div>
+									<!-- 分段详情 -->
+									<div v-if="row.segments && row.segments.length">
+										<div style="font-weight: 600; margin-bottom: 4px">分段审核：</div>
+										<el-table :data="row.segments" size="small" border>
+											<el-table-column label="分段" width="70" align="center">
+												<template #default="{ row: seg }">
+													#{{ seg.segment_index ?? '-' }}
+												</template>
+											</el-table-column>
+											<el-table-column label="摘要" min-width="160">
+												<template #default="{ row: seg }">
+													{{ seg.text_summary || '-' }}
+												</template>
+											</el-table-column>
+											<el-table-column label="置信度" width="160" align="center">
+												<template #default="{ row: seg }">
+													<el-progress
+														:percentage="Number((seg.confidence * 100).toFixed(1))"
+														:color="confidenceColor(seg.confidence)"
+														:stroke-width="12"
+														:text-inside="true"
+														style="width: 120px"
+													/>
+												</template>
+											</el-table-column>
+											<el-table-column label="违规类型" width="120">
+												<template #default="{ row: seg }">
+													<el-tag
+														v-for="vt in seg.violation_types"
+														:key="vt"
+														type="danger"
+														size="small"
+														style="margin-right: 4px"
+													>
+														{{ violationLabelMap[vt] || vt }}
+													</el-tag>
+													<span v-if="!seg.violation_types?.length">无</span>
+												</template>
+											</el-table-column>
+											<el-table-column label="违规片段" min-width="160">
+												<template #default="{ row: seg }">
+													<span v-if="seg.flagged_content" style="color: #f56c6c; font-size: 12px">{{ seg.flagged_content }}</span>
+													<span v-else style="color: #c0c4cc; font-size: 12px">无</span>
+												</template>
+											</el-table-column>
+										</el-table>
+									</div>
+									<div v-if="!row.flagged_content && !row.raw_output && !(row.segments && row.segments.length)" style="color: #909399">
+										无详细信息
+									</div>
 								</div>
-								<div v-else style="padding: 8px 16px; color: #909399">无分段详情</div>
 							</template>
 						</el-table-column>
 						<el-table-column prop="part_name" label="审核部分" min-width="120" />
@@ -366,9 +385,17 @@
 									size="small"
 									style="margin-right: 4px"
 								>
-									{{ vt }}
+									{{ violationLabelMap[vt] || vt }}
 								</el-tag>
 								<span v-if="!row.violation_types?.length">无</span>
+							</template>
+						</el-table-column>
+						<el-table-column label="违规片段" min-width="140">
+							<template #default="{ row }">
+								<span v-if="row.flagged_content" style="color: #f56c6c; font-size: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden">
+									{{ row.flagged_content }}
+								</span>
+								<span v-else style="color: #c0c4cc; font-size: 12px">无</span>
 							</template>
 						</el-table-column>
 					</el-table>
@@ -405,12 +432,13 @@ const { resetCrudOptions } = useCrud({ crudExpose, crudOptions });
 
 // ==================== 统计数据 ====================
 const stats = reactive<api.ReviewStats>({
-	pending_total: 0,
+	pending_count: 0,
 	pending_knowledge: 0,
 	pending_persona: 0,
 	approved_today: 0,
 	rejected_today: 0,
-	approval_rate: 0,
+	pass_rate: 0,
+	ai_auto_approved_count: 0,
 });
 
 /** 加载统计数据 */
@@ -549,6 +577,8 @@ const submitReturn = async () => {
 
 // ==================== AI 审核 ====================
 const aiReviewLoading = ref(false);
+// 行级 AI 审核 loading 状态，key 为内容 ID
+const aiReviewRowLoading = ref<Record<string, boolean>>({});
 const reportDialogVisible = ref(false);
 const currentReport = ref<AIReviewReport | null>(null);
 
@@ -591,6 +621,16 @@ const reportParts = computed(() => {
 	return currentReport.value?.report_data?.parts || [];
 });
 
+/** 违规类型英文 → 中文映射 */
+const violationLabelMap: Record<string, string> = {
+	porn: '色情内容',
+	politics: '涉政内容',
+	abuse: '辱骂内容',
+	violence: '暴力内容',
+	spam: '垃圾信息',
+	illegal: '违法内容',
+};
+
 /** 置信度颜色（用于进度条） */
 const confidenceColor = (confidence: number): string => {
 	if (confidence >= 0.8) return '#67c23a';
@@ -600,23 +640,26 @@ const confidenceColor = (confidence: number): string => {
 
 /** 触发单条 AI 审核 */
 const handleAIReview = async (row: any) => {
+	// 防止重复点击
+	if (aiReviewRowLoading.value[row.id]) return;
 	try {
 		await ElMessageBox.confirm(
 			`确定对「${row.name}」执行 AI 审核吗？`,
 			'AI 审核',
 			{ confirmButtonText: '确定', cancelButtonText: '取消', type: 'info' }
 		);
-		aiReviewLoading.value = true;
+		aiReviewRowLoading.value[row.id] = true;
 		await triggerAIReview(row.id, row.content_type);
 		successMessage('AI 审核任务已创建');
 		crudExpose.doRefresh();
 		loadStats();
 	} catch (error: any) {
 		if (error !== 'cancel') {
-			errorMessage('AI 审核失败：' + (error.msg || error.message || '未知错误'));
+			const msg = error?.response?.data?.msg || error.msg || error.message || '未知错误';
+			errorMessage('AI 审核失败：' + msg);
 		}
 	} finally {
-		aiReviewLoading.value = false;
+		aiReviewRowLoading.value[row.id] = false;
 	}
 };
 
@@ -761,7 +804,15 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
+.stat-row {
+	display: flex;
+	gap: 12px;
+	margin-bottom: 16px;
+	flex-shrink: 0;
+}
+
 .stat-card {
+	flex: 1;
 	text-align: center;
 	.stat-label {
 		font-size: 13px;
@@ -774,7 +825,25 @@ onMounted(() => {
 		color: #303133;
 	}
 }
-.el-card {
-	height: 100%;
+
+/* 让 fs-page 内部的 content 区域也用 flex 布局 */
+:deep(.fs-page-content) {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.crud-card {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	:deep(.el-card__body) {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
 }
 </style>

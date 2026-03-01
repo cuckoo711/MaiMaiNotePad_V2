@@ -8,6 +8,7 @@
 """
 
 import logging
+import os
 import toml
 from typing import Any, Optional
 from django.db import models
@@ -84,11 +85,17 @@ class PersonaCardViewSet(CustomModelViewSet):
         return queryset
     
     def perform_create(self, serializer):
-        """创建人设卡后处理上传的文件，解析版本号，触发 AI 审核
-        
+        """创建人设卡后处理上传的文件，解析版本号，用户选择公开时自动提交审核
+
+        创建流程统一为：先创建私有人设卡 → 处理文件 → 解析版本号 → 如果用户选择了
+        公开则调用 submit_for_review 走统一审核流程，确保审核入口唯一，避免重复通知。
+
         Args:
             serializer: 人设卡创建序列化器
         """
+        # 记录用户是否选择了公开（serializer 已将 is_public 统一设为 False）
+        want_public = str(self.request.data.get('is_public', '')).lower() == 'true'
+
         persona_card = serializer.save()
         
         # 处理上传的文件
@@ -124,11 +131,18 @@ class PersonaCardViewSet(CustomModelViewSet):
                     f"人设卡 {persona_card.id} 从 bot_config.toml 解析到版本号: {version}"
                 )
         
-        # 公开内容自动触发 AI 审核
-        if persona_card.is_public and persona_card.is_pending:
-            from mainotebook.content.tasks import auto_review_task
-            auto_review_task.delay(str(persona_card.id), 'persona')
-            logger.info(f"人设卡 {persona_card.id} 已触发 AI 自动审核")
+        # 用户选择公开时，通过 submit_for_review 统一走审核流程
+        if want_public:
+            try:
+                from mainotebook.content.services.persona_card_service import PersonaCardService
+                PersonaCardService.submit_for_review(
+                    persona_card, self.request.user
+                )
+                logger.info(f"人设卡 {persona_card.id} 创建时选择公开，已提交审核")
+            except Exception as e:
+                logger.warning(
+                    f"人设卡 {persona_card.id} 创建时自动提交审核失败: {e}"
+                )
     
     @staticmethod
     def _parse_version_from_toml(file_path: str) -> Optional[str]:
@@ -137,13 +151,15 @@ class PersonaCardViewSet(CustomModelViewSet):
         按优先级搜索：顶层字段 → meta/card 子字段 → 深度搜索。
         
         Args:
-            file_path: toml 文件路径
+            file_path: toml 文件路径（相对于 MEDIA_ROOT）
             
         Returns:
             Optional[str]: 版本号，未找到返回 None
         """
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            from django.conf import settings
+            full_path = os.path.join(settings.MEDIA_ROOT, file_path)
+            with open(full_path, 'r', encoding='utf-8') as f:
                 data = toml.load(f)
         except Exception as e:
             logger.warning(f"读取 bot_config.toml 失败: {file_path}, 错误: {e}")
@@ -158,8 +174,8 @@ class PersonaCardViewSet(CustomModelViewSet):
             if isinstance(value, (str, int, float)):
                 return str(value)
         
-        # 2. meta/card 子字段
-        for meta_key in ('meta', 'Meta', 'card', 'Card'):
+        # 2. meta/card/inner 子字段
+        for meta_key in ('inner', 'Inner', 'meta', 'Meta', 'card', 'Card'):
             meta = data.get(meta_key)
             if isinstance(meta, dict):
                 for key in ('version', 'Version', 'schema_version', 'card_version'):

@@ -121,6 +121,29 @@ export default function ({ crudExpose, context }: CreateCrudOptionsProps): Creat
 						show: false,
 					},
 				},
+				message_type: {
+					title: '消息类型',
+					search: {
+						show: true,
+					},
+					type: 'dict-select',
+					dict: dict({
+						data: [
+							{ label: '系统通知', value: 0, color: 'info' },
+							{ label: '评论', value: 1, color: 'primary' },
+							{ label: '回复', value: 2, color: 'primary' },
+							{ label: '点赞', value: 3, color: 'warning' },
+							{ label: '审核', value: 4, color: 'success' },
+						],
+					}),
+					column: {
+						minWidth: 100,
+						align: 'center',
+					},
+					form: {
+						show: false,
+					},
+				},
 				target_type: {
 					title: '目标类型',
 					type: ['dict-radio', 'colspan'],

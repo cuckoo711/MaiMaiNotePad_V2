@@ -31,11 +31,13 @@ class CommentService:
         Returns:
             List[Comment]: 根评论列表，每个评论包含 _prefetched_replies 属性存储子评论
         """
-        # 获取所有评论（包括回复），按创建时间排序
+        # 获取所有评论（包括回复），排除已删除和 AI 拒绝的评论
         comments = Comment.objects.filter(
             target_id=target_id,
             target_type=target_type,
-            is_deleted=False
+            is_deleted=False,
+        ).exclude(
+            moderation_status='rejected',
         ).select_related('user', 'reply_to', 'reply_to__user').prefetch_related('replies').order_by('create_datetime')
         
         # 构建树形结构
@@ -61,34 +63,34 @@ class CommentService:
     
     @staticmethod
     def create_comment(user: Users, data: dict) -> Comment:
-        """创建评论
-        
+        """创建评论（含 AI 内容审核）
+
         创建新评论或回复。验证用户禁言状态和父评论有效性。
-        
+        评论内容会经过 AI 审核，拒绝的评论不会被创建。
+
         Args:
             user: 评论用户
             data: 评论数据，包含 target_id, target_type, content, parent（可选）
-            
+
         Returns:
             Comment: 创建的评论对象
-            
+
         Raises:
-            ValidationError: 当用户被禁言或父评论无效时
+            ValidationError: 当用户被禁言、父评论无效或评论被 AI 拒绝时
         """
         # 验证评论内容
         content = data.get('content', '')
         if not content or not content.strip():
             raise ValidationError("评论内容不能为空")
-        
+
         if len(content) > 500:
             raise ValidationError("评论内容不能超过 500 字符")
-        
+
         # 验证用户是否被禁言
         if user.is_muted:
-            # 检查是否是永久禁言或禁言期未过
             if user.muted_until is None or user.muted_until > timezone.now():
                 raise ValidationError("您已被禁言，无法发表评论")
-        
+
         # 验证父评论（如果是回复）
         parent_id = data.get('parent')
         if parent_id:
@@ -98,17 +100,85 @@ class CommentService:
                     raise ValidationError("父评论已被删除，无法回复")
             except Comment.DoesNotExist:
                 raise ValidationError("父评论不存在")
-        
-        # 创建评论
+
+        # AI 内容审核
+        moderation_status, moderation_detail = CommentService._moderate_content(content)
+
+        # AI 拒绝的评论直接抛出异常，不创建
+        if moderation_status == 'rejected':
+            violation_label_map = {
+                'porn': '色情内容',
+                'politics': '涉政内容',
+                'abuse': '辱骂内容',
+            }
+            violation_types = moderation_detail.get('violation_types', [])
+            violation_labels = [violation_label_map.get(v, v) for v in violation_types]
+            if violation_labels:
+                msg = f"您的评论未通过内容审核（违规类型：{'、'.join(violation_labels)}），请修改后重试"
+            else:
+                msg = "您的评论未通过内容审核，请修改后重试"
+            raise ValidationError(msg)
+
+        # 创建评论（通过和不确定的都允许展示）
         comment = Comment.objects.create(
             user=user,
             target_id=data['target_id'],
             target_type=data['target_type'],
             content=content,
-            parent_id=parent_id
+            parent_id=parent_id,
+            moderation_status=moderation_status,
+            moderation_detail=moderation_detail,
         )
-        
+
         return comment
+    @staticmethod
+    def _moderate_content(content: str, user=None, content_id: str = None) -> tuple:
+        """调用 AI 审核评论内容
+
+        使用 ModerationService 对评论内容进行审核，并记录审核日志。
+        AI 异常时默认放行（返回 uncertain），不阻塞用户发言。
+
+        Args:
+            content: 评论文本内容
+            user: 触发审核的用户对象（可选，用于日志记录）
+            content_id: 关联的评论 ID（可选，用于日志记录）
+
+        Returns:
+            tuple: (moderation_status, moderation_detail)
+                - moderation_status: 'approved' / 'rejected' / 'uncertain'
+                - moderation_detail: AI 返回的原始审核结果字典
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        try:
+            from mainotebook.content.services.moderation_service import get_moderation_service
+            service = get_moderation_service()
+            result = service.moderate(
+                content, text_type="comment",
+                source="comment", user=user, content_id=content_id,
+            )
+
+            decision = result.get("decision", "unknown")
+
+            # 映射 AI 决策到评论审核状态
+            if decision == "false":
+                moderation_status = "rejected"
+            elif decision == "true":
+                moderation_status = "approved"
+            else:
+                moderation_status = "uncertain"
+
+            logger.info(
+                "评论 AI 审核完成 - 状态: %s, 置信度: %s, 违规类型: %s",
+                moderation_status, result.get("confidence"), result.get("violation_types"),
+            )
+            return moderation_status, result
+
+        except Exception as e:
+            # AI 服务异常时默认放行，不阻塞用户
+            logger.warning("评论 AI 审核异常，默认放行: %s", e)
+            return "uncertain", {"error": str(e), "decision": "unknown"}
     
     @staticmethod
     def delete_comment(comment: Comment, user: Users) -> None:

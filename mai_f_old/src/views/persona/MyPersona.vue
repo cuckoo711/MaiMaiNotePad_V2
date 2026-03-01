@@ -295,7 +295,8 @@ import {
   getPersonaCardDetail,
   deletePersonaCard,
   updatePersonaCard,
-  addFilesToPersonaCard
+  addFilesToPersonaCard,
+  submitPersonaCard
 } from '@/api/persona'
 import { handleApiError, formatFileSize, formatDate, showApiErrorNotification, showErrorNotification, showSuccessNotification, showWarningNotification, normalizeTags } from '@/utils/api'
 import { useUserStore } from '@/stores/user'
@@ -484,9 +485,7 @@ const requestPublish = async (pc) => {
     return
   }
   try {
-    const response = await updatePersonaCard(pc.id, {
-      is_pending: true
-    })
+    const response = await submitPersonaCard(pc.id)
     if (response && response.success) {
       showSuccessNotification(response.message || '已提交公开申请，等待审核')
       fetchPersona()

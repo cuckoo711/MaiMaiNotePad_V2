@@ -19,14 +19,14 @@ class AutoReviewService:
     支持知识库和人设卡内容的自动审核，包括文本字段和关联文件。
     """
 
-    # 分段审核最大长度（字符数）
-    MAX_SEGMENT_LENGTH = 4000
+    # 分段审核最大长度（字符数，128k 上下文模型约可处理 10 万中文字符）
+    MAX_SEGMENT_LENGTH = 100000
 
     # 置信度阈值：低于此值自动通过
     AUTO_APPROVE_THRESHOLD = 0.5
 
-    # 置信度阈值：高于此值自动拒绝
-    AUTO_REJECT_THRESHOLD = 0.8
+    # 置信度阈值：高于此值自动拒绝（仅限知识库和人设卡，标准较宽松）
+    AUTO_REJECT_THRESHOLD = 0.95
 
     # 并发线程数上限（用于分段审核和多文件审核）
     MAX_WORKERS = 5
@@ -85,13 +85,22 @@ class AutoReviewService:
             # 2. 拼接并审核文本字段
             text_fields = AutoReviewService._build_text_fields(content)
             if text_fields:
-                text_result = moderation_service.moderate(text_fields, text_type)
+                text_result = moderation_service.moderate(
+                    text_fields, text_type,
+                    source=content_type,
+                    content_id=content_id,
+                    user=getattr(content, 'uploader', None),
+                )
+
+                meta = text_result.get("_meta", {})
                 text_part = {
                     "part_name": "文本字段",
                     "part_type": "text_field",
                     "confidence": text_result.get("confidence", 0.0),
                     "violation_types": text_result.get("violation_types", []),
                     "decision": text_result.get("decision", "unknown"),
+                    "flagged_content": text_result.get("flagged_content", ""),
+                    "raw_output": meta.get("raw_output", ""),
                 }
                 all_results.append(text_result)
                 part_results.append(text_part)
@@ -117,8 +126,15 @@ class AutoReviewService:
                             AutoReviewService._review_segments(
                                 AutoReviewService._split_text_segments(file_content),
                                 text_type,
+                                source="knowledge_file" if text_type == "knowledge" else text_type,
+                                content_id=content_id,
                             )
                         )
+                        # 从分段详情中收集 flagged_content
+                        flagged_parts = [
+                            d.get("flagged_content", "")
+                            for d in segment_details if d and d.get("flagged_content")
+                        ]
                         file_part = {
                             "part_name": file_name,
                             "part_type": "file",
@@ -128,20 +144,31 @@ class AutoReviewService:
                                 "true" if max_conf < AutoReviewService.AUTO_APPROVE_THRESHOLD else "unknown"
                             ),
                             "segments": segment_details,
+                            "flagged_content": " | ".join(flagged_parts),
+                            "raw_output": "",  # 分段审核无单一 raw_output
                         }
                         agg_result = {
                             "confidence": max_conf,
                             "violation_types": merged_violations,
+                            "flagged_content": " | ".join(flagged_parts),
                         }
                     else:
                         # 小文件整体审核
-                        file_result = moderation_service.moderate(file_content, text_type)
+                        file_result = moderation_service.moderate(
+                            file_content, text_type,
+                            source="knowledge_file" if text_type == "knowledge" else text_type,
+                            content_id=content_id,
+                        )
+
+                        file_meta = file_result.get("_meta", {})
                         file_part = {
                             "part_name": file_name,
                             "part_type": "file",
                             "confidence": file_result.get("confidence", 0.0),
                             "violation_types": file_result.get("violation_types", []),
                             "decision": file_result.get("decision", "unknown"),
+                            "flagged_content": file_result.get("flagged_content", ""),
+                            "raw_output": file_meta.get("raw_output", ""),
                         }
                         agg_result = file_result
 
@@ -166,6 +193,7 @@ class AutoReviewService:
                 decision = AutoReviewService._make_decision(
                     content_id, content_type,
                     final_confidence, final_violation_types,
+                    part_results,
                 )
             except Exception as e:
                 logger.error(
@@ -181,10 +209,9 @@ class AutoReviewService:
                 part_results,
             )
 
-            # 7. 通知上传者
-            AutoReviewService._notify_uploader(content, content_type, report)
-
-            # 8. 返回报告数据
+            # 7. 返回报告数据
+            # 注意：通知已在 _make_decision → ReviewService.approve/reject_content 中发送，
+            # 无需再调用 _notify_uploader，避免重复通知
             return report.report_data
 
         except Exception as e:
@@ -217,29 +244,59 @@ class AutoReviewService:
             parts.append(content.content)
         return "\n".join(parts)
 
+    # 可审核的文件 MIME 类型（纯文本类文件，可直接读取内容）
+    REVIEWABLE_MIME_TYPES = [
+        'text/plain',           # .txt, 部分 .toml
+        'application/json',     # .json
+        'application/toml',     # .toml（部分浏览器）
+        'text/markdown',        # .md
+        'text/x-toml',          # .toml（部分浏览器）
+        'application/x-yaml',   # .yaml/.yml
+        'text/yaml',            # .yaml/.yml
+    ]
+
     @staticmethod
     def _get_text_files(content, content_type: str) -> List:
-        """获取内容关联的 text/plain 文件列表
+        """获取内容关联的可读文本文件列表
 
-        根据 content_type 查询关联的文件，仅返回 file_type 为
-        text/plain 的文件。
+        根据 content_type 查询关联的文件，返回所有可以读取文本内容的文件。
+        知识库支持 txt、json 文件，人设卡支持 toml 文件。
 
         Args:
             content: 知识库或人设卡模型实例
             content_type: 内容类型（knowledge/persona）
 
         Returns:
-            list: text/plain 文件对象列表
+            list: 可读文本文件对象列表
         """
-        if content_type in ('knowledge', 'persona'):
-            return list(content.files.filter(file_type='text/plain'))
-        return []
+        from django.db.models import Q
+
+        if content_type not in ('knowledge', 'persona'):
+            return []
+
+        # 按 MIME 类型过滤
+        mime_q = Q()
+        for mime in AutoReviewService.REVIEWABLE_MIME_TYPES:
+            mime_q |= Q(file_type=mime)
+
+        # 兜底：按文件扩展名匹配（防止 MIME 类型不准确）
+        ext_q = (
+            Q(original_name__iendswith='.txt') |
+            Q(original_name__iendswith='.json') |
+            Q(original_name__iendswith='.toml') |
+            Q(original_name__iendswith='.md') |
+            Q(original_name__iendswith='.yaml') |
+            Q(original_name__iendswith='.yml')
+        )
+
+        return list(content.files.filter(mime_q | ext_q))
 
     @staticmethod
     def _read_file_content(file_obj) -> Optional[str]:
         """安全读取文件内容
 
-        尝试以 UTF-8 编码读取文件，文件不可读时返回 None 并记录警告日志。
+        拼接 MEDIA_ROOT 得到绝对路径，以 UTF-8 编码读取文件。
+        文件不可读时返回 None 并记录警告日志。
 
         Args:
             file_obj: 文件模型实例（KnowledgeBaseFile 或 PersonaCardFile）
@@ -247,8 +304,16 @@ class AutoReviewService:
         Returns:
             Optional[str]: 文件文本内容，不可读时返回 None
         """
+        import os
+        from django.conf import settings
+
         try:
-            with open(file_obj.file_path, 'r', encoding='utf-8') as f:
+            file_path = file_obj.file_path
+            # file_path 是相对于 MEDIA_ROOT 的路径，需要拼接
+            if not os.path.isabs(file_path):
+                file_path = os.path.join(settings.MEDIA_ROOT, file_path)
+
+            with open(file_path, 'r', encoding='utf-8') as f:
                 return f.read()
         except Exception as e:
             logger.warning(
@@ -297,7 +362,9 @@ class AutoReviewService:
 
     @staticmethod
     def _review_segments(
-        segments: List[str], text_type: str
+        segments: List[str], text_type: str,
+        source: Optional[str] = None,
+        content_id: Optional[str] = None,
     ) -> Tuple[float, List[str], List[Dict]]:
         """并发审核多个文本分段
 
@@ -306,6 +373,8 @@ class AutoReviewService:
         Args:
             segments: 文本分段列表
             text_type: 文本类型（knowledge/persona）
+            source: 审核来源（可选，传递给 moderate）
+            content_id: 关联内容 ID（可选，传递给 moderate）
 
         Returns:
             tuple: (max_confidence, merged_violation_types, segment_details)
@@ -322,13 +391,19 @@ class AutoReviewService:
         def _review_one_segment(index_and_segment: Tuple[int, str]) -> Dict:
             """审核单个分段（线程内执行）"""
             index, segment = index_and_segment
-            result = moderation_service.moderate(segment, text_type)
+            result = moderation_service.moderate(
+                segment, text_type,
+                source=source,
+                content_id=content_id,
+            )
             return {
                 "segment_index": index + 1,
                 "text_summary": segment[:100],
                 "confidence": result.get("confidence", 0.0),
                 "violation_types": result.get("violation_types", []),
                 "decision": result.get("decision", "unknown"),
+                "flagged_content": result.get("flagged_content", ""),
+                "raw_output": result.get("_meta", {}).get("raw_output", ""),
             }
 
         # 并发审核所有分段
@@ -392,18 +467,20 @@ class AutoReviewService:
         content_type: str,
         confidence: float,
         violation_types: List[str],
+        part_results: Optional[List[Dict]] = None,
     ) -> str:
         """根据置信度执行审核决策
 
         - confidence < 0.5: 自动通过
-        - confidence > 0.8: 自动拒绝
-        - 0.5 <= confidence <= 0.8: 待人工复核
+        - confidence > 0.95: 自动拒绝（知识库/人设卡标准较宽松）
+        - 0.5 <= confidence <= 0.95: 待人工复核
 
         Args:
             content_id: 内容 ID
             content_type: 内容类型（knowledge/persona）
             confidence: 最终置信度
             violation_types: 最终违规类型列表
+            part_results: 各审核部分的详细结果列表（可选，用于提取违规片段）
 
         Returns:
             str: 决策结果（auto_approved/auto_rejected/pending_manual）
@@ -429,7 +506,26 @@ class AutoReviewService:
                 username="ai_reviewer",
                 defaults={"name": "AI 审核员"},
             )
-            reason = ", ".join(violation_types) if violation_types else "AI 检测到违规内容"
+            # 违规类型英文 → 中文映射
+            violation_label_map = {
+                'porn': '色情内容',
+                'politics': '涉政内容',
+                'abuse': '辱骂内容',
+                'violence': '暴力内容',
+                'spam': '垃圾信息',
+                'illegal': '违法内容',
+            }
+            if violation_types:
+                labels = [violation_label_map.get(v, v) for v in violation_types]
+                reason = "AI 检测到违规内容：" + "、".join(labels)
+            else:
+                reason = "AI 检测到违规内容"
+
+            # 从 part_results 中提取违规片段，附加到拒绝原因
+            flagged_snippets = AutoReviewService._collect_flagged_content(part_results)
+            if flagged_snippets:
+                reason += "\n违规片段：" + flagged_snippets
+
             try:
                 ReviewService.reject_content(
                     content_id, content_type, ai_reviewer, reason
@@ -440,6 +536,41 @@ class AutoReviewService:
 
         # 置信度在阈值之间，待人工复核
         return "pending_manual"
+
+    @staticmethod
+    def _collect_flagged_content(part_results: Optional[List[Dict]]) -> str:
+        """从各审核部分结果中收集违规片段
+
+        Args:
+            part_results: 各审核部分的详细结果列表
+
+        Returns:
+            str: 合并后的违规片段文本，多个片段用 | 分隔
+        """
+        if not part_results:
+            return ""
+
+        snippets = []
+        for part in part_results:
+            flagged = part.get("flagged_content", "")
+            if flagged and flagged.strip():
+                snippets.append(flagged.strip())
+
+            # 也检查分段中的 flagged_content
+            for seg in part.get("segments", []):
+                seg_flagged = seg.get("flagged_content", "")
+                if seg_flagged and seg_flagged.strip():
+                    snippets.append(seg_flagged.strip())
+
+        # 去重并合并
+        seen = set()
+        unique = []
+        for s in snippets:
+            if s not in seen:
+                seen.add(s)
+                unique.append(s)
+
+        return " | ".join(unique)
 
 
     @staticmethod

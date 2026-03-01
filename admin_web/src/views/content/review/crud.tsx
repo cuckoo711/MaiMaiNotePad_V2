@@ -1,7 +1,6 @@
 import * as api from './api';
 import {
 	dict,
-	UserPageQuery,
 	CreateCrudOptionsProps,
 	CreateCrudOptionsRet,
 } from '@fast-crud/fast-crud';
@@ -32,22 +31,31 @@ function truncateText(text: string, maxLength: number = 80): string {
  */
 export const createCrudOptions = function ({ crudExpose }: CreateCrudOptionsProps): CreateCrudOptionsRet {
 	// 分页查询请求 — 适配后端 {items, total, page, page_size} 格式
-	const pageRequest = async (query: UserPageQuery) => {
-		const res = await api.GetList(query);
-		// Fast-CRUD 需要 { records, total, currentPage, pageSize }
-		const data = res.data || res;
-		return {
-			records: data.items || [],
-			total: data.total || 0,
-			currentPage: data.page || 1,
-			pageSize: data.page_size || 10,
-		};
+	const pageRequest = async (query: any) => {
+		// query 已经过全局 transformQuery 转换为 { page, limit, ...form }
+		// 后端使用 page_size 而非 limit，需要转换参数名
+		const params: any = { ...query };
+		if (params.limit !== undefined) {
+			params.page_size = params.limit;
+			delete params.limit;
+		}
+		return await api.GetList(params);
 	};
 
 	return {
 		crudOptions: {
 			request: {
 				pageRequest,
+				// 覆盖全局 transformRes，适配审核 API 的响应格式
+				transformRes: ({ res }: any) => {
+					const data = res.data || res;
+					return {
+						records: data.items || [],
+						total: data.total || 0,
+						currentPage: data.page || 1,
+						pageSize: data.page_size || 10,
+					};
+				},
 			},
 			actionbar: {
 				buttons: {
@@ -55,7 +63,13 @@ export const createCrudOptions = function ({ crudExpose }: CreateCrudOptionsProp
 				},
 			},
 			rowHandle: {
-				show: false, // 使用自定义行操作模板
+				fixed: 'right',
+				width: 320,
+				buttons: {
+					view: { show: false },
+					edit: { show: false },
+					remove: { show: false },
+				},
 			},
 			// 搜索区域配置
 			search: {

@@ -11,6 +11,7 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from django.core.exceptions import ValidationError, PermissionDenied
 from django.utils import timezone
 
@@ -42,7 +43,7 @@ class CommentViewSet(CustomModelViewSet):
     - POST /api/content/comments/{id}/admin_delete/ - 管理后台删除评论（管理员）
     """
     
-    queryset = Comment.objects.filter(is_deleted=False)
+    queryset = Comment.objects.filter(is_deleted=False).exclude(moderation_status='rejected')
     serializer_class = CommentSerializer
     create_serializer_class = CommentCreateSerializer
     ordering_fields = ['create_datetime', 'like_count']
@@ -151,6 +152,9 @@ class CommentViewSet(CustomModelViewSet):
             # 保存评论（序列化器会自动设置 user）
             comment = serializer.save()
             
+            # 发送通知（异步，不阻塞响应）
+            self._send_comment_notifications(comment, request.user)
+            
             # 使用展示序列化器返回数据
             response_serializer = CommentSerializer(comment, context={'request': request})
             
@@ -162,11 +166,24 @@ class CommentViewSet(CustomModelViewSet):
                 },
                 status=status.HTTP_201_CREATED
             )
-        except ValidationError as e:
+        except (ValidationError, DRFValidationError) as e:
+            # 从异常中提取干净的错误消息
+            if hasattr(e, 'detail'):
+                detail = e.detail
+                if isinstance(detail, list):
+                    msg = str(detail[0]) if detail else '参数验证失败'
+                elif isinstance(detail, dict):
+                    # 取第一个字段的第一条错误
+                    first_errors = next(iter(detail.values()), ['参数验证失败'])
+                    msg = str(first_errors[0]) if first_errors else '参数验证失败'
+                else:
+                    msg = str(detail)
+            else:
+                msg = str(e.message) if hasattr(e, 'message') else str(e)
             return Response(
                 {
                     'code': 4000,
-                    'msg': str(e)
+                    'msg': msg
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
@@ -258,6 +275,19 @@ class CommentViewSet(CustomModelViewSet):
                 )
             
             result = CommentService.react_comment(comment, request.user, react_action)
+            
+            # 点赞时通知评论作者（排除自己点赞自己）
+            if react_action == 'like' and comment.user_id != request.user.id:
+                try:
+                    from mainotebook.content.services.comment_notification import CommentNotificationService
+                    user_name = getattr(request.user, 'name', '') or getattr(request.user, 'username', '匿名用户')
+                    CommentNotificationService.notify_new_like(
+                        comment_author_id=comment.user_id,
+                        liker_name=user_name,
+                        comment_content_preview=comment.content[:50],
+                    )
+                except Exception:
+                    pass  # 通知失败不影响点赞操作
             
             msg_map = {
                 'like': '点赞成功',
@@ -593,3 +623,116 @@ class CommentViewSet(CustomModelViewSet):
                 {'code': 5000, 'msg': f'封禁用户失败: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+    @staticmethod
+    def _send_comment_notifications(comment: Comment, current_user) -> None:
+        """评论创建后发送相关通知
+
+        根据评论类型发送不同通知：
+        - 回复：通知被回复评论的作者
+        - 一级评论：通知知识库/人设卡的作者
+
+        Args:
+            comment: 刚创建的评论对象
+            current_user: 当前操作用户
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        try:
+            from mainotebook.content.services.comment_notification import CommentNotificationService
+            from mainotebook.content.models import KnowledgeBase, PersonaCard
+
+            user_name = getattr(current_user, 'name', '') or getattr(current_user, 'username', '匿名用户')
+
+            if comment.parent_id:
+                # 回复场景
+                parent_comment = Comment.objects.select_related('user').filter(
+                    id=comment.parent_id
+                ).first()
+
+                # 沿 parent 链向上查找真正的根评论（parent=None）
+                root_comment = parent_comment
+                if root_comment and root_comment.parent_id:
+                    root_comment = Comment.objects.filter(
+                        id=root_comment.parent_id
+                    ).first() or root_comment
+                    # 最多再向上一层，防止极端情况
+                    if root_comment and root_comment.parent_id:
+                        root_comment = Comment.objects.filter(
+                            id=root_comment.parent_id
+                        ).first() or root_comment
+                root_comment_id = str(root_comment.id) if root_comment else str(comment.parent_id)
+
+                # 查出实际被回复的评论（reply_to），用于通知内容预览
+                reply_to_comment = None
+                if comment.reply_to_id and comment.reply_to_id != comment.parent_id:
+                    reply_to_comment = Comment.objects.select_related('user').filter(
+                        id=comment.reply_to_id
+                    ).first()
+
+                # 确定通知中展示的"被回复评论内容"：
+                # 有 reply_to 时用 reply_to 的内容，否则用 parent 的内容
+                actual_replied_content = (
+                    reply_to_comment.content[:30] if reply_to_comment
+                    else (parent_comment.content[:30] if parent_comment else '')
+                )
+
+                # 通知根评论作者（排除自己）
+                if parent_comment and parent_comment.user_id != current_user.id:
+                    CommentNotificationService.notify_new_reply(
+                        comment_author_id=parent_comment.user_id,
+                        replier_name=user_name,
+                        comment_content_preview=actual_replied_content,
+                        reply_content_preview=comment.content[:50],
+                        comment_id=str(parent_comment.id),
+                        reply_id=str(comment.id),
+                        target_id=str(comment.target_id),
+                        target_type=comment.target_type,
+                        root_comment_id=root_comment_id,
+                    )
+
+                # 通知被回复评论的作者（reply_to 与 parent 不同时）
+                if (reply_to_comment
+                        and reply_to_comment.user_id != current_user.id
+                        and (not parent_comment or reply_to_comment.user_id != parent_comment.user_id)):
+                    CommentNotificationService.notify_new_reply(
+                        comment_author_id=reply_to_comment.user_id,
+                        replier_name=user_name,
+                        comment_content_preview=reply_to_comment.content[:30],
+                        reply_content_preview=comment.content[:50],
+                        comment_id=str(reply_to_comment.id),
+                        reply_id=str(comment.id),
+                        target_id=str(comment.target_id),
+                        target_type=comment.target_type,
+                        root_comment_id=root_comment_id,
+                    )
+            else:
+                # 一级评论场景：通知内容作者
+                target_id = comment.target_id
+                target_type = comment.target_type
+                content_owner_id = None
+                content_name = ""
+
+                if target_type == 'knowledge':
+                    kb = KnowledgeBase.objects.filter(id=target_id).only('uploader_id', 'name').first()
+                    if kb:
+                        content_owner_id = kb.uploader_id
+                        content_name = kb.name
+                elif target_type == 'persona':
+                    pc = PersonaCard.objects.filter(id=target_id).only('uploader_id', 'name').first()
+                    if pc:
+                        content_owner_id = pc.uploader_id
+                        content_name = pc.name
+
+                if content_owner_id and content_owner_id != current_user.id:
+                    CommentNotificationService.notify_new_comment_on_content(
+                        content_owner_id=content_owner_id,
+                        commenter_name=user_name,
+                        content_name=content_name,
+                        content_type=target_type,
+                        comment_content_preview=comment.content[:50],
+                        comment_id=str(comment.id),
+                        target_id=str(target_id),
+                    )
+        except Exception:
+            logger.exception("发送评论通知失败，不影响评论创建")

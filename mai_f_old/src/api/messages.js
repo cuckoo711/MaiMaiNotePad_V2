@@ -13,17 +13,14 @@ export const getMessages = (page = 1, pageSize = 20, otherUserId) => {
   return apiClient.get('/system/message_center/get_self_receive/', { params })
 }
 
-// 根据类型获取消息 (后端 get_self_receive 返回所有，这里尝试传参过滤，或者由前端过滤)
+// 根据类型获取消息
+// messageType: 逗号分隔的消息类型编号（0=系统通知, 1=评论, 2=回复, 3=点赞, 4=审核）
 export const getMessagesByType = (messageType, page = 1, pageSize = 20) => {
-  // messageType 可能需要映射到后端的 target_type (1:角色, 2:部门, 3:系统, 0:个人?)
-  // 或者 messageType 是 contentType (TEXT, SYSTEM...)?
-  // 假设前端传的是 'SYSTEM' 等字符串，而后端可能需要数字或字符串
-  // 暂时透传
   return apiClient.get('/system/message_center/get_self_receive/', {
     params: {
       page,
       limit: pageSize,
-      msg_type: messageType // 尝试传参，需后端支持
+      message_type: messageType
     }
   })
 }

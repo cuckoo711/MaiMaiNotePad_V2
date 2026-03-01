@@ -459,6 +459,24 @@ class Comment(CoreModel):
         verbose_name="是否已删除",
         help_text="软删除标记"
     )
+    MODERATION_STATUS_CHOICES = (
+        ('approved', 'AI 审核通过'),
+        ('rejected', 'AI 审核拒绝'),
+        ('uncertain', 'AI 审核不确定'),
+    )
+    moderation_status = models.CharField(
+        max_length=20,
+        choices=MODERATION_STATUS_CHOICES,
+        default='approved',
+        verbose_name="审核状态",
+        help_text="AI 内容审核状态"
+    )
+    moderation_detail = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name="审核详情",
+        help_text="AI 审核返回的详细信息（JSON 格式）"
+    )
     like_count = models.IntegerField(
         default=0,
         verbose_name="点赞数",
@@ -877,6 +895,9 @@ class ReviewReport(CoreModel):
                 'porn': '色情',
                 'politics': '涉政',
                 'abuse': '辱骂',
+                'violence': '暴力',
+                'spam': '垃圾信息',
+                'illegal': '违法',
             }
             violation_labels = [violation_map.get(v, v) for v in self.violation_types]
             lines.append(f"违规类型：{', '.join(violation_labels)}")
@@ -897,6 +918,11 @@ class ReviewReport(CoreModel):
                 lines.append(f"    置信度：{part_confidence:.2f}")
                 lines.append(f"    违规类型：{', '.join(violation_labels)}")
 
+                # 违规片段
+                flagged = part.get('flagged_content', '')
+                if flagged:
+                    lines.append(f"    违规片段：{flagged}")
+
                 # 分段详情
                 segments = part.get('segments', [])
                 if segments:
@@ -910,6 +936,233 @@ class ReviewReport(CoreModel):
                         lines.append(f"      第 {seg_index} 段：置信度 {seg_confidence:.2f}，违规类型：{', '.join(seg_violation_labels)}")
                         if seg_summary:
                             lines.append(f"        摘要：{seg_summary}")
+                        seg_flagged = seg.get('flagged_content', '')
+                        if seg_flagged:
+                            lines.append(f"        违规片段：{seg_flagged}")
 
         lines.append(f"\n{'=' * 40}")
         return "\n".join(lines)
+
+
+class AIModel(CoreModel):
+    """AI 审核模型配置
+
+    存储可用于内容审核的 AI 模型信息，支持在管理后台动态管理。
+    ModelPool 从此表读取启用的模型列表，按优先级排序后进行负载均衡调度。
+    """
+
+    name = models.CharField(
+        max_length=200,
+        unique=True,
+        verbose_name="模型名称",
+        help_text="模型全称，如 deepseek-ai/DeepSeek-R1-0528-Qwen3-8B"
+    )
+    provider = models.CharField(
+        max_length=50,
+        default="siliconflow",
+        verbose_name="API 提供商",
+        help_text="API 服务提供商标识，如 siliconflow"
+    )
+    parameter_size = models.FloatField(
+        default=7.0,
+        verbose_name="参数量(B)",
+        help_text="模型参数量，单位为十亿（B），如 7.0 表示 7B"
+    )
+    max_context_length = models.IntegerField(
+        default=32000,
+        verbose_name="最大上下文长度",
+        help_text="模型支持的最大上下文 token 数"
+    )
+    rpm_limit = models.IntegerField(
+        default=1000,
+        verbose_name="RPM 限制",
+        help_text="每分钟最大请求数（Requests Per Minute）"
+    )
+    tpm_limit = models.IntegerField(
+        default=50000,
+        verbose_name="TPM 限制",
+        help_text="每分钟最大 Token 数（Tokens Per Minute）"
+    )
+    priority = models.IntegerField(
+        default=0,
+        verbose_name="优先级",
+        help_text="调度优先级，数值越小优先级越高（0 为最高）"
+    )
+    is_enabled = models.BooleanField(
+        default=True,
+        verbose_name="是否启用",
+        help_text="是否参与负载均衡调度"
+    )
+    cooldown_seconds = models.IntegerField(
+        default=65,
+        verbose_name="限速冷却时间(秒)",
+        help_text="触发 429 限速后的冷却等待时间"
+    )
+
+    class Meta:
+        db_table = table_prefix + "content_ai_model"
+        verbose_name = "AI 审核模型"
+        verbose_name_plural = verbose_name
+        ordering = ("priority", "-parameter_size", "-max_context_length")
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.parameter_size}B, {self.max_context_length // 1000}k)"
+
+
+class ModerationLog(CoreModel):
+    """AI 审核操作日志模型
+
+    记录每一次 AI 审核 API 调用的详细信息，用于统计看板、成本分析和审计追踪。
+    包含 token 用量、模型信息、审核结果、耗时等关键指标。
+    """
+
+    # ==================== 审核来源 ====================
+    SOURCE_CHOICES = (
+        ('comment', '评论审核'),
+        ('knowledge', '知识库审核'),
+        ('persona', '人设卡审核'),
+        ('knowledge_file', '知识库文件审核'),
+    )
+
+    source = models.CharField(
+        max_length=30,
+        choices=SOURCE_CHOICES,
+        verbose_name="审核来源",
+        help_text="触发审核的业务场景"
+    )
+    content_id = models.CharField(
+        max_length=36,
+        null=True,
+        blank=True,
+        verbose_name="关联内容ID",
+        help_text="关联的评论/知识库/人设卡 ID"
+    )
+    user = models.ForeignKey(
+        to=Users,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_constraint=False,
+        related_name="moderation_logs",
+        verbose_name="触发用户",
+        help_text="触发审核操作的用户"
+    )
+
+    # ==================== 模型信息 ====================
+    model_name = models.CharField(
+        max_length=100,
+        verbose_name="模型名称",
+        help_text="调用的 AI 模型名称，如 Qwen/Qwen3-8B"
+    )
+    api_provider = models.CharField(
+        max_length=50,
+        default="siliconflow",
+        verbose_name="API 提供商",
+        help_text="API 服务提供商标识"
+    )
+    temperature = models.FloatField(
+        default=0.1,
+        verbose_name="温度参数",
+        help_text="模型推理温度参数"
+    )
+
+    # ==================== 审核内容 ====================
+    text_type = models.CharField(
+        max_length=30,
+        verbose_name="文本类型",
+        help_text="审核的文本类型（comment/post/title/content/knowledge/persona）"
+    )
+    input_text = models.TextField(
+        verbose_name="审核输入文本",
+        help_text="提交给 AI 审核的原始文本内容"
+    )
+    input_text_length = models.IntegerField(
+        default=0,
+        verbose_name="输入文本长度",
+        help_text="输入文本的字符数"
+    )
+
+    # ==================== Token 用量 ====================
+    prompt_tokens = models.IntegerField(
+        default=0,
+        verbose_name="提示词 Token 数",
+        help_text="系统提示词 + 用户输入消耗的 Token 数"
+    )
+    completion_tokens = models.IntegerField(
+        default=0,
+        verbose_name="生成 Token 数",
+        help_text="模型生成输出消耗的 Token 数"
+    )
+    total_tokens = models.IntegerField(
+        default=0,
+        verbose_name="总 Token 数",
+        help_text="本次调用消耗的总 Token 数"
+    )
+
+    # ==================== 审核结果 ====================
+    DECISION_CHOICES = (
+        ('true', '通过'),
+        ('false', '拒绝'),
+        ('unknown', '不确定'),
+        ('error', '调用异常'),
+    )
+
+    decision = models.CharField(
+        max_length=10,
+        choices=DECISION_CHOICES,
+        verbose_name="审核决策",
+        help_text="AI 返回的审核决策"
+    )
+    confidence = models.FloatField(
+        default=0.0,
+        verbose_name="置信度",
+        help_text="AI 返回的违规置信度（0~1）"
+    )
+    violation_types = models.JSONField(
+        default=list,
+        verbose_name="违规类型",
+        help_text="AI 检测到的违规类型列表，如 ['porn', 'abuse']"
+    )
+    raw_output = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name="模型原始输出",
+        help_text="AI 模型返回的原始文本（用于调试和审计）"
+    )
+
+    # ==================== 性能指标 ====================
+    latency_ms = models.IntegerField(
+        default=0,
+        verbose_name="响应耗时(ms)",
+        help_text="从发起 API 请求到收到响应的耗时（毫秒）"
+    )
+    is_success = models.BooleanField(
+        default=True,
+        verbose_name="是否调用成功",
+        help_text="API 调用是否成功（False 表示异常/超时）"
+    )
+    error_message = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name="错误信息",
+        help_text="调用失败时的错误信息"
+    )
+
+    class Meta:
+        db_table = table_prefix + "content_moderation_log"
+        verbose_name = "AI 审核日志"
+        verbose_name_plural = verbose_name
+        ordering = ("-create_datetime",)
+        indexes = [
+            models.Index(fields=['source']),
+            models.Index(fields=['decision']),
+            models.Index(fields=['model_name']),
+            models.Index(fields=['user']),
+            models.Index(fields=['is_success']),
+            models.Index(fields=['create_datetime']),
+            models.Index(fields=['content_id']),
+        ]
+
+    def __str__(self) -> str:
+        return f"[{self.get_source_display()}] {self.get_decision_display()} - {self.input_text[:30]}"
+

@@ -59,7 +59,8 @@ class ReviewNotificationService:
             message = MessageCenter.objects.create(
                 title=title,
                 content=message_content,
-                target_type=0
+                target_type=0,
+                message_type=4,
             )
 
             # 创建目标用户关联记录

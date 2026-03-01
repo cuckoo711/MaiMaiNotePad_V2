@@ -702,9 +702,23 @@ class LoginLog(CoreModel):
 
 
 class MessageCenter(CoreModel):
+    MESSAGE_TYPE_CHOICES = (
+        (0, '系统通知'),
+        (1, '评论'),
+        (2, '回复'),
+        (3, '点赞'),
+        (4, '审核'),
+    )
+
     title = models.CharField(max_length=100, verbose_name="标题", help_text="标题")
     content = models.TextField(verbose_name="内容", help_text="内容")
     target_type = models.IntegerField(default=0, verbose_name="目标类型", help_text="目标类型")
+    message_type = models.IntegerField(
+        default=0,
+        choices=MESSAGE_TYPE_CHOICES,
+        verbose_name="消息类型",
+        help_text="消息类型：0=系统通知, 1=评论, 2=回复, 3=点赞, 4=审核"
+    )
     target_user = models.ManyToManyField(to=Users, related_name='user', through='MessageCenterTargetUser',
                                          through_fields=('messagecenter', 'users'), blank=True, verbose_name="目标用户",
                                          help_text="目标用户")
@@ -712,6 +726,11 @@ class MessageCenter(CoreModel):
                                          verbose_name="目标部门", help_text="目标部门")
     target_role = models.ManyToManyField(to=Role, blank=True, db_constraint=False,
                                          verbose_name="目标角色", help_text="目标角色")
+    extra_data = models.JSONField(
+        default=dict, blank=True, null=True,
+        verbose_name="扩展数据",
+        help_text="存储消息关联的业务数据，如评论 ID、目标内容 ID 等"
+    )
 
     class Meta:
         db_table = table_prefix + "message_center"

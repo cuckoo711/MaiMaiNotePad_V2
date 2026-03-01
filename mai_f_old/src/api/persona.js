@@ -36,6 +36,11 @@ export const getUserPersonaCards = (user_id, params = {}) => {
   return apiClient.get('/content/persona/', { params: { ...params, uploader: user_id } })
 }
 
+// 提交人设卡审核（申请公开）
+export const submitPersonaCard = (pc_id) => {
+  return apiClient.post(`/content/persona/${pc_id}/submit/`)
+}
+
 // 更新人设卡
 export const updatePersonaCard = (pc_id, payload) => {
   return apiClient.put(`/content/persona/${pc_id}/`, payload)
