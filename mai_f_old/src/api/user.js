@@ -7,7 +7,8 @@ export const login = (username, password, captcha, captchaKey) => {
     username,
     password,
     captcha,
-    captchaKey
+    captchaKey,
+    login_type: 'web'
   })
 }
 

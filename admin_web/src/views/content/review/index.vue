@@ -28,7 +28,7 @@
 			</el-card>
 			<el-card shadow="hover" class="stat-card">
 				<div class="stat-label">AI 接管数</div>
-				<div class="stat-value" style="color: #409eff">{{ stats.ai_auto_approved_count }}</div>
+				<div class="stat-value" style="color: #409eff">{{ stats.ai_takeover_count }}</div>
 			</el-card>
 		</div>
 
@@ -388,7 +388,7 @@ const stats = reactive<api.ReviewStats>({
 	approved_today: 0,
 	rejected_today: 0,
 	pass_rate: 0,
-	ai_auto_approved_count: 0,
+	ai_takeover_count: 0,
 });
 
 /** 加载统计数据 */

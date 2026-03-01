@@ -46,7 +46,7 @@ export interface ReviewStats {
 	approved_today: number;
 	rejected_today: number;
 	pass_rate: number;
-	ai_auto_approved_count: number;
+	ai_takeover_count: number;
 }
 
 export const apiPrefix = '/api/content/review/';

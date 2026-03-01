@@ -58,6 +58,9 @@ class LoginSerializer(TokenObtainPairSerializer):
     captcha = serializers.CharField(
         max_length=6, required=False, allow_null=True, allow_blank=True
     )
+    login_type = serializers.CharField(
+        max_length=20, required=False, allow_null=True, allow_blank=True
+    )
 
     class Meta:
         model = Users
@@ -100,8 +103,10 @@ class LoginSerializer(TokenObtainPairSerializer):
         # 检查是否为超级管理员或员工，只有这些角色才能登录管理后台
         # is_superuser: 超级管理员
         # is_staff: 职员（可登录后台）
-        if not (user.is_superuser or user.is_staff):
-            raise CustomValidationError("普通用户禁止登录管理后台")
+        login_type = self.initial_data.get("login_type")
+        if login_type == 'admin':
+            if not (user.is_superuser or user.is_staff):
+                raise CustomValidationError("普通用户禁止登录管理后台")
             
         try:
             # 必须重置用户名为username,否则使用邮箱手机号登录会提示密码错误

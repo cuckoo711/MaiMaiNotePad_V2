@@ -808,9 +808,11 @@ class ReviewReport(CoreModel):
     )
 
     DECISION_CHOICES = (
+        ('pending_ai', 'AI 审核中'),
         ('auto_approved', '自动通过'),
         ('auto_rejected', '自动拒绝'),
         ('pending_manual', '待人工复核'),
+        ('error', '审核异常'),
     )
 
     id = models.UUIDField(
@@ -874,9 +876,11 @@ class ReviewReport(CoreModel):
         """
         # 决策结果映射为中文描述
         decision_map = {
+            'pending_ai': '⏳ AI 审核中',
             'auto_approved': '✅ 自动通过',
             'auto_rejected': '❌ 自动拒绝',
             'pending_manual': '⏳ 待人工复核',
+            'error': '⚠️ 审核异常',
         }
         decision_text = decision_map.get(self.decision, self.decision)
 

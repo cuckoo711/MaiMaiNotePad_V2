@@ -35,8 +35,8 @@ class AutoReviewService:
     def execute_auto_review(content_id: str, content_type: str) -> dict:
         """执行 AI 自动审核主流程
 
-        组装完整审核流程：查找内容 → 拼接文本 → 审核文本字段 → 获取并审核文件
-        → 聚合结果 → 执行决策 → 生成报告 → 通知上传者。
+        组装完整审核流程：查找内容 → 创建初始报告 → 拼接文本 → 审核文本字段 → 获取并审核文件
+        → 聚合结果 → 执行决策 → 更新报告 → 通知上传者。
 
         Args:
             content_id: 内容 ID
@@ -45,10 +45,11 @@ class AutoReviewService:
         Returns:
             dict: 审核报告数据，或包含 error 键的错误信息字典
         """
-        from mainotebook.content.models import KnowledgeBase, PersonaCard
+        from mainotebook.content.models import KnowledgeBase, PersonaCard, ReviewReport
         from mainotebook.content.services.moderation_service import (
             get_moderation_service,
         )
+        from django.utils import timezone
 
         # 1. 查找内容对象
         if content_type == "knowledge":
@@ -73,19 +74,34 @@ class AutoReviewService:
             )
             return {"error": "内容不在待审核状态"}
 
+        # 2. 创建初始审核报告（状态为 pending_ai）
+        report = ReviewReport.objects.create(
+            content_id=content_id,
+            content_type=content_type,
+            content_name=content.name,
+            decision="pending_ai",
+            final_confidence=0.0,
+            violation_types=[],
+            report_data={
+                "status": "processing",
+                "start_time": timezone.now().isoformat(),
+                "message": "AI 正在审核中..."
+            }
+        )
+
         try:
             moderation_service = get_moderation_service()
             text_type = content_type  # identity 映射
 
-            # 1. 收集所有文本内容（文本字段 + 关联文件）
+            # 3. 收集所有文本内容（文本字段 + 关联文件）
             all_content_parts = []
             
-            # 1.1 文本字段（标题、描述、正文）
+            # 3.1 文本字段（标题、描述、正文）
             text_fields = AutoReviewService._build_text_fields(content)
             if text_fields:
                 all_content_parts.append(f"--- 基础信息 ---\n{text_fields}")
 
-            # 1.2 关联文件内容
+            # 3.2 关联文件内容
             text_files = AutoReviewService._get_text_files(content, content_type)
             for file_obj in text_files:
                 file_content = AutoReviewService._read_file_content(file_obj)
@@ -98,9 +114,13 @@ class AutoReviewService:
             # 如果没有可审核的内容，直接返回
             if not full_content.strip():
                 logger.warning("内容为空，无需审核: content_id=%s", content_id)
+                # 更新报告为无内容
+                report.decision = "auto_approved"  # 或其他状态
+                report.report_data = {"message": "内容为空，自动通过"}
+                report.save()
                 return {}
 
-            # 2. 对合并后的完整内容进行审核（自动分段）
+            # 4. 对合并后的完整内容进行审核（自动分段）
             # 无论长短，都统一走分段逻辑，长文本会被切分，短文本作为单段处理
             max_confidence, merged_violations, segment_details = (
                 AutoReviewService._review_segments(
@@ -111,7 +131,7 @@ class AutoReviewService:
                 )
             )
 
-            # 3. 构造唯一的聚合结果 Part
+            # 5. 构造唯一的聚合结果 Part
             # 从分段详情中收集 flagged_content
             flagged_parts = [
                 d.get("flagged_content", "")
@@ -135,7 +155,7 @@ class AutoReviewService:
             final_confidence = max_confidence
             final_violation_types = merged_violations
 
-            # 4. 执行决策
+            # 6. 执行决策
             try:
                 decision = AutoReviewService._make_decision(
                     content_id, content_type,
@@ -149,22 +169,39 @@ class AutoReviewService:
                 )
                 decision = "pending_manual"
 
-            # 5. 生成审核报告
-            report = AutoReviewService._generate_report(
-                content_id, content_type, content.name,
-                decision, final_confidence, final_violation_types,
-                part_results,
-            )
+            # 7. 更新审核报告
+            report_data = {
+                "content_name": content.name,
+                "content_type": content_type,
+                "review_time": timezone.now().isoformat(),
+                "decision": decision,
+                "final_confidence": final_confidence,
+                "violation_types": final_violation_types,
+                "parts": part_results,
+            }
+            
+            report.decision = decision
+            report.final_confidence = final_confidence
+            report.violation_types = final_violation_types
+            report.report_data = report_data
+            report.save()
 
-            # 6. 返回报告数据
+            # 8. 通知上传者（可选，这里已经在 _make_decision 后可能触发了 ReviewNotificationService，但原逻辑是在 execute_auto_review 外或 _notify_uploader 中）
+            # 原逻辑中有 _notify_uploader 方法，这里应该调用它
+            AutoReviewService._notify_uploader(content, content_type, report)
+
+            # 9. 返回报告数据
             return report.report_data
 
         except Exception as e:
-            # API 失败或其他异常，保持待审核状态不变
+            # API 失败或其他异常，更新报告为错误状态
             logger.error(
                 "AI 审核服务异常: content_id=%s, content_type=%s, 错误: %s",
                 content_id, content_type, e,
             )
+            report.decision = "error"
+            report.report_data = {"error": str(e), "message": "AI 审核服务异常"}
+            report.save()
             return {"error": "AI 审核服务暂时不可用"}
 
     @staticmethod

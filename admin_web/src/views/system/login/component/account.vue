@@ -164,7 +164,7 @@ export default defineComponent({
 			}
 			await formRef.value.validate((valid: any) => {
 				if (valid) {
-					loginApi.login({ ...state.ruleForm, password: Md5.hashStr(state.ruleForm.password) }).then((res: any) => {
+					loginApi.login({ ...state.ruleForm, password: Md5.hashStr(state.ruleForm.password), login_type: 'admin' }).then((res: any) => {
 						if (res.code === 2000) {
               const {data} = res
               Cookies.set('username', res.data.username);

@@ -385,6 +385,7 @@ class ReviewService:
                 - approved_today: 今日已批准数
                 - rejected_today: 今日已拒绝数
                 - pass_rate: 通过率（最近 30 天）
+                - ai_takeover_count: AI 接管数（AI 自动通过 + AI 自动拒绝）
         """
         # 待审核数量
         pending_knowledge = KnowledgeBase.objects.filter(
@@ -407,20 +408,22 @@ class ReviewService:
         
         # 通过率（最近 30 天）
         thirty_days_ago = timezone.now() - timedelta(days=30)
-        total_reviewed = UploadRecord.objects.filter(
+        # 这里计算的是总的通过率，不区分人工还是 AI
+        total_reviewed_records = UploadRecord.objects.filter(
             status__in=['approved', 'rejected'],
             update_datetime__gte=thirty_days_ago
         ).count()
-        approved_count = UploadRecord.objects.filter(
+        approved_count_records = UploadRecord.objects.filter(
             status='approved',
             update_datetime__gte=thirty_days_ago
         ).count()
         
-        pass_rate = (approved_count / total_reviewed * 100) if total_reviewed > 0 else 0
+        pass_rate = (approved_count_records / total_reviewed_records * 100) if total_reviewed_records > 0 else 0
         
-        # AI 接管并通过的数量（ReviewReport 中 decision 为 auto_approved 的记录数）
-        ai_auto_approved_count = ReviewReport.objects.filter(
-            decision='auto_approved'
+        # AI 接管数：AI 审查后直接标记通过或拒绝的数量
+        # decision 为 'auto_approved' 或 'auto_rejected'
+        ai_takeover_count = ReviewReport.objects.filter(
+            decision__in=['auto_approved', 'auto_rejected']
         ).count()
         
         return {
@@ -430,5 +433,5 @@ class ReviewService:
             'approved_today': approved_today,
             'rejected_today': rejected_today,
             'pass_rate': round(pass_rate, 2),
-            'ai_auto_approved_count': ai_auto_approved_count,
+            'ai_takeover_count': ai_takeover_count,
         }
