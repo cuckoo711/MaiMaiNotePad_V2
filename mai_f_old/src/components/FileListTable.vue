@@ -43,13 +43,13 @@
     </el-table-column>
     <el-table-column
       label="操作"
-      :width="actionColumnWidth"
+      width="180"
       align="center"
       header-align="center"
     >
       <template #default="scope">
         <el-tooltip
-          v-if="showPreview"
+          v-if="showPreview && isPreviewable(scope.row)"
           content="浏览文件"
           placement="top"
         >
@@ -59,6 +59,23 @@
             circle
             size="small"
             @click="handlePreview(scope.row)"
+          >
+            <el-icon>
+              <View />
+            </el-icon>
+          </el-button>
+        </el-tooltip>
+        <el-tooltip
+          v-else-if="showPreview"
+          content="暂不支持预览"
+          placement="top"
+        >
+          <el-button
+            type="info"
+            text
+            circle
+            disabled
+            size="small"
           >
             <el-icon>
               <View />
@@ -133,7 +150,13 @@ const props = defineProps({
 
 const emit = defineEmits(['preview', 'download', 'delete'])
 
-const actionColumnWidth = computed(() => 140)
+const isPreviewable = (row) => {
+  const name = (row.original_name || row.file_name || '').toLowerCase()
+  if (name.endsWith('.zip') || name.endsWith('.rar') || name.endsWith('.7z') || name.endsWith('.trg')) {
+    return false
+  }
+  return true
+}
 
 const deleteIconComponent = computed(() => {
   if (props.deleteText === '替换配置') {
