@@ -687,11 +687,20 @@ const isTomlVisual = computed(() => {
     return false
   }
   if (tomlBlocks.value.length > 0) {
-    ensureTranslationDictLoaded()
     return true
   }
   return false
 })
+
+watch(
+  () => isTomlVisual.value,
+  (val) => {
+    if (val) {
+      ensureTranslationDictLoaded()
+    }
+  },
+  { immediate: true }
+)
 
 const tomlBlockCount = computed(() => {
   if (!isTomlVisual.value) {

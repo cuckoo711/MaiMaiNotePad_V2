@@ -97,7 +97,7 @@
               :on-change="handleFileChange"
               :on-remove="handleFileRemove"
               :limit="100"
-              accept=".txt,.json"
+              accept=".txt,.json,.zip,.rar,.7z,.trg"
             >
               <el-icon class="upload-icon">
                 <UploadFilled />
@@ -107,7 +107,8 @@
                 <em>点击选择文件</em>
               </div>
               <div class="el-upload__tip">
-                仅支持 .txt/.json 文件，最多 100 个，单个文件不超过 100MB
+                支持 .txt/.json 文件（单个不超过 10MB）<br/>
+                支持 .zip/.rar/.7z/.trg 压缩包（不支持在线预览，如文件过大建议使用压缩包）
               </div>
             </el-upload>
           </el-form-item>
@@ -231,31 +232,61 @@ const handleFileChange = async (file, files) => {
       continue
     }
     const lowerName = raw.name.toLowerCase()
-    if (lowerName.endsWith('.json')) {
-      try {
-        const text = await readFileAsText(raw)
-        let parsed
-        try {
-          parsed = JSON.parse(text)
-        } catch (e) {
-          showErrorNotification(`JSON 文件解析失败: ${raw.name}`)
-          continue
-        }
-        const errorMessage = validateKnowledgeJsonStructure(parsed)
-        if (errorMessage) {
-          showErrorNotification(`JSON 文件结构不符合要求: ${raw.name}，${errorMessage}`)
-          continue
-        }
-      } catch (e) {
-        showErrorNotification(`读取文件失败: ${raw.name}`)
+    
+    // 检查文件大小
+    const sizeMB = raw.size / 1024 / 1024
+    
+    // 文本文件检查
+    if (lowerName.endsWith('.txt') || lowerName.endsWith('.json')) {
+      if (sizeMB > 10) {
+        showErrorNotification(`文件 ${raw.name} 超过 10MB，请使用压缩包上传`)
         continue
       }
+      
+      // JSON 结构校验
+      if (lowerName.endsWith('.json')) {
+        try {
+          const text = await readFileAsText(raw)
+          let parsed
+          try {
+            parsed = JSON.parse(text)
+          } catch (e) {
+            showErrorNotification(`JSON 文件解析失败: ${raw.name}`)
+            continue
+          }
+          const errorMessage = validateKnowledgeJsonStructure(parsed)
+          if (errorMessage) {
+            showErrorNotification(`JSON 文件结构不符合要求: ${raw.name}，${errorMessage}`)
+            continue
+          }
+        } catch (e) {
+          showErrorNotification(`读取文件失败: ${raw.name}`)
+          continue
+        }
+      }
+    } 
+    // 压缩包文件检查
+    else if (
+      lowerName.endsWith('.zip') || 
+      lowerName.endsWith('.rar') || 
+      lowerName.endsWith('.7z') || 
+      lowerName.endsWith('.trg')
+    ) {
+      // 压缩包暂时没有特定的大小限制，或者可以使用默认的服务器限制
+      // 可以在这里添加压缩包的大小限制逻辑，如果需要的话
+    } else {
+      showErrorNotification(`不支持的文件类型: ${raw.name}`)
+      continue
     }
+    
     validFiles.push(item)
   }
+  
   if (validFiles.length === 0 && files.length > 0) {
-    showErrorNotification('所有选择的 JSON 文件均未通过结构校验，请检查后重新上传')
+    // 如果没有有效文件，但用户尝试上传了文件，提示错误
+    // 具体的错误信息已经在循环中提示了
   }
+  
   fileList.value = validFiles
 }
 

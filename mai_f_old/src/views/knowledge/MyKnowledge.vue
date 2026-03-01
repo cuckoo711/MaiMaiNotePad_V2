@@ -660,6 +660,10 @@ const resolveFileLanguage = (fileName) => {
 const isPreviewableFile = (file) => {
   const name = (file && file.original_name) || ''
   const lower = name.toLowerCase()
+  // 压缩包不支持预览
+  if (lower.endsWith('.zip') || lower.endsWith('.rar') || lower.endsWith('.7z') || lower.endsWith('.trg')) {
+    return false
+  }
   return lower.endsWith('.toml') || lower.endsWith('.json') || lower.endsWith('.txt')
 }
 
