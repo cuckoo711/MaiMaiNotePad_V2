@@ -22,11 +22,11 @@ class AutoReviewService:
     # 分段审核最大长度（字符数，128k 上下文模型约可处理 10 万中文字符）
     MAX_SEGMENT_LENGTH = 100000
 
-    # 置信度阈值：低于此值自动通过
-    AUTO_APPROVE_THRESHOLD = 0.5
+    # 置信度阈值：低于或等于此值自动通过（放宽到 0.7，即允许一定程度的疑似违规）
+    AUTO_APPROVE_THRESHOLD = 0.7
 
     # 置信度阈值：高于此值自动拒绝（仅限知识库和人设卡，标准较宽松）
-    AUTO_REJECT_THRESHOLD = 0.95
+    AUTO_REJECT_THRESHOLD = 0.9
 
     # 并发线程数上限（用于分段审核和多文件审核）
     MAX_WORKERS = 5
@@ -77,118 +77,65 @@ class AutoReviewService:
             moderation_service = get_moderation_service()
             text_type = content_type  # identity 映射
 
-            # 用于聚合的所有审核结果列表
-            all_results: List[Dict] = []
-            # 用于报告的各部分详细结果列表
-            part_results: List[Dict] = []
-
-            # 2. 拼接并审核文本字段
+            # 1. 收集所有文本内容（文本字段 + 关联文件）
+            all_content_parts = []
+            
+            # 1.1 文本字段（标题、描述、正文）
             text_fields = AutoReviewService._build_text_fields(content)
             if text_fields:
-                text_result = moderation_service.moderate(
-                    text_fields, text_type,
+                all_content_parts.append(f"--- 基础信息 ---\n{text_fields}")
+
+            # 1.2 关联文件内容
+            text_files = AutoReviewService._get_text_files(content, content_type)
+            for file_obj in text_files:
+                file_content = AutoReviewService._read_file_content(file_obj)
+                if file_content:
+                    file_name = getattr(file_obj, 'file_name', str(file_obj))
+                    all_content_parts.append(f"\n\n--- 文件: {file_name} ---\n{file_content}")
+
+            full_content = "\n".join(all_content_parts)
+
+            # 如果没有可审核的内容，直接返回
+            if not full_content.strip():
+                logger.warning("内容为空，无需审核: content_id=%s", content_id)
+                return {}
+
+            # 2. 对合并后的完整内容进行审核（自动分段）
+            # 无论长短，都统一走分段逻辑，长文本会被切分，短文本作为单段处理
+            max_confidence, merged_violations, segment_details = (
+                AutoReviewService._review_segments(
+                    AutoReviewService._split_text_segments(full_content),
+                    text_type,
                     source=content_type,
                     content_id=content_id,
-                    user=getattr(content, 'uploader', None),
                 )
-
-                meta = text_result.get("_meta", {})
-                text_part = {
-                    "part_name": "文本字段",
-                    "part_type": "text_field",
-                    "confidence": text_result.get("confidence", 0.0),
-                    "violation_types": text_result.get("violation_types", []),
-                    "decision": text_result.get("decision", "unknown"),
-                    "flagged_content": text_result.get("flagged_content", ""),
-                    "raw_output": meta.get("raw_output", ""),
-                }
-                all_results.append(text_result)
-                part_results.append(text_part)
-
-            # 3. 获取并审核关联的文本文件（多文件并发）
-            text_files = AutoReviewService._get_text_files(content, content_type)
-            if text_files:
-                def _review_one_file(file_obj) -> Optional[Dict]:
-                    """审核单个文件（线程内执行）
-
-                    Returns:
-                        Optional[Dict]: 包含 part 和 result 的字典，文件不可读时返回 None
-                    """
-                    file_content = AutoReviewService._read_file_content(file_obj)
-                    if file_content is None:
-                        return None
-
-                    file_name = getattr(file_obj, 'file_name', str(file_obj))
-
-                    if len(file_content) > AutoReviewService.MAX_SEGMENT_LENGTH:
-                        # 大文件分段审核（内部已并发）
-                        max_conf, merged_violations, segment_details = (
-                            AutoReviewService._review_segments(
-                                AutoReviewService._split_text_segments(file_content),
-                                text_type,
-                                source="knowledge_file" if text_type == "knowledge" else text_type,
-                                content_id=content_id,
-                            )
-                        )
-                        # 从分段详情中收集 flagged_content
-                        flagged_parts = [
-                            d.get("flagged_content", "")
-                            for d in segment_details if d and d.get("flagged_content")
-                        ]
-                        file_part = {
-                            "part_name": file_name,
-                            "part_type": "file",
-                            "confidence": max_conf,
-                            "violation_types": merged_violations,
-                            "decision": "false" if max_conf > AutoReviewService.AUTO_REJECT_THRESHOLD else (
-                                "true" if max_conf < AutoReviewService.AUTO_APPROVE_THRESHOLD else "unknown"
-                            ),
-                            "segments": segment_details,
-                            "flagged_content": " | ".join(flagged_parts),
-                            "raw_output": "",  # 分段审核无单一 raw_output
-                        }
-                        agg_result = {
-                            "confidence": max_conf,
-                            "violation_types": merged_violations,
-                            "flagged_content": " | ".join(flagged_parts),
-                        }
-                    else:
-                        # 小文件整体审核
-                        file_result = moderation_service.moderate(
-                            file_content, text_type,
-                            source="knowledge_file" if text_type == "knowledge" else text_type,
-                            content_id=content_id,
-                        )
-
-                        file_meta = file_result.get("_meta", {})
-                        file_part = {
-                            "part_name": file_name,
-                            "part_type": "file",
-                            "confidence": file_result.get("confidence", 0.0),
-                            "violation_types": file_result.get("violation_types", []),
-                            "decision": file_result.get("decision", "unknown"),
-                            "flagged_content": file_result.get("flagged_content", ""),
-                            "raw_output": file_meta.get("raw_output", ""),
-                        }
-                        agg_result = file_result
-
-                    return {"part": file_part, "result": agg_result}
-
-                workers = min(AutoReviewService.MAX_WORKERS, len(text_files))
-                with ThreadPoolExecutor(max_workers=workers) as executor:
-                    futures = [executor.submit(_review_one_file, f) for f in text_files]
-                    for future in as_completed(futures):
-                        outcome = future.result()
-                        if outcome is not None:
-                            part_results.append(outcome["part"])
-                            all_results.append(outcome["result"])
-
-            # 4. 聚合所有审核结果
-            final_confidence, final_violation_types = (
-                AutoReviewService._aggregate_results(all_results)
             )
 
-            # 5. 执行决策
+            # 3. 构造唯一的聚合结果 Part
+            # 从分段详情中收集 flagged_content
+            flagged_parts = [
+                d.get("flagged_content", "")
+                for d in segment_details if d and d.get("flagged_content")
+            ]
+            
+            aggregated_part = {
+                "part_name": "完整内容聚合",
+                "part_type": "aggregated",
+                "confidence": max_confidence,
+                "violation_types": merged_violations,
+                "decision": "false" if max_confidence > AutoReviewService.AUTO_REJECT_THRESHOLD else (
+                    "true" if max_confidence <= AutoReviewService.AUTO_APPROVE_THRESHOLD else "unknown"
+                ),
+                "segments": segment_details,
+                "flagged_content": " | ".join(flagged_parts),
+                "raw_output": "",  # 聚合模式下无单一 raw_output
+            }
+
+            part_results = [aggregated_part]
+            final_confidence = max_confidence
+            final_violation_types = merged_violations
+
+            # 4. 执行决策
             try:
                 decision = AutoReviewService._make_decision(
                     content_id, content_type,
@@ -202,16 +149,14 @@ class AutoReviewService:
                 )
                 decision = "pending_manual"
 
-            # 6. 生成审核报告
+            # 5. 生成审核报告
             report = AutoReviewService._generate_report(
                 content_id, content_type, content.name,
                 decision, final_confidence, final_violation_types,
                 part_results,
             )
 
-            # 7. 返回报告数据
-            # 注意：通知已在 _make_decision → ReviewService.approve/reject_content 中发送，
-            # 无需再调用 _notify_uploader，避免重复通知
+            # 6. 返回报告数据
             return report.report_data
 
         except Exception as e:
@@ -471,9 +416,9 @@ class AutoReviewService:
     ) -> str:
         """根据置信度执行审核决策
 
-        - confidence < 0.5: 自动通过
-        - confidence > 0.95: 自动拒绝（知识库/人设卡标准较宽松）
-        - 0.5 <= confidence <= 0.95: 待人工复核
+        - confidence <= 0.7: 自动通过
+        - confidence > 0.90: 自动拒绝（知识库/人设卡标准较宽松）
+        - 0.7 < confidence <= 0.90: 待人工复核
 
         Args:
             content_id: 内容 ID
@@ -488,8 +433,8 @@ class AutoReviewService:
         from mainotebook.content.services.review_service import ReviewService
         from mainotebook.system.models import Users
 
-        if confidence < AutoReviewService.AUTO_APPROVE_THRESHOLD:
-            # 置信度低于阈值，自动通过
+        if confidence <= AutoReviewService.AUTO_APPROVE_THRESHOLD:
+            # 置信度低于或等于阈值，自动通过
             ai_reviewer, _ = Users.objects.get_or_create(
                 username="ai_reviewer",
                 defaults={"name": "AI 审核员"},

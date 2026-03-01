@@ -468,8 +468,9 @@ run_migrations() {
 
 init_data() {
     header "初始化系统数据"
-    "$PYTHON_CMD" "$BACKEND_DIR/manage.py" init_area
     "$PYTHON_CMD" "$BACKEND_DIR/manage.py" init -y
+    "$PYTHON_CMD" "$BACKEND_DIR/manage.py" init_area
+    "$PYTHON_CMD" "$BACKEND_DIR/manage.py" init_ai_models
     success "系统数据初始化完成"
 }
 
@@ -542,8 +543,8 @@ main() {
     # 6. 数据库迁移
     run_migrations
 
-    # 7. 数据初始化（首次启动时）
-    if [[ "$FLAG_INIT" == true ]]; then
+    # 7. 数据初始化（首次启动或重置时）
+    if [[ "$FLAG_INIT" == true ]] || [[ "$FLAG_RESET" == true ]]; then
         init_data
     fi
 

@@ -26,8 +26,15 @@ def event_stream(user_id):
 
 def sse_view(request):
     token = request.GET.get('token')
-    decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-    user_id = decoded.get('user_id')
+    if not token:
+        return StreamingHttpResponse(status=401)
+        
+    try:
+        decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        user_id = decoded.get('user_id')
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        return StreamingHttpResponse(status=401)
+
     response = StreamingHttpResponse(event_stream(user_id), content_type='text/event-stream')
     response['Cache-Control'] = 'no-cache'
     return response

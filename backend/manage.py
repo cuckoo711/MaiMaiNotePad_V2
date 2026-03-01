@@ -2,10 +2,14 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+import warnings
 
 
 def main():
     """Run administrative tasks."""
+    # 忽略 drf-yasg 导致的 pkg_resources 废弃警告
+    warnings.filterwarnings("ignore", category=UserWarning, message="pkg_resources is deprecated as an API")
+    
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'application.settings')
     try:
         from django.core.management import execute_from_command_line
