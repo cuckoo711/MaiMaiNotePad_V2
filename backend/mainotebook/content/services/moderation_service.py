@@ -415,6 +415,8 @@ class ModerationService:
                     temperature=temperature,
                     max_tokens=max_tokens,
                     stream=False,
+                    response_format={"type": "json_object"},
+                    enable_thinking=False,
                 )
                 latency_ms = int((time.monotonic() - start_time) * 1000)
 

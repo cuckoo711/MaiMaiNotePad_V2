@@ -79,7 +79,7 @@
                   class="pc-avatar"
                 >
                   <template #default>
-                    {{ getPCInitial(card.author || card.name) }}
+                    {{ getPCInitial(getAuthorName(card) || card.name) }}
                   </template>
                 </el-avatar>
                 <div class="card-title-main">
@@ -593,14 +593,22 @@ const getPCInitial = (name) => {
 }
 
 const resolveAuthorAvatar = (card) => {
-  if (!card || !card.author_id) {
+  if (!card) {
+    return ''
+  }
+  const userId = card.uploader || card.uploader_id || card.author_id
+  if (!userId) {
     return ''
   }
   const base = apiBase || ''
   const trimmedBase = base.endsWith('/') ? base.slice(0, -1) : base
-  let url = `${trimmedBase}/users/${card.author_id}/avatar?size=64`
+  let url = `${trimmedBase}/users/${userId}/avatar?size=64`
+  
   if (card.avatar_updated_at) {
     url += `&t=${encodeURIComponent(card.avatar_updated_at)}`
+  } else if (card.uploader_avatar) {
+    // 使用 uploader_avatar 作为缓存破坏参数
+    url += `&v=${encodeURIComponent(card.uploader_avatar)}`
   }
   return url
 }

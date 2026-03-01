@@ -46,7 +46,7 @@
                       class="kb-avatar"
                     >
                       <template #default>
-                        {{ getKBInitial(kb.author || kb.name) }}
+                        {{ getKBInitial(getAuthorName(kb) || kb.name) }}
                       </template>
                     </el-avatar>
                     <h3 class="card-name">{{ kb.name }}</h3>
@@ -488,14 +488,20 @@ const getKBInitial = (name) => {
 }
 
 const resolveAuthorAvatar = (kb) => {
-  if (!kb || !kb.author_id) {
+  if (!kb) {
+    return ''
+  }
+  const userId = kb.uploader || kb.uploader_id || kb.author_id
+  if (!userId) {
     return ''
   }
   const base = apiBase || ''
   const trimmedBase = base.endsWith('/') ? base.slice(0, -1) : base
-  let url = `${trimmedBase}/users/${kb.author_id}/avatar?size=64`
+  let url = `${trimmedBase}/users/${userId}/avatar?size=64`
   if (kb.avatar_updated_at) {
     url += `&t=${encodeURIComponent(kb.avatar_updated_at)}`
+  } else if (kb.uploader_avatar) {
+    url += `&v=${encodeURIComponent(kb.uploader_avatar)}`
   }
   return url
 }
