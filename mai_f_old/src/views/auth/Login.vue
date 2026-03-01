@@ -8,7 +8,7 @@
         :rules="loginRules"
         ref="loginFormRef"
         label-position="left"
-        label-width="80px"
+        label-width="90px"
       >
         <el-form-item label="用户名" prop="username">
           <el-input
@@ -46,6 +46,16 @@
           </div>
         </el-form-item>
         <el-form-item>
+          <div class="login-agreement">
+            <el-checkbox v-model="loginForm.agreement" style="margin-right: 5px;">
+              我已阅读并同意
+            </el-checkbox>
+            <a :href="systemConfig['login.privacy_url'] || '/api/system/clause/privacy.html'" target="_blank">《隐私政策》</a>
+            和
+            <a :href="systemConfig['login.clause_url'] || '/api/system/clause/terms_service.html'" target="_blank">《服务条款》</a>
+          </div>
+        </el-form-item>
+        <el-form-item>
           <el-checkbox v-model="loginForm.remember">记住用户名和密码</el-checkbox>
         </el-form-item>
         <el-form-item>
@@ -56,6 +66,10 @@
           </div>
         </el-form-item>
       </el-form>
+      <div v-if="systemConfig['login.copyright']" class="copyright">
+        {{ systemConfig['login.copyright'] }}
+        <span v-if="systemConfig['login.keep_record']"> | {{ systemConfig['login.keep_record'] }}</span>
+      </div>
     </div>
   </div>
 </template>
@@ -65,7 +79,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { User, Lock, Key } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
-import { login, getCaptcha } from '@/api/user'
+import { login, getCaptcha, getSystemConfig } from '@/api/user'
 import { handleApiError, showApiErrorNotification, showErrorNotification, showSuccessNotification } from '@/utils/api'
 import websocket from '@/utils/websocket'
 
@@ -76,8 +90,10 @@ const loginForm = ref({
   password: '',
   captcha: '',
   captchaKey: '',
-  remember: false
+  remember: false,
+  agreement: false
 })
+const systemConfig = ref({})
 
 const captchaImage = ref('')
 
@@ -91,6 +107,17 @@ const fetchCaptcha = async () => {
     }
   } catch (error) {
     console.error('Failed to fetch captcha:', error)
+  }
+}
+
+const fetchSystemConfig = async () => {
+  try {
+    const response = await getSystemConfig()
+    if (response.code === 2000 && response.data) {
+      systemConfig.value = response.data
+    }
+  } catch (error) {
+    console.error('Failed to fetch system config:', error)
   }
 }
 
@@ -126,6 +153,10 @@ const getRememberedInfo = () => {
 
 const handleLogin = async () => {
   if (!loginFormRef.value) return
+  if (!loginForm.value.agreement) {
+    showErrorNotification('请先阅读并同意隐私政策和服务条款')
+    return
+  }
   await loginFormRef.value.validate(async (valid) => {
     if (valid) {
       try {
@@ -173,6 +204,7 @@ onMounted(() => {
   getRegisterInfo()
   getRememberedInfo()
   fetchCaptcha()
+  fetchSystemConfig()
 })
 </script>
 
@@ -187,7 +219,7 @@ onMounted(() => {
 }
 
 .login-form-wrapper {
-  width: 400px;
+  width: 520px;
   padding: 40px;
   background-color: var(--card-background);
   border-radius: 10px;
@@ -237,4 +269,29 @@ h3 {
     border: 1px solid #dcdfe6;
     border-radius: 4px;
   }
+
+.login-agreement {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: #606266;
+  flex-wrap: wrap;
+}
+
+.login-agreement a {
+  color: var(--el-color-primary);
+  text-decoration: none;
+  margin: 0 2px;
+}
+
+.login-agreement a:hover {
+  text-decoration: underline;
+}
+
+.copyright {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 12px;
+  color: #909399;
+}
 </style>

@@ -24,6 +24,14 @@
 				</el-input>
 			</el-form-item>
 			<el-form-item class="login-animation4">
+				<div class="login-agreement">
+					<el-checkbox v-model="state.form.agreement" style="margin-right: 5px;">
+						我已阅读并同意
+					</el-checkbox>
+					<a :href="getSystemConfig['login.privacy_url'] || '/api/system/clause/privacy.html'" target="_blank">《隐私政策》</a>
+					和
+					<a :href="getSystemConfig['login.clause_url'] || '/api/system/clause/terms_service.html'" target="_blank">《服务条款》</a>
+				</div>
 				<el-button type="primary" class="login-content-submit" round :loading="state.loading" @click="handleRegister">
 					注册
 				</el-button>
@@ -44,20 +52,28 @@
 </template>
 
 <script setup lang="ts" name="loginRegister">
-import { reactive, ref } from 'vue';
+import { reactive, ref, computed, toRefs } from 'vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
 import { register } from '/@/views/system/login/api';
+import { storeToRefs } from 'pinia';
+import { SystemConfigStore } from '/@/stores/systemConfig';
 
 const emit = defineEmits(['switchToLogin']);
 
 const formRef = ref<FormInstance>();
+const systemConfigStore = SystemConfigStore();
+const { systemConfig } = storeToRefs(systemConfigStore);
+const getSystemConfig = computed(() => {
+	return systemConfig.value;
+});
 
 const state = reactive({
 	form: {
 		email: '',
 		username: '',
 		password: '',
+		agreement: false,
 	},
 	loading: false,
 	isSuccess: false,
@@ -81,6 +97,10 @@ const rules = reactive<FormRules>({
 // 提交注册
 const handleRegister = async () => {
 	if (!formRef.value) return;
+	if (!state.form.agreement) {
+		ElMessage.warning('请先阅读并同意隐私政策和服务条款');
+		return;
+	}
 	const valid = await formRef.value.validate().catch(() => false);
 	if (!valid) return;
 	state.loading = true;
@@ -103,7 +123,7 @@ const handleRegister = async () => {
 // 重置表单并切回登录 tab
 const resetForm = () => {
 	state.isSuccess = false;
-	state.form = { email: '', username: '', password: '' };
+	state.form = { email: '', username: '', password: '', agreement: false };
 	emit('switchToLogin');
 };
 </script>

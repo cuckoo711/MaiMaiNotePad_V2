@@ -21,6 +21,14 @@
 			</el-col>
 		</el-form-item>
 		<el-form-item class="login-animation3">
+			<div class="login-agreement">
+				<el-checkbox v-model="ruleForm.agreement" style="margin-right: 5px;">
+					我已阅读并同意
+				</el-checkbox>
+				<a :href="getSystemConfig['login.privacy_url'] || '/api/system/clause/privacy.html'" target="_blank">《隐私政策》</a>
+				和
+				<a :href="getSystemConfig['login.clause_url'] || '/api/system/clause/terms_service.html'" target="_blank">《服务条款》</a>
+			</div>
 			<el-button round type="primary" class="login-content-submit">
 				<span>{{ $t('message.mobile.btnText') }}</span>
 			</el-button>
@@ -30,25 +38,36 @@
 </template>
 
 <script lang="ts">
-import { toRefs, reactive, defineComponent } from 'vue';
+import { toRefs, reactive, defineComponent, computed } from 'vue';
+import { storeToRefs } from 'pinia';
+import { SystemConfigStore } from '/@/stores/systemConfig';
 
 // 定义接口来定义对象的类型
 interface LoginMobileState {
 	username: any;
 	code: string | number | undefined;
+	agreement: boolean;
 }
 
 // 定义对象与类型
 const ruleForm: LoginMobileState = {
 	username: '',
 	code: '',
+	agreement: false,
 };
 
 export default defineComponent({
 	name: 'loginMobile',
 	setup() {
+		const systemConfigStore = SystemConfigStore();
+		const { systemConfig } = storeToRefs(systemConfigStore);
+		const getSystemConfig = computed(() => {
+			return systemConfig.value;
+		});
+
 		const state = reactive({ ruleForm });
 		return {
+			getSystemConfig,
 			...toRefs(state),
 		};
 	},
@@ -75,6 +94,26 @@ export default defineComponent({
 			animation-duration: 0.5s;
 			animation-fill-mode: forwards;
 			animation-delay: #{calc($i / 10)}s;
+		}
+	}
+
+	.login-agreement {
+		width: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 12px;
+		color: #606266;
+		margin-bottom: 10px;
+
+		a {
+			color: var(--el-color-primary);
+			text-decoration: none;
+			margin: 0 2px;
+
+			&:hover {
+				text-decoration: underline;
+			}
 		}
 	}
 

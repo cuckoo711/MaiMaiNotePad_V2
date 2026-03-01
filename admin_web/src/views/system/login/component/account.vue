@@ -39,6 +39,14 @@
 			</el-col>
 		</el-form-item>
 		<el-form-item class="login-animation4">
+			<div class="login-agreement">
+				<el-checkbox v-model="state.ruleForm.agreement" style="margin-right: 5px;">
+					我已阅读并同意
+				</el-checkbox>
+				<a :href="getSystemConfig['login.privacy_url'] || '/api/system/clause/privacy.html'" target="_blank">《隐私政策》</a>
+				和
+				<a :href="getSystemConfig['login.clause_url'] || '/api/system/clause/terms_service.html'" target="_blank">《服务条款》</a>
+			</div>
 			<el-button type="primary" class="login-content-submit" round @click="loginClick"
 				:loading="loading.signIn">
 				<span>{{ $t('message.account.accountBtnText') }}</span>
@@ -84,6 +92,12 @@ export default defineComponent({
 		const { userInfos } = storeToRefs(useUserInfo());
 		const route = useRoute();
 		const router = useRouter();
+		const systemConfigStore = SystemConfigStore()
+		const { systemConfig } = storeToRefs(systemConfigStore)
+		const getSystemConfig = computed(() => {
+			return systemConfig.value
+		})
+
 		const state = reactive({
 			isShowPassword: false,
 			ruleForm: {
@@ -92,6 +106,7 @@ export default defineComponent({
 				captcha: '',
 				captchaKey: '',
 				captchaImgBase: '',
+				agreement: false,
 			},
 			loading: {
 				signIn: false,
@@ -143,6 +158,10 @@ export default defineComponent({
 		};
 		const loginClick = async () => {
 			if (!formRef.value) return
+			if (!state.ruleForm.agreement) {
+				errorMessage("请先阅读并同意隐私政策和服务条款")
+				return
+			}
 			await formRef.value.validate((valid: any) => {
 				if (valid) {
 					loginApi.login({ ...state.ruleForm, password: Md5.hashStr(state.ruleForm.password) }).then((res: any) => {
@@ -226,6 +245,7 @@ export default defineComponent({
 			rules,
       applyBtnClick,
       showApply,
+			getSystemConfig,
 			...toRefs(state),
 		};
 	},
@@ -291,6 +311,26 @@ export default defineComponent({
 		font-weight: 800;
 		margin-top: 15px;
     border-radius:8px;
+	}
+
+	.login-agreement {
+		width: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 12px;
+		color: #606266;
+		margin-bottom: 10px;
+
+		a {
+			color: var(--el-color-primary);
+			text-decoration: none;
+			margin: 0 2px;
+
+			&:hover {
+				text-decoration: underline;
+			}
+		}
 	}
 }
 </style>

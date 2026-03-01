@@ -43,19 +43,33 @@
           ></el-input>
         </el-form-item>
         <el-form-item>
+          <div class="login-agreement">
+            <el-checkbox v-model="registerForm.agreement" style="margin-right: 5px;">
+              我已阅读并同意
+            </el-checkbox>
+            <a :href="systemConfig['login.privacy_url'] || '/api/system/clause/privacy.html'" target="_blank">《隐私政策》</a>
+            和
+            <a :href="systemConfig['login.clause_url'] || '/api/system/clause/terms_service.html'" target="_blank">《服务条款》</a>
+          </div>
+        </el-form-item>
+        <el-form-item>
           <el-button type="primary" @click="handleRegister" class="register-btn">注册</el-button>
           <el-link type="primary" @click="$router.push('/login')" class="login-link">去登录</el-link>
         </el-form-item>
       </el-form>
+      <div v-if="systemConfig['login.copyright']" class="copyright">
+        {{ systemConfig['login.copyright'] }}
+        <span v-if="systemConfig['login.keep_record']"> | {{ systemConfig['login.keep_record'] }}</span>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { User, Lock, Message } from '@element-plus/icons-vue'
-import { register } from '@/api/user'
+import { register, getSystemConfig } from '@/api/user'
 import { showApiErrorNotification, showErrorNotification, showSuccessNotification } from '@/utils/api'
 
 const router = useRouter()
@@ -65,8 +79,21 @@ const registerForm = reactive({
   username: '',
   password: '',
   email: '',
-  confirm_password: ''
+  confirm_password: '',
+  agreement: false
 })
+const systemConfig = ref({})
+
+const fetchSystemConfig = async () => {
+  try {
+    const response = await getSystemConfig()
+    if (response.code === 2000 && response.data) {
+      systemConfig.value = response.data
+    }
+  } catch (error) {
+    console.error('Failed to fetch system config:', error)
+  }
+}
 
 const registerRules = {
   username: [
@@ -114,6 +141,10 @@ const registerRules = {
 
 const handleRegister = async () => {
   if (!registerFormRef.value) return
+  if (!registerForm.agreement) {
+    showErrorNotification('请先阅读并同意隐私政策和服务条款')
+    return
+  }
   await registerFormRef.value.validate(async (valid) => {
     if (valid) {
       try {
@@ -151,6 +182,10 @@ const handleRegister = async () => {
     }
   })
 }
+
+onMounted(() => {
+  fetchSystemConfig()
+})
 </script>
 
 <style scoped>
@@ -164,7 +199,7 @@ const handleRegister = async () => {
 }
 
 .register-form-wrapper {
-  width: 450px;
+  width: 520px;
   padding: 40px;
   background-color: var(--card-background);
   border-radius: 10px;
@@ -195,5 +230,30 @@ h3 {
 .login-link {
   display: block;
   text-align: center;
+}
+
+.login-agreement {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: #606266;
+  flex-wrap: wrap;
+}
+
+.login-agreement a {
+  color: var(--el-color-primary);
+  text-decoration: none;
+  margin: 0 2px;
+}
+
+.login-agreement a:hover {
+  text-decoration: underline;
+}
+
+.copyright {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 12px;
+  color: #909399;
 }
 </style>

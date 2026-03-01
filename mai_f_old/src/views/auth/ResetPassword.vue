@@ -62,15 +62,19 @@
           <el-link type="primary" @click="$router.push('/login')" class="login-link">返回登录</el-link>
         </el-form-item>
       </el-form>
+      <div v-if="systemConfig['login.copyright']" class="copyright">
+        {{ systemConfig['login.copyright'] }}
+        <span v-if="systemConfig['login.keep_record']"> | {{ systemConfig['login.keep_record'] }}</span>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Message, CircleCheck, Lock } from '@element-plus/icons-vue'
-import { sendResetPasswordCode, resetPassword } from '@/api/user'
+import { sendResetPasswordCode, resetPassword, getSystemConfig } from '@/api/user'
 import { handleApiError, showApiErrorNotification, showErrorNotification, showSuccessNotification, showWarningNotification } from '@/utils/api'
 
 const router = useRouter()
@@ -85,6 +89,19 @@ const resetForm = reactive({
   new_password: '',
   confirm_password: ''
 })
+
+const systemConfig = ref({})
+
+const fetchSystemConfig = async () => {
+  try {
+    const response = await getSystemConfig()
+    if (response.code === 2000 && response.data) {
+      systemConfig.value = response.data
+    }
+  } catch (error) {
+    console.error('Failed to fetch system config:', error)
+  }
+}
 
 const resetRules = {
   email: [
@@ -187,6 +204,10 @@ const handleReset = async () => {
     }
   })
 }
+
+onMounted(() => {
+  fetchSystemConfig()
+})
 </script>
 
 <style scoped>
@@ -200,7 +221,7 @@ const handleReset = async () => {
 }
 
 .reset-form-wrapper {
-  width: 450px;
+  width: 520px;
   padding: 40px;
   background-color: var(--card-background);
   border-radius: 10px;
@@ -255,5 +276,12 @@ h3 {
 .login-link {
   display: block;
   text-align: center;
+}
+
+.copyright {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 12px;
+  color: #909399;
 }
 </style>

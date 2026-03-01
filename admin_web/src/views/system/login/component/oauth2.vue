@@ -1,8 +1,16 @@
 <template>
 	<div class="other-fast-way" v-if="backends.length">
 		<div class="fast-title"><span>其他快速方式登录</span></div>
+		<div class="login-agreement">
+			<el-checkbox v-model="agreement" style="margin-right: 5px;">
+				我已阅读并同意
+			</el-checkbox>
+			<a :href="getSystemConfig['login.privacy_url'] || '/api/system/clause/privacy.html'" target="_blank">《隐私政策》</a>
+			和
+			<a :href="getSystemConfig['login.clause_url'] || '/api/system/clause/terms_service.html'" target="_blank">《服务条款》</a>
+		</div>
 		<ul class="fast-list">
-			<li v-for="(v, k) in backends" :key="v">
+			<li v-for="(v, k) in backends" :key="v.app_name">
 				<a @click.once="handleOAuth2LoginClick(v)" style="width: 50px;color: #18bc9c">
 					<img :src="v.icon" :alt="v.app_name" />
 										<p>{{ v.app_name }}</p>
@@ -14,21 +22,36 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, reactive, toRefs } from 'vue';
+import { defineComponent, onMounted, reactive, toRefs, computed } from 'vue';
+import { ElMessage } from 'element-plus';
 import * as loginApi from '../api';
 import { OAuth2Backend } from '/@/views/system/login/types';
+import { storeToRefs } from 'pinia';
+import { SystemConfigStore } from '/@/stores/systemConfig';
 
 export default defineComponent({
 	name: 'loginOAuth2',
 	setup() {
+		const systemConfigStore = SystemConfigStore();
+		const { systemConfig } = storeToRefs(systemConfigStore);
+		const getSystemConfig = computed(() => {
+			return systemConfig.value;
+		});
+
+		const state = reactive({
+			agreement: false,
+			backends: [] as OAuth2Backend[],
+		});
+
 		const handleOAuth2LoginClick = (backend: OAuth2Backend) => {
+			if (!state.agreement) {
+				ElMessage.warning('请先阅读并同意隐私政策和服务条款');
+				return;
+			}
 			history.replaceState(null, '', location.pathname + location.search);
 			window.location.href = backend.authentication_url + '?next=' + window.location.href;
 		};
-		const state = reactive({
-			handleOAuth2LoginClick: handleOAuth2LoginClick,
-			backends: [],
-		});
+
 		const getBackends = async () => {
 			loginApi.getBackends().then((ret: any) => {				
 				state.backends = ret.data;
@@ -43,6 +66,8 @@ export default defineComponent({
 			// getBackends();
 		});
 		return {
+			handleOAuth2LoginClick,
+			getSystemConfig,
 			...toRefs(state),
 		};
 	},
@@ -50,6 +75,26 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.login-agreement {
+	width: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 12px;
+	color: #606266;
+	margin-bottom: 10px;
+
+	a {
+		color: var(--el-color-primary);
+		text-decoration: none;
+		margin: 0 2px;
+
+		&:hover {
+			text-decoration: underline;
+		}
+	}
+}
+
 .login-content-form {
 	margin-top: 20px;
 	@for $i from 1 through 4 {

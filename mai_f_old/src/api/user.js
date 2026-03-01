@@ -112,3 +112,8 @@ export const getUserStars = (params = {}) => {
     params
   })
 }
+
+// 获取系统初始化配置
+export const getSystemConfig = () => {
+  return apiClient.get('/init/settings/')
+}
