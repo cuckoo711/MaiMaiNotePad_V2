@@ -118,7 +118,7 @@ export const createCrudOptions = function ({ crudExpose }: CreateCrudOptionsProp
 					search: {
 						show: true,
 						component: {
-							name: 'input',
+							name: 'el-input',
 							placeholder: '搜索用户',
 						},
 					},
@@ -163,7 +163,7 @@ export const createCrudOptions = function ({ crudExpose }: CreateCrudOptionsProp
 					search: {
 						show: true,
 						component: {
-							name: 'input',
+							name: 'el-input',
 							placeholder: '搜索评论内容',
 						},
 					},

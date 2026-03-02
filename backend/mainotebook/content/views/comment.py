@@ -474,10 +474,16 @@ class CommentViewSet(CustomModelViewSet):
         if content:
             queryset = queryset.filter(content__icontains=content)
         
-        # 按用户筛选
+        # 按用户筛选 (ID)
         user_id = request.query_params.get('user')
         if user_id:
             queryset = queryset.filter(user_id=user_id)
+
+        # 按用户名称筛选
+        user_name = request.query_params.get('user_name')
+        if user_name:
+            from django.db.models import Q
+            queryset = queryset.filter(Q(user__name__icontains=user_name) | Q(user__username__icontains=user_name))
         
         # 按评论层级筛选（是否为一级评论）
         is_root = request.query_params.get('is_root')

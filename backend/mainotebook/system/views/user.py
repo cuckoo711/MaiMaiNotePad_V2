@@ -18,6 +18,7 @@ from mainotebook.utils.json_response import ErrorResponse, DetailResponse, Succe
 from mainotebook.utils.serializers import CustomModelSerializer
 from mainotebook.utils.validator import CustomUniqueValidator
 from mainotebook.utils.viewset import CustomModelViewSet
+from mainotebook.system.services.email_code_service import store_email_code, send_email_code, verify_email_code
 
 
 def recursion(instance, parent, result):
@@ -188,8 +189,41 @@ class UserInfoUpdateSerializer(CustomModelSerializer):
         required=False
     )
     avatar = FileOrStringField(required=False, allow_null=True)
+    email_code = serializers.CharField(write_only=True, required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        """
+        验证数据
+        """
+        user = self.context['request'].user
+        email = attrs.get('email')
+        
+        # 优先从 attrs 获取 email_code，如果 validated_data 中没有（因为 required=False），则尝试从原始请求数据中获取
+        email_code = attrs.get('email_code')
+        if not email_code and 'email_code' in self.initial_data:
+            email_code = self.initial_data['email_code']
+
+        # 如果修改了邮箱，必须提供验证码
+        if email and email != user.email:
+            if not email_code:
+                raise serializers.ValidationError("修改邮箱必须提供验证码")
+            
+            # 检查新邮箱是否已被其他用户使用
+            from mainotebook.system.models import Users
+            if Users.objects.filter(email=email).exclude(id=user.id).exists():
+                raise serializers.ValidationError("该邮箱已被其他用户使用")
+            
+            # 验证验证码
+            is_valid, error = verify_email_code(user.id, email, email_code)
+            if not is_valid:
+                raise serializers.ValidationError(error)
+        
+        return attrs
 
     def update(self, instance, validated_data):
+        # 移除 email_code 字段，因为它不是模型字段
+        validated_data.pop('email_code', None)
+        
         # 处理头像上传
         avatar_data = validated_data.get('avatar')
         if avatar_data and hasattr(avatar_data, 'read'):
@@ -216,7 +250,7 @@ class UserInfoUpdateSerializer(CustomModelSerializer):
 
     class Meta:
         model = Users
-        fields = ['username', 'email', 'mobile', 'avatar', 'gender', 'avatar_updated_at']
+        fields = ['username', 'email', 'mobile', 'avatar', 'gender', 'avatar_updated_at', 'email_code']
         extra_kwargs = {
             "post": {"required": False, "read_only": True},
             "mobile": {"required": False},
@@ -387,23 +421,7 @@ class UserViewSet(CustomModelViewSet):
         user = request.user
         data = request.data
 
-        # 如果修改了邮箱，需要校验验证码
-        new_email = data.get("email")
-        if new_email and new_email != user.email:
-            email_code = data.get("email_code", "")
-            if not email_code:
-                return ErrorResponse(msg="修改邮箱需要提供验证码")
-
-            from mainotebook.system.services.email_code_service import verify_email_code
-            ok, err_msg = verify_email_code(user.id, new_email, email_code)
-            if not ok:
-                return ErrorResponse(msg=err_msg)
-
-            # 检查新邮箱是否已被其他用户使用
-            if Users.objects.filter(email=new_email).exclude(id=user.id).exists():
-                return ErrorResponse(msg="该邮箱已被其他用户使用")
-
-        serializer = UserInfoUpdateSerializer(user, data=data, request=request, partial=True)
+        serializer = UserInfoUpdateSerializer(user, data=data, context={'request': request}, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return DetailResponse(data=None, msg="修改成功")
@@ -412,31 +430,27 @@ class UserViewSet(CustomModelViewSet):
     def send_email_code(self, request):
         """发送邮箱验证码
 
-        向指定邮箱发送 6 位数字验证码，有效期 5 分钟。
-        同一用户重复请求会覆盖旧验证码。
+        Body:
+            email: 目标邮箱
         """
-        email = request.data.get("email", "").strip()
+        email = request.data.get("email")
         if not email:
-            return ErrorResponse(msg="请输入邮箱地址")
+            return ErrorResponse(msg="邮箱不能为空")
 
-        # 简单格式校验
-        from rest_framework.serializers import EmailField
-        try:
-            EmailField().run_validation(email)
-        except Exception:
-            return ErrorResponse(msg="请输入有效的邮箱地址")
-
-        # 检查邮箱是否已被其他用户使用
-        if Users.objects.filter(email=email).exclude(id=request.user.id).exists():
+        user = request.user
+        # 检查邮箱是否被其他用户占用
+        if Users.objects.filter(email=email).exclude(id=user.id).exists():
             return ErrorResponse(msg="该邮箱已被其他用户使用")
 
-        from mainotebook.system.services.email_code_service import store_email_code, send_email_code
-        code = store_email_code(request.user.id, email)
-        ok, err_msg = send_email_code(email, code)
-        if not ok:
-            return ErrorResponse(msg=err_msg)
+        # 生成并存储验证码
+        code = store_email_code(user.id, email)
 
-        return DetailResponse(data=None, msg="验证码已发送")
+        # 发送邮件
+        success, error = send_email_code(email, code)
+        if success:
+            return SuccessResponse(msg="验证码已发送，请查收")
+        else:
+            return ErrorResponse(msg=error)
 
     @action(methods=["PUT"], detail=False, permission_classes=[IsAuthenticated])
     def change_password(self, request, *args, **kwargs):

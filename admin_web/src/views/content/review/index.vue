@@ -206,7 +206,7 @@
 					<el-descriptions-item label="置信度">
 						<el-progress
 							:percentage="Number((currentReport.final_confidence * 100).toFixed(1))"
-							:color="confidenceColor(currentReport.final_confidence)"
+							:color="confidenceColor(currentReport.final_confidence, currentReport.decision)"
 							:stroke-width="16"
 							:text-inside="true"
 							style="width: 180px"
@@ -228,6 +228,25 @@
 						{{ formatDateTime(currentReport.create_datetime) }}
 					</el-descriptions-item>
 				</el-descriptions>
+
+				<!-- 审核进度 -->
+				<div v-if="currentReport.decision === 'processing' || currentReport.decision === 'pending_ai'" style="margin-top: 16px">
+					<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px">
+						<h4 style="margin: 0">审核进度</h4>
+						<span v-if="reportProgress" style="font-size: 13px; color: #606266">
+							已完成: {{ reportProgress.completed }}/{{ reportProgress.total }}
+						</span>
+					</div>
+					<el-progress
+						v-if="reportProgress"
+						:percentage="reportProgress.percent"
+						:stroke-width="18"
+						:status="reportProgress.percent === 100 ? 'success' : ''"
+						striped
+						striped-flow
+					/>
+					<div v-else style="color: #909399; font-size: 13px">准备中...</div>
+				</div>
 
 				<!-- 分段审核详情 -->
 				<div v-if="reportParts.length" style="margin-top: 16px">
@@ -261,14 +280,26 @@
 											</el-table-column>
 											<el-table-column label="摘要" min-width="160">
 												<template #default="{ row: seg }">
-													{{ seg.text_summary || '-' }}
+													<div style="display: flex; flex-direction: column;">
+														<span>{{ seg.text_summary || '-' }}</span>
+														<el-button 
+															v-if="seg.text_full && seg.text_full.length > 100" 
+															type="primary" 
+															link 
+															size="small" 
+															style="align-self: flex-start; margin-top: 4px;"
+															@click="handleViewFullText(seg)"
+														>
+															查看全文
+														</el-button>
+													</div>
 												</template>
 											</el-table-column>
 											<el-table-column label="置信度" width="160" align="center">
 												<template #default="{ row: seg }">
 													<el-progress
 														:percentage="Number((seg.confidence * 100).toFixed(1))"
-														:color="confidenceColor(seg.confidence)"
+														:color="confidenceColor(seg.confidence, seg.decision)"
 														:stroke-width="12"
 														:text-inside="true"
 														style="width: 120px"
@@ -313,7 +344,7 @@
 							<template #default="{ row }">
 								<el-progress
 									:percentage="Number((row.confidence * 100).toFixed(1))"
-									:color="confidenceColor(row.confidence)"
+									:color="confidenceColor(row.confidence, row.decision)"
 									:stroke-width="12"
 									:text-inside="true"
 									style="width: 120px"
@@ -350,11 +381,20 @@
 				<el-button @click="reportDialogVisible = false">关闭</el-button>
 			</template>
 		</el-dialog>
+		<!-- 全文内容对话框 -->
+		<el-dialog v-model="fullTextDialogVisible" title="分段全文" width="600px" append-to-body>
+			<div style="white-space: pre-wrap; word-break: break-all; max-height: 500px; overflow-y: auto; padding: 10px; background-color: #f5f7fa; border-radius: 4px;">
+				{{ currentFullText }}
+			</div>
+			<template #footer>
+				<el-button @click="fullTextDialogVisible = false">关闭</el-button>
+			</template>
+		</el-dialog>
 	</fs-page>
 </template>
 
 <script lang="ts" setup name="contentReview">
-import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, watch, onBeforeUnmount } from 'vue';
 import { useExpose, useCrud } from '@fast-crud/fast-crud';
 import { createCrudOptions } from './crud';
 import * as api from './api';
@@ -531,16 +571,97 @@ const aiReviewLoading = ref(false);
 const aiReviewRowLoading = ref<Record<string, boolean>>({});
 const reportDialogVisible = ref(false);
 const currentReport = ref<AIReviewReport | null>(null);
+const fullTextDialogVisible = ref(false);
+const currentFullText = ref('');
+let reportPollTimer: any = null;
+
+/** 查看分段全文 */
+const handleViewFullText = (seg: any) => {
+	currentFullText.value = seg.text_full || '';
+	fullTextDialogVisible.value = true;
+};
+
+/** 轮询更新报告 */
+const startReportPolling = () => {
+	stopReportPolling();
+	if (!currentReport.value) return;
+	
+	// 仅当状态为进行中时才轮询
+	const status = currentReport.value.decision;
+	if (status !== 'processing' && status !== 'pending_ai') return;
+
+	reportPollTimer = setInterval(async () => {
+		// 如果对话框已关闭，停止轮询
+		if (!reportDialogVisible.value || !currentReport.value) {
+			stopReportPolling();
+			return;
+		}
+
+		try {
+			const res: any = await getAIReport(currentReport.value.content_id, currentReport.value.content_type);
+			const data = res.data || res;
+			// 只有当数据有变化时才更新（简单判断 decision 或 progress）
+			// 这里直接更新整个对象，Vue 会处理 diff
+			currentReport.value = data;
+			
+			// 如果状态变为终态，停止轮询
+			const newStatus = data.decision;
+			if (newStatus !== 'processing' && newStatus !== 'pending_ai') {
+				stopReportPolling();
+				crudExpose.doRefresh(); // 刷新列表状态
+				loadStats(); // 刷新统计
+			}
+		} catch (e) {
+			console.error('报告轮询失败', e);
+			// 连续失败处理可根据需要添加
+		}
+	}, 2000); // 每 2 秒轮询一次
+};
+
+const stopReportPolling = () => {
+	if (reportPollTimer) {
+		clearInterval(reportPollTimer);
+		reportPollTimer = null;
+	}
+};
+
+// 监听对话框关闭，停止轮询
+watch(reportDialogVisible, (val) => {
+	if (!val) {
+		stopReportPolling();
+		currentReport.value = null;
+	} else {
+		// 对话框打开时，如果是进行中状态，启动轮询
+		startReportPolling();
+	}
+});
+
+// 组件卸载时清理
+onBeforeUnmount(() => {
+	stopReportPolling();
+});
 
 /** AI 审核决策 → 标签类型（用于列表列） */
 const aiDecisionTagType = (decision: string): string => {
-	const map: Record<string, string> = { auto_approved: 'success', auto_rejected: 'danger', pending_manual: 'warning' };
+	const map: Record<string, string> = {
+		auto_approved: 'success',
+		auto_rejected: 'danger',
+		pending_manual: 'warning',
+		pending_ai: 'primary',
+		processing: 'primary',
+	};
 	return map[decision] || 'info';
 };
 
 /** AI 审核决策 → 中文标签（用于列表列） */
 const aiDecisionLabel = (decision: string): string => {
-	const map: Record<string, string> = { auto_approved: '自动通过', auto_rejected: '自动拒绝', pending_manual: '待人工复核' };
+	const map: Record<string, string> = {
+		auto_approved: '自动通过',
+		auto_rejected: '自动拒绝',
+		pending_manual: '待人工复核',
+		pending_ai: 'AI 审核中',
+		processing: 'AI 审核中',
+	};
 	return map[decision] || decision;
 };
 
@@ -551,6 +672,8 @@ const reportDecisionTagType = computed(() => {
 		auto_approved: 'success',
 		auto_rejected: 'danger',
 		pending_manual: 'warning',
+		pending_ai: 'primary',
+		processing: 'primary',
 	};
 	return map[currentReport.value.decision] || 'info';
 });
@@ -562,6 +685,8 @@ const reportDecisionLabel = computed(() => {
 		auto_approved: '自动通过',
 		auto_rejected: '自动拒绝',
 		pending_manual: '待人工复核',
+		pending_ai: 'AI 审核中',
+		processing: 'AI 审核中',
 	};
 	return map[currentReport.value.decision] || currentReport.value.decision;
 });
@@ -569,6 +694,14 @@ const reportDecisionLabel = computed(() => {
 /** 报告中的审核分段详情 */
 const reportParts = computed(() => {
 	return currentReport.value?.report_data?.parts || [];
+});
+
+/** 审核进度信息 */
+const reportProgress = computed(() => {
+	if (!currentReport.value?.report_data?.parts?.length) return null;
+	// 查找聚合部分的进度信息
+	const aggregatedPart = currentReport.value.report_data.parts.find((p: any) => p.part_type === 'aggregated');
+	return aggregatedPart?.progress || null;
 });
 
 /** 违规类型英文 → 中文映射 */
@@ -582,10 +715,14 @@ const violationLabelMap: Record<string, string> = {
 };
 
 /** 置信度颜色（用于进度条） */
-const confidenceColor = (confidence: number): string => {
-	if (confidence >= 0.8) return '#67c23a';
-	if (confidence >= 0.5) return '#e6a23c';
-	return '#f56c6c';
+const confidenceColor = (confidence: number, decision: string = ''): string => {
+	// 如果明确通过，无论置信度多少都显示绿色
+	if (decision === 'true' || decision === 'auto_approved') return '#67c23a';
+	
+	// 如果是拒绝或不确定，置信度越高越危险（红）
+	if (confidence >= 0.8) return '#f56c6c'; // 高危
+	if (confidence >= 0.5) return '#e6a23c'; // 疑似
+	return '#67c23a'; // 低风险
 };
 
 /** 触发单条 AI 审核 */

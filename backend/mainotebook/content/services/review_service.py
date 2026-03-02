@@ -26,25 +26,27 @@ class ReviewService:
         page: int = 1,
         page_size: int = 10
     ) -> Dict:
-        """获取待审核列表（服务端分页）
+        """获取审核列表（服务端分页）
 
-        使用数据库级过滤、排序和分页，避免内存级操作。
-        由于 Django 不支持跨模型 UNION，分别查询两个模型后在 Python 中合并排序分页。
+        支持查看所有状态的内容，不再仅限于待审核。
+        使用数据库级过滤、排序和分页。
 
         Args:
-            filters: 过滤条件，支持 content_type（内容类型）、search（搜索关键词）
+            filters: 过滤条件，支持 content_type（内容类型）、search（搜索关键词）、status（审核状态：pending/approved/rejected）
             page: 页码，默认 1
             page_size: 每页数量，默认 10
 
         Returns:
-            dict: 包含 items（待审核项列表）和 total（总数）的字典
+            dict: 包含 items（列表）和 total（总数）的字典
         """
         content_type_filter = None
         search_filter = None
+        status_filter = None
 
         if filters:
             content_type_filter = filters.get('content_type')
             search_filter = filters.get('search')
+            status_filter = filters.get('status')
 
         items = []
 
@@ -53,15 +55,40 @@ class ReviewService:
         if search_filter:
             search_q = Q(name__icontains=search_filter) | Q(description__icontains=search_filter)
 
-        # 查询待审核的知识库（仅在未指定类型或指定为 knowledge 时查询）
+        # 构建状态条件
+        # is_pending=True -> 待审核
+        # is_pending=False, is_public=True -> 已通过
+        # is_pending=False, is_public=False -> 已拒绝（或草稿，此处简化处理，主要关注拒绝）
+        # 注意：这里简化了逻辑，实际上 is_public=False 可能包含草稿。
+        # 但在审核上下文中，我们主要关心 已通过 和 已拒绝。
+        # 如果需要更精确，可能需要结合 rejection_reason 判断。
+        
+        status_q = Q()
+        if status_filter == 'pending':
+            status_q = Q(is_pending=True)
+        elif status_filter == 'approved':
+            status_q = Q(is_pending=False, is_public=True)
+        elif status_filter == 'rejected':
+            status_q = Q(is_pending=False, is_public=False)
+        # 如果 status_filter 为空，则查询所有（不加限制）
+
+        # 查询知识库
         if not content_type_filter or content_type_filter == 'knowledge':
             kb_qs = KnowledgeBase.objects.filter(
-                Q(is_pending=True) & search_q
+                search_q & status_q
             ).select_related('uploader').annotate(
                 file_count_val=Count('files')
             ).order_by('-create_datetime')
 
             for kb in kb_qs:
+                # 确定当前状态用于前端展示
+                current_status = 'pending'
+                if not kb.is_pending:
+                    if kb.is_public:
+                        current_status = 'approved'
+                    else:
+                        current_status = 'rejected'
+
                 items.append({
                     'id': kb.id,
                     'name': kb.name,
@@ -72,17 +99,27 @@ class ReviewService:
                     'create_datetime': kb.create_datetime,
                     'tags': kb.tags,
                     'file_count': kb.file_count_val,
+                    'status': current_status, # 新增状态字段
+                    'rejection_reason': kb.rejection_reason, # 新增拒绝原因
                 })
 
-        # 查询待审核的人设卡（仅在未指定类型或指定为 persona 时查询）
+        # 查询人设卡
         if not content_type_filter or content_type_filter == 'persona':
             pc_qs = PersonaCard.objects.filter(
-                Q(is_pending=True) & search_q
+                search_q & status_q
             ).select_related('uploader').annotate(
                 file_count_val=Count('files')
             ).order_by('-create_datetime')
 
             for pc in pc_qs:
+                # 确定当前状态用于前端展示
+                current_status = 'pending'
+                if not pc.is_pending:
+                    if pc.is_public:
+                        current_status = 'approved'
+                    else:
+                        current_status = 'rejected'
+
                 items.append({
                     'id': pc.id,
                     'name': pc.name,
@@ -93,6 +130,8 @@ class ReviewService:
                     'create_datetime': pc.create_datetime,
                     'tags': pc.tags,
                     'file_count': pc.file_count_val,
+                    'status': current_status, # 新增状态字段
+                    'rejection_reason': pc.rejection_reason, # 新增拒绝原因
                 })
 
         # 合并后按创建时间倒序排序
@@ -110,16 +149,33 @@ class ReviewService:
             content_ids = [item['id'] for item in items]
             # 查询每个 content_id 的最新报告
             latest_reports = {}
-            for report in ReviewReport.objects.filter(
+            # 获取所有相关的报告，按时间倒序
+            reports = ReviewReport.objects.filter(
                 content_id__in=content_ids
-            ).order_by('content_id', '-create_datetime'):
-                # 只保留每个 content_id 的第一条（最新）
+            ).order_by('content_id', '-create_datetime')
+
+            for report in reports:
                 if report.content_id not in latest_reports:
-                    latest_reports[report.content_id] = report.decision
+                    # 如果最新状态是 processing，直接使用
+                    if report.decision == 'processing':
+                        latest_reports[report.content_id] = report.decision
+                    # 如果最新状态是 pending_ai，也直接使用
+                    elif report.decision == 'pending_ai':
+                        latest_reports[report.content_id] = report.decision
+                    # 否则，如果尚未记录，则记录当前状态
+                    else:
+                        latest_reports[report.content_id] = report.decision
+                elif latest_reports[report.content_id] not in ['processing', 'pending_ai']:
+                    # 如果已记录的状态不是 processing 或 pending_ai，且当前报告状态是 processing，则更新为 processing
+                    # 这确保了如果在 pending_manual 之前有 processing 状态（实际上不太可能，因为 processing 应该是最新的），
+                    # 或者如果有多个报告，我们优先展示正在进行的状态
+                    if report.decision == 'processing':
+                         latest_reports[report.content_id] = 'processing'
 
             # 注入 ai_review_decision 字段
             for item in items:
-                item['ai_review_decision'] = latest_reports.get(item['id'], None)
+                decision = latest_reports.get(item['id'], None)
+                item['ai_review_decision'] = decision
 
         return {'items': items, 'total': total}
     

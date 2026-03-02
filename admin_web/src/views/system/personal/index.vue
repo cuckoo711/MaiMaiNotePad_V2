@@ -79,6 +79,16 @@
 									<el-input v-model="state.personalForm.email" placeholder="请输入邮箱" clearable></el-input>
 								</el-form-item>
 							</el-col>
+              <el-col v-if="state.personalForm.email !== originalEmail">
+                <el-form-item label="验证码" prop="email_code" :rules="[{ required: true, message: '请输入验证码', trigger: 'blur' }]">
+                  <div style="display: flex; width: 100%">
+                    <el-input v-model="state.personalForm.email_code" placeholder="请输入验证码" clearable style="flex: 1; margin-right: 10px"></el-input>
+                    <el-button type="primary" :loading="codeLoading" :disabled="codeTimer > 0" @click="handleSendCode">
+                      {{ codeTimer > 0 ? `${codeTimer}s后重试` : '获取验证码' }}
+                    </el-button>
+                  </div>
+                </el-form-item>
+              </el-col>
 							<el-col>
 								<el-form-item label="手机" prop="mobile">
 									<el-input v-model="state.personalForm.mobile" placeholder="请输入手机" clearable></el-input>
@@ -219,11 +229,17 @@ interface PersonalState {
 			id: number;
 			name: string;
 		}>;
+    email_code?: string;
 	};
 }
 
 const router = useRouter();
 const themeConfigStore = useThemeConfig();
+
+const originalEmail = ref('');
+const codeLoading = ref(false);
+const codeTimer = ref(0);
+let timerInterval: any = null;
 
 const avatarSelector = defineAsyncComponent(() => import('/@/components/avatarSelector/index.vue'));
 const avatarSelectorRef = ref<any>(null);
@@ -264,6 +280,7 @@ const state = reactive<PersonalState>({
 		email: '',
 		mobile: '',
 		gender: '',
+    email_code: '',
 		dept_info: {
 			dept_id: 0,
 			dept_name: '',
@@ -302,7 +319,40 @@ const getUserInfo = function () {
 		state.personalForm.gender = data.gender;
 		state.personalForm.dept_info.dept_name = data.dept_info.dept_name || '';
 		state.personalForm.role_info = data.role_info || [];
+    originalEmail.value = data.email || '';
 	});
+};
+
+/**
+ * 发送验证码
+ */
+const handleSendCode = async () => {
+  if (!state.personalForm.email) {
+    ElMessage.warning('请输入邮箱');
+    return;
+  }
+  // 简单校验邮箱格式
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.personalForm.email)) {
+    ElMessage.warning('请输入有效的邮箱地址');
+    return;
+  }
+
+  codeLoading.value = true;
+  try {
+    await api.sendEmailCode({ email: state.personalForm.email });
+    ElMessage.success('验证码已发送，请注意查收');
+    codeTimer.value = 60;
+    timerInterval = setInterval(() => {
+      codeTimer.value--;
+      if (codeTimer.value <= 0) {
+        clearInterval(timerInterval);
+      }
+    }, 1000);
+  } catch (error: any) {
+    // 错误信息已由 request 拦截器处理或 api 抛出
+  } finally {
+    codeLoading.value = false;
+  }
 };
 
 /**

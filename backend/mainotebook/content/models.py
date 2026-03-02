@@ -813,6 +813,7 @@ class ReviewReport(CoreModel):
         ('auto_rejected', '自动拒绝'),
         ('pending_manual', '待人工复核'),
         ('error', '审核异常'),
+        ('processing', '审核中'),  # 新增状态
     )
 
     id = models.UUIDField(
@@ -881,6 +882,7 @@ class ReviewReport(CoreModel):
             'auto_rejected': '❌ 自动拒绝',
             'pending_manual': '⏳ 待人工复核',
             'error': '⚠️ 审核异常',
+            'processing': '🔄 审核中',  # 新增映射
         }
         decision_text = decision_map.get(self.decision, self.decision)
 
@@ -991,6 +993,11 @@ class AIModel(CoreModel):
         default=0,
         verbose_name="优先级",
         help_text="调度优先级，数值越小优先级越高（0 为最高）"
+    )
+    enable_thinking = models.BooleanField(
+        default=False,
+        verbose_name="启用思考",
+        help_text="是否支持 enable_thinking 参数（如 DeepSeek 系列模型）"
     )
     is_enabled = models.BooleanField(
         default=True,

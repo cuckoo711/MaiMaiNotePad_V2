@@ -27,6 +27,12 @@ class AutoReviewService:
 
     # 置信度阈值：高于此值自动拒绝（仅限知识库和人设卡，标准较宽松）
     AUTO_REJECT_THRESHOLD = 0.9
+    
+    # 针对不确定意见（unknown）的拒绝阈值
+    UNKNOWN_REJECT_THRESHOLD = 0.7
+    
+    # 针对拒绝意见（false）的拒绝阈值
+    FALSE_REJECT_THRESHOLD = 0.85
 
     # 并发线程数上限（用于分段审核和多文件审核）
     MAX_WORKERS = 5
@@ -128,10 +134,14 @@ class AutoReviewService:
                     text_type,
                     source=content_type,
                     content_id=content_id,
+                    report_id=str(report.id),  # 传递报告 ID 用于更新进度
                 )
             )
 
             # 5. 构造唯一的聚合结果 Part
+            # 重新聚合分段结果
+            max_confidence, merged_violations, final_decision = AutoReviewService._aggregate_results(segment_details)
+
             # 从分段详情中收集 flagged_content
             flagged_parts = [
                 d.get("flagged_content", "")
@@ -143,9 +153,7 @@ class AutoReviewService:
                 "part_type": "aggregated",
                 "confidence": max_confidence,
                 "violation_types": merged_violations,
-                "decision": "false" if max_confidence > AutoReviewService.AUTO_REJECT_THRESHOLD else (
-                    "true" if max_confidence <= AutoReviewService.AUTO_APPROVE_THRESHOLD else "unknown"
-                ),
+                "decision": final_decision,
                 "segments": segment_details,
                 "flagged_content": " | ".join(flagged_parts),
                 "raw_output": "",  # 聚合模式下无单一 raw_output
@@ -157,9 +165,11 @@ class AutoReviewService:
 
             # 6. 执行决策
             try:
+                # 传递 final_decision 给 _make_decision
                 decision = AutoReviewService._make_decision(
                     content_id, content_type,
                     final_confidence, final_violation_types,
+                    final_decision, # 新增参数
                     part_results,
                 )
             except Exception as e:
@@ -278,6 +288,7 @@ class AutoReviewService:
         """安全读取文件内容
 
         拼接 MEDIA_ROOT 得到绝对路径，以 UTF-8 编码读取文件。
+        对于 JSON 知识库文件，尝试提取 docs -> passage 字段内容。
         文件不可读时返回 None 并记录警告日志。
 
         Args:
@@ -287,6 +298,7 @@ class AutoReviewService:
             Optional[str]: 文件文本内容，不可读时返回 None
         """
         import os
+        import json
         from django.conf import settings
 
         try:
@@ -295,8 +307,34 @@ class AutoReviewService:
             if not os.path.isabs(file_path):
                 file_path = os.path.join(settings.MEDIA_ROOT, file_path)
 
+            file_ext = os.path.splitext(file_path)[1].lower()
+
             with open(file_path, 'r', encoding='utf-8') as f:
-                return f.read()
+                content = f.read()
+
+            # 针对 JSON 文件进行特殊处理
+            if file_ext == '.json' or getattr(file_obj, 'file_type', '') == 'application/json':
+                try:
+                    data = json.loads(content)
+                    # 检查是否符合 {"docs": [{"passage": "..."}]} 结构
+                    if isinstance(data, dict) and "docs" in data and isinstance(data["docs"], list):
+                        passages = []
+                        for doc in data["docs"]:
+                            if isinstance(doc, dict) and "passage" in doc:
+                                passage = str(doc["passage"]).strip()
+                                if passage:
+                                    passages.append(passage)
+                        
+                        if passages:
+                            logger.info(f"成功从 JSON 文件 {file_obj.original_name} 中提取 {len(passages)} 条 passage")
+                            # 使用 \n\n 拼接，保持段落独立性，配合 _split_text_segments 使用
+                            return "\n\n".join(passages)
+                except json.JSONDecodeError:
+                    logger.warning(f"JSON 解析失败，回退到普通文本读取: {file_obj.original_name}")
+                except Exception as e:
+                    logger.warning(f"JSON 内容提取失败，回退到普通文本读取: {file_obj.original_name}, 错误: {e}")
+
+            return content
         except Exception as e:
             logger.warning(
                 f"文件读取失败，跳过该文件: {file_obj.file_path}, 错误: {e}"
@@ -304,10 +342,78 @@ class AutoReviewService:
             return None
 
     @staticmethod
+    def _update_report_progress(report_id: str, total_segments: int, completed_segments: int, segment_details: List[Optional[Dict]]) -> None:
+        """更新审核报告进度
+
+        Args:
+            report_id: 报告 ID
+            total_segments: 总分段数
+            completed_segments: 已完成分段数
+            segment_details: 当前分段详情列表（可能包含 None）
+        """
+        from mainotebook.content.models import ReviewReport
+        try:
+            # 重新获取报告以避免覆盖
+            report = ReviewReport.objects.get(id=report_id)
+            
+            # 过滤掉未完成的分段（None）
+            completed_details = [d for d in segment_details if d is not None]
+            
+            # 构造临时的聚合结果
+            max_confidence = 0.0
+            violation_types_set = set()
+            flagged_parts = []
+            
+            for detail in completed_details:
+                conf = detail.get("confidence", 0.0)
+                if conf > max_confidence:
+                    max_confidence = conf
+                violation_types_set.update(detail.get("violation_types", []))
+                
+                flagged = detail.get("flagged_content", "")
+                if flagged:
+                    flagged_parts.append(flagged)
+            
+            aggregated_part = {
+                "part_name": "完整内容聚合（审核中...）",
+                "part_type": "aggregated",
+                "confidence": max_confidence,
+                "violation_types": list(violation_types_set),
+                "decision": "processing",
+                "segments": completed_details,
+                "flagged_content": " | ".join(flagged_parts),
+                "raw_output": "",
+                "progress": {
+                    "total": total_segments,
+                    "completed": completed_segments,
+                    "percent": int((completed_segments / total_segments) * 100) if total_segments > 0 else 0
+                }
+            }
+            
+            # 更新 report_data
+            report.report_data.update({
+                "status": "processing",
+                "message": f"AI 正在审核中... ({completed_segments}/{total_segments})",
+                "parts": [aggregated_part],
+                "final_confidence": max_confidence,
+                "violation_types": list(violation_types_set)
+            })
+            
+            # 显式更新字段，防止 update 覆盖
+            report.final_confidence = max_confidence
+            report.violation_types = list(violation_types_set)
+            report.save(update_fields=['report_data', 'final_confidence', 'violation_types'])
+            
+        except Exception as e:
+            logger.warning(f"更新审核进度失败: report_id={report_id}, 错误={e}")
+
+    @staticmethod
     def _split_text_segments(text: str) -> List[str]:
         """将长文本分段
 
-        优先按段落（\\n\\n）分割，若单段仍超长则按固定长度切分。
+        优先按段落（\\n\\n）分割。
+        尽可能合并短段落以填充到 MAX_SEGMENT_LENGTH，减少 API 调用次数。
+        若单段落超长，则按固定长度强制切分。
         所有分段拼接后等于原始文本。
 
         Args:
@@ -321,6 +427,7 @@ class AutoReviewService:
 
         max_len = AutoReviewService.MAX_SEGMENT_LENGTH
         # 按段落分割，保留分隔符在前一段末尾
+        # 注意：这里假设 JSON passage 提取时用了 \n\n 拼接
         raw_parts = text.split('\n\n')
         paragraphs = []
         for i, part in enumerate(raw_parts):
@@ -331,13 +438,32 @@ class AutoReviewService:
                 paragraphs.append(part)
 
         segments = []
+        current_segment = ""
+
         for paragraph in paragraphs:
-            if len(paragraph) <= max_len:
-                segments.append(paragraph)
-            else:
-                # 超长段落按固定长度切分
+            # 检查当前段落是否超长
+            if len(paragraph) > max_len:
+                # 如果之前有累积的段落，先保存
+                if current_segment:
+                    segments.append(current_segment)
+                    current_segment = ""
+                
+                # 对超长段落进行强制切分
                 for i in range(0, len(paragraph), max_len):
                     segments.append(paragraph[i:i + max_len])
+            else:
+                # 尝试合并到当前分段
+                if len(current_segment) + len(paragraph) <= max_len:
+                    current_segment += paragraph
+                else:
+                    # 加上这段会超长，先保存当前分段
+                    segments.append(current_segment)
+                    # 开启新的分段
+                    current_segment = paragraph
+        
+        # 保存最后一个分段
+        if current_segment:
+            segments.append(current_segment)
 
         return segments
 
@@ -347,6 +473,7 @@ class AutoReviewService:
         segments: List[str], text_type: str,
         source: Optional[str] = None,
         content_id: Optional[str] = None,
+        report_id: Optional[str] = None,
     ) -> Tuple[float, List[str], List[Dict]]:
         """并发审核多个文本分段
 
@@ -357,6 +484,7 @@ class AutoReviewService:
             text_type: 文本类型（knowledge/persona）
             source: 审核来源（可选，传递给 moderate）
             content_id: 关联内容 ID（可选，传递给 moderate）
+            report_id: 报告 ID（可选，用于更新进度）
 
         Returns:
             tuple: (max_confidence, merged_violation_types, segment_details)
@@ -381,6 +509,7 @@ class AutoReviewService:
             return {
                 "segment_index": index + 1,
                 "text_summary": segment[:100],
+                "text_full": segment,  # 增加完整内容
                 "confidence": result.get("confidence", 0.0),
                 "violation_types": result.get("violation_types", []),
                 "decision": result.get("decision", "unknown"),
@@ -391,6 +520,11 @@ class AutoReviewService:
         # 并发审核所有分段
         workers = min(AutoReviewService.MAX_WORKERS, len(segments))
         segment_details: List[Optional[Dict]] = [None] * len(segments)
+        completed_count = 0
+
+        # 如果有 report_id，先初始化进度
+        if report_id:
+            AutoReviewService._update_report_progress(report_id, len(segments), 0, segment_details)
 
         with ThreadPoolExecutor(max_workers=workers) as executor:
             future_map = {
@@ -399,49 +533,94 @@ class AutoReviewService:
             }
             for future in as_completed(future_map):
                 idx = future_map[future]
-                segment_details[idx] = future.result()
+                result = future.result()
+                segment_details[idx] = result
+                
+                # 如果有 report_id，更新进度
+                if report_id:
+                    completed_count += 1
+                    AutoReviewService._update_report_progress(
+                        report_id, len(segments), completed_count, segment_details
+                    )
 
         # 聚合结果
         max_confidence = 0.0
         violation_types_set: set = set()
         for detail in segment_details:
-            conf = detail["confidence"]
-            if conf > max_confidence:
-                max_confidence = conf
-            violation_types_set.update(detail["violation_types"])
+            # detail 可能为 None（如果出现异常），这里简单处理
+            if detail:
+                conf = detail.get("confidence", 0.0)
+                if conf > max_confidence:
+                    max_confidence = conf
+                violation_types_set.update(detail.get("violation_types", []))
 
         return max_confidence, list(violation_types_set), segment_details
 
     @staticmethod
-    def _aggregate_results(results: List[Dict]) -> Tuple[float, List[str]]:
+    def _aggregate_results(results: List[Dict]) -> Tuple[float, List[str], str]:
         """综合所有审核结果
 
-        取最高 confidence，合并 violation_types（去重）。
-
+        逻辑更新：
+        1. 优先看模型给出的意见（decision）
+        2. 如果有任何分段为 'false'（拒绝），且置信度 > FALSE_REJECT_THRESHOLD，则整体为 'false'
+        3. 如果有任何分段为 'unknown'（不确定），且置信度 > UNKNOWN_REJECT_THRESHOLD，则整体为 'false'（视为违规）
+        4. 其他情况视为 'true'（通过）
+        
         Args:
-            results: 审核结果字典列表，每个包含 'confidence' 和 'violation_types'
+            results: 审核结果字典列表
 
         Returns:
-            tuple: (max_confidence, merged_violation_types)
-                - max_confidence: 所有结果中最高的置信度
+            tuple: (max_confidence, merged_violation_types, final_decision)
+                - max_confidence: 决定最终结果的那个分段的置信度
                 - merged_violation_types: 所有违规类型的去重合并列表
+                - final_decision: 最终决策 'true'/'false'/'unknown'
         """
         if not results:
-            return 0.0, []
+            return 0.0, [], "true"
 
         max_confidence = 0.0
         violation_types_set: set = set()
+        
+        # 决策优先级：拒绝(false) > 不确定(unknown) > 通过(true)
+        # 但需要结合置信度判断
+        
+        final_decision = "true"
+        highest_risk_confidence = 0.0 # 记录最高风险的置信度
 
         for result in results:
+            decision = result.get("decision", "unknown")
             confidence = result.get("confidence", 0.0)
             violations = result.get("violation_types", [])
-
+            
+            violation_types_set.update(violations)
+            
+            # 更新最大置信度（仅用于统计，不直接决定结果）
             if confidence > max_confidence:
                 max_confidence = confidence
 
-            violation_types_set.update(violations)
+            # 判定逻辑
+            if decision == "false":
+                if confidence > AutoReviewService.FALSE_REJECT_THRESHOLD:
+                    # 拒绝且置信度高 -> 确定拒绝
+                    final_decision = "false"
+                    highest_risk_confidence = max(highest_risk_confidence, confidence)
+                # 否则视为通过（忽略低置信度的拒绝）
+                
+            elif decision == "unknown":
+                if confidence > AutoReviewService.UNKNOWN_REJECT_THRESHOLD:
+                    # 不确定但置信度高（认为违规概率大） -> 拒绝
+                    if final_decision != "false": # 如果已经是 false 则保持
+                        final_decision = "false"
+                    highest_risk_confidence = max(highest_risk_confidence, confidence)
+                # 否则视为通过
+            
+            # decision == "true" 直接通过，不改变 final_decision（除非已经被置为 false）
 
-        return max_confidence, list(violation_types_set)
+        # 如果最终决定是拒绝，使用最高风险置信度作为最终置信度
+        # 否则使用最大置信度
+        final_conf = highest_risk_confidence if final_decision == "false" else max_confidence
+
+        return final_conf, list(violation_types_set), final_decision
 
     @staticmethod
     def _make_decision(
@@ -449,19 +628,21 @@ class AutoReviewService:
         content_type: str,
         confidence: float,
         violation_types: List[str],
+        final_decision: str = "unknown",
         part_results: Optional[List[Dict]] = None,
     ) -> str:
         """根据置信度执行审核决策
 
-        - confidence <= 0.7: 自动通过
-        - confidence > 0.90: 自动拒绝（知识库/人设卡标准较宽松）
-        - 0.7 < confidence <= 0.90: 待人工复核
+        逻辑更新：
+        - 如果 final_decision 为 'false'，则自动拒绝
+        - 否则（'true' 或 'unknown' 但未达拒绝阈值），自动通过
 
         Args:
             content_id: 内容 ID
             content_type: 内容类型（knowledge/persona）
             confidence: 最终置信度
             violation_types: 最终违规类型列表
+            final_decision: 聚合后的最终决策建议（'true'/'false'/'unknown'）
             part_results: 各审核部分的详细结果列表（可选，用于提取违规片段）
 
         Returns:
@@ -470,20 +651,9 @@ class AutoReviewService:
         from mainotebook.content.services.review_service import ReviewService
         from mainotebook.system.models import Users
 
-        if confidence <= AutoReviewService.AUTO_APPROVE_THRESHOLD:
-            # 置信度低于或等于阈值，自动通过
-            ai_reviewer, _ = Users.objects.get_or_create(
-                username="ai_reviewer",
-                defaults={"name": "AI 审核员"},
-            )
-            try:
-                ReviewService.approve_content(content_id, content_type, ai_reviewer)
-            except Exception as e:
-                logger.error(f"自动通过失败: content_id={content_id}, 错误: {e}")
-            return "auto_approved"
-
-        if confidence > AutoReviewService.AUTO_REJECT_THRESHOLD:
-            # 置信度高于阈值，自动拒绝
+        # 优先根据 final_decision 判断
+        if final_decision == "false":
+            # 自动拒绝
             ai_reviewer, _ = Users.objects.get_or_create(
                 username="ai_reviewer",
                 defaults={"name": "AI 审核员"},
@@ -508,16 +678,35 @@ class AutoReviewService:
             if flagged_snippets:
                 reason += "\n违规片段：" + flagged_snippets
 
+            # 截断过长的原因，确保不超过 500 字符限制
+            if len(reason) > 500:
+                reason = reason[:497] + "..."
+
             try:
                 ReviewService.reject_content(
                     content_id, content_type, ai_reviewer, reason
                 )
+                logger.info(f"AI 自动拒绝成功: content_id={content_id}")
             except Exception as e:
                 logger.error(f"自动拒绝失败: content_id={content_id}, 错误: {e}")
+                # 如果自动拒绝失败（例如原因过长），回退到人工复核
+                return "pending_manual"
             return "auto_rejected"
 
-        # 置信度在阈值之间，待人工复核
-        return "pending_manual"
+        else:
+            # 自动通过（包括 final_decision 为 true 或 unknown）
+            ai_reviewer, _ = Users.objects.get_or_create(
+                username="ai_reviewer",
+                defaults={"name": "AI 审核员"},
+            )
+            try:
+                ReviewService.approve_content(content_id, content_type, ai_reviewer)
+                logger.info(f"AI 自动通过成功: content_id={content_id}")
+            except Exception as e:
+                logger.error(f"自动通过失败: content_id={content_id}, 错误: {e}")
+                # 如果自动通过失败，回退到人工复核
+                return "pending_manual"
+            return "auto_approved"
 
     @staticmethod
     def _collect_flagged_content(part_results: Optional[List[Dict]]) -> str:

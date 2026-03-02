@@ -39,6 +39,11 @@ export const createCrudOptions = function ({ crudExpose, context }: CreateCrudOp
 			params.page_size = params.limit;
 			delete params.limit;
 		}
+		// 修复：将 name 字段映射为 search 字段
+		if (params.name) {
+			params.search = params.name;
+			delete params.name;
+		}
 		return await api.GetList(params);
 	};
 
@@ -146,16 +151,8 @@ export const createCrudOptions = function ({ crudExpose, context }: CreateCrudOp
 					search: {
 						show: true,
 						component: {
-							name: 'input',
+							name: 'el-input',
 							placeholder: '搜索名称或描述',
-						},
-						// 将搜索框的值映射到 search 参数
-						valueResolve(context: any) {
-							const { value } = context;
-							if (value) {
-								context.form.search = value;
-								delete context.form.name;
-							}
 						},
 					},
 					column: {
@@ -166,28 +163,32 @@ export const createCrudOptions = function ({ crudExpose, context }: CreateCrudOp
 				},
 				content_type: {
 					title: '内容类型',
-					search: { show: true },
 					type: 'dict-select',
 					dict: dict({
 						data: [
-							{ label: '知识库', value: 'knowledge' },
-							{ label: '人设卡', value: 'persona' },
+							{ value: 'knowledge', label: '知识库', color: 'primary' },
+							{ value: 'persona', label: '人设卡', color: 'success' },
 						],
 					}),
-					column: {
-						width: 100,
-						align: 'center',
-						formatter: ({ value }: any) => CONTENT_TYPE_MAP[value] || value,
-					},
-					form: { show: false },
+					search: { show: true },
+					column: { width: 100, align: 'center' },
+				},
+				status: {
+					title: '审核状态',
+					type: 'dict-select',
+					dict: dict({
+						data: [
+							{ value: 'pending', label: '待审核', color: 'warning' },
+							{ value: 'approved', label: '已通过', color: 'success' },
+							{ value: 'rejected', label: '已拒绝', color: 'danger' },
+						],
+					}),
+					search: { show: true, value: 'pending' }, // 默认搜索待审核
+					column: { width: 100, align: 'center' },
 				},
 				uploader_name: {
 					title: '上传者',
-					column: {
-						width: 120,
-						formatter: ({ value }: any) => value || '-',
-					},
-					form: { show: false },
+					column: { width: 120 },
 				},
 				tags: {
 					title: '标签',

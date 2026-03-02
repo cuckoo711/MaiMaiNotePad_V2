@@ -55,8 +55,8 @@ class ModelPool:
         """初始化模型池"""
         self._lock = threading.Lock()
         self._index = 0
-        # 模型列表缓存：[(name, max_context_length, cooldown_seconds), ...]
-        self._models: List[Tuple[str, int, int]] = []
+        # 模型列表缓存：[(name, max_context_length, cooldown_seconds, enable_thinking), ...]
+        self._models: List[Tuple[str, int, int, bool]] = []
         # 每个模型的冷却截止时间戳
         self._cooldown_until: Dict[str, float] = {}
         # 上次刷新时间
@@ -79,16 +79,16 @@ class ModelPool:
             db_models = list(
                 AIModel.objects.filter(is_enabled=True)
                 .order_by('priority', '-parameter_size', '-max_context_length')
-                .values_list('name', 'max_context_length', 'cooldown_seconds')
+                .values_list('name', 'max_context_length', 'cooldown_seconds', 'enable_thinking')
             )
             if db_models:
                 self._models = db_models
                 # 为新模型初始化冷却时间
-                for name, _, _ in self._models:
+                for name, _, _, _ in self._models:
                     if name not in self._cooldown_until:
                         self._cooldown_until[name] = 0.0
                 # 清理已删除模型的冷却记录
-                active_names = {name for name, _, _ in self._models}
+                active_names = {name for name, _, _, _ in self._models}
                 for name in list(self._cooldown_until.keys()):
                     if name not in active_names:
                         del self._cooldown_until[name]
@@ -100,14 +100,14 @@ class ModelPool:
             logger.error("刷新模型池失败: %s", e)
             # 数据库不可用时保留旧列表
 
-    def get_next_model(self) -> Optional[str]:
-        """获取下一个可用模型
+    def get_next_model(self) -> Optional[Tuple[str, bool]]:
+        """获取下一个可用模型及其配置
 
         按优先级轮询，跳过处于冷却期的模型。
         如果所有模型都在冷却中，返回冷却时间最短的模型。
 
         Returns:
-            Optional[str]: 模型名称，无可用模型时返回 None
+            Optional[Tuple[str, bool]]: (模型名称, 是否启用思考)，无可用模型时返回 None
         """
         self._refresh_models()
         now = time_module.time()
@@ -120,21 +120,24 @@ class ModelPool:
             for i in range(len(self._models)):
                 idx = (self._index + i) % len(self._models)
                 model_name = self._models[idx][0]
+                enable_thinking = self._models[idx][3]
                 if self._cooldown_until.get(model_name, 0.0) <= now:
                     self._index = (idx + 1) % len(self._models)
-                    return model_name
+                    return model_name, enable_thinking
 
             # 所有模型都在冷却中，返回冷却最快结束的
-            earliest_model = min(
-                ((name, self._cooldown_until.get(name, 0.0)) for name, _, _ in self._models),
-                key=lambda x: x[1],
-            )[0]
+            earliest_model_info = min(
+                ((name, enable_thinking, self._cooldown_until.get(name, 0.0)) for name, _, _, enable_thinking in self._models),
+                key=lambda x: x[2],
+            )
+            earliest_model = earliest_model_info[0]
+            earliest_enable_thinking = earliest_model_info[1]
             wait_time = self._cooldown_until.get(earliest_model, 0.0) - now
             logger.warning(
                 "所有模型均在冷却中，使用冷却最快结束的模型: %s（%.1f 秒后可用）",
                 earliest_model, wait_time,
             )
-            return earliest_model
+            return earliest_model, earliest_enable_thinking
 
     def mark_rate_limited(self, model_name: str) -> None:
         """标记模型触发了 429 限速，进入冷却期
@@ -147,7 +150,7 @@ class ModelPool:
         # 查找该模型的冷却时间配置
         cooldown = 65  # 默认值
         with self._lock:
-            for name, _, cd in self._models:
+            for name, _, cd, _ in self._models:
                 if name == model_name:
                     cooldown = cd
                     break
@@ -196,9 +199,14 @@ class ModerationService:
 6. 违法（illegal）：仅限教唆犯罪、贩卖违禁品等明确违法内容
 
 判断逻辑：
-- 明确违规（置信度 > 0.9）：文本明显包含上述任一违规类型
-- 明确正常（置信度 < 0.4）：文本完全正常，无任何违规迹象
-- 不确定（置信度 0.4 ~ 0.9）：文本疑似违规但无法确定，如隐晦表达、谐音、反讽或边缘内容
+- 明确违规：文本明显包含上述任一违规类型
+- 明确正常：文本完全正常，无任何违规迹象
+- 不确定：文本疑似违规但无法确定，如隐晦表达、谐音、反讽或边缘内容
+
+其中，
+- 置信度（Confidence）代表的是 你对你的判断的置信度，数值越高，表示你越确信你的判断是正确的。
+- 置信度与判断结果直接相关，置信度越高，判断结果越可信。
+- 如果是不确定，置信度则代表你认为ta是违规的概率，数值越高，表示你越确信ta是违规的。
 
 {context_specific_rules}
 
@@ -216,27 +224,14 @@ class ModerationService:
 - violation_types: 违规类型数组，若 decision 为 "true" 则为空数组
 - flagged_content: 从原文中摘录的违规片段（原文引用，不要改写），多个片段用 | 分隔。若无违规则为空字符串
 
-示例：
+请严格按照上述格式输出，不要添加任何解释或额外文字。
 
-输入：[包含露骨性描写的文本]
-输出：{{"decision": "false", "confidence": 0.95, "violation_types": ["porn"], "flagged_content": "她脱下了所有衣服..."}}
-
-输入：[包含对领导人侮辱性称呼的文本]
-输出：{{"decision": "false", "confidence": 0.92, "violation_types": ["politics"], "flagged_content": "xxx是个xxx..."}}
-
-输入：[包含粗口的句子]
-输出：{{"decision": "false", "confidence": 0.88, "violation_types": ["abuse"], "flagged_content": "你这个xxx"}}
-
-输入：[正常的日常对话]
-输出：{{"decision": "true", "confidence": 0.15, "violation_types": [], "flagged_content": ""}}
-
-输入：[使用谐音或隐晦表达的疑似违规内容]
-输出：{{"decision": "unknown", "confidence": 0.65, "violation_types": ["politics"], "flagged_content": "疑似违规的片段..."}}
-
-输入：[同时包含多种违规类型的文本]
-输出：{{"decision": "false", "confidence": 0.93, "violation_types": ["porn", "abuse"], "flagged_content": "违规片段1 | 违规片段2"}}
-
-请严格按照上述格式输出，不要添加任何解释或额外文字。"""
+置信度（Confidence）代表的是 你认为你的判断是正确的概率，数值越高，表示你越确信你的判断是正确的。
+因此：
+- 置信度越高，判断结果越可信。
+- 置信度越低，判断结果越不可信。
+- 如果你不确定，但是你认为ta是违规的，置信度则代表你认为ta是违规的概率，数值越高，表示你越确信ta是违规的。
+"""
 
     # 不同文本类型的特定审核规则
     CONTEXT_RULES = {
@@ -395,9 +390,11 @@ class ModerationService:
         last_error = None
 
         for attempt in range(max_attempts):
-            model_name = self.model_pool.get_next_model()
-            if model_name is None:
+            model_info = self.model_pool.get_next_model()
+            if model_info is None:
                 break
+            
+            model_name, enable_thinking_supported = model_info
 
             # 如果模型在冷却中且这是最后的选择，短暂等待
             if not self.model_pool.is_available(model_name):
@@ -406,18 +403,28 @@ class ModerationService:
 
             start_time = time.monotonic()
             try:
-                response = self.client.chat.completions.create(
-                    model=model_name,
-                    messages=[
+                # 构造 API 请求参数
+                
+                api_params = {
+                    "model": model_name,
+                    "messages": [
                         {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": "今天天气真好"},
+                        {"role": "assistant", "content": '{"decision": "true", "confidence": 0.9, "violation_types": [], "flagged_content": ""}'},
                         {"role": "user", "content": user_message},
                     ],
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    stream=False,
-                    response_format={"type": "json_object"},
-                    enable_thinking=False,
-                )
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "stream": False,
+                }
+                
+                # 仅当模型支持且需要禁用思考时，才通过 extra_body 传递参数
+                # 这里假设如果模型支持 enable_thinking，我们默认将其设为 False 以加速审核
+                # 如果未来需要启用思考，可以在 AIModel 中增加字段控制默认值
+                if enable_thinking_supported:
+                    api_params["extra_body"] = {"enable_thinking": False}
+
+                response = self.client.chat.completions.create(**api_params)
                 latency_ms = int((time.monotonic() - start_time) * 1000)
 
                 # 提取 token 用量

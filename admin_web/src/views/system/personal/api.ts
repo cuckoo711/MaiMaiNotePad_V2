@@ -61,3 +61,15 @@ export function uploadAvatar(data: AddReq) {
 		},
 	});
 }
+
+/**
+ * 发送邮箱验证码
+ * @param data { email: string }
+ */
+export function sendEmailCode(data: { email: string }) {
+	return request({
+		url: '/api/system/user/send_email_code/',
+		method: 'post',
+		data: data,
+	});
+}
