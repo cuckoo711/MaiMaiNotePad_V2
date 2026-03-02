@@ -24,7 +24,6 @@
 						</div>
             <div class="flex-auto">
 							<span class="font24">{{ v.num1 }}</span>
-							<span class="ml5 font14" :style="{ color: v.color1 }">{{ v.num2 }}%</span>
 							<div class="mt10">{{ v.num3 }}</div>
 						</div>
 					</div>
@@ -85,12 +84,12 @@
 					<div class="home-monitor">
 						<div class="flex-warp">
 							<div class="flex-warp-item" v-for="(v, k) in homeThree" :key="k">
-								<div class="flex-warp-item-box" :class="`home-animation${k}`">
+								<div class="flex-warp-item-box" :class="`home-animation${k}`" @click="navigateTo(v.path)">
 									<div class="flex-margin">
                     <div class="home-card-item-icon flex" style="margin: 20px;" :style="{ background: '#f8f8f8' }">
                       <i class="flex-margin font24" :class="v.icon" :style="{ color: v.iconColor}"></i>
 						        </div>
-                    <span class="pl20" :style="{ fontSize: 'clamp(0.875rem, 2vw, 1rem)' }"><a :href="v.url">{{ $t(v.label) }}</a></span>
+                    <span class="pl20" :style="{ fontSize: 'clamp(0.875rem, 2vw, 1rem)' }">{{ v.label }}</span>
 									</div>
 								</div>
 							</div>
@@ -115,14 +114,14 @@ import HomeBg from '/@/assets/home-bg.png';
 
 let global: any = {
 	homeChartOne: null,
-	homeChartTwo: null,
 	homeCharThree: null,
 	dispose: [null, '', undefined],
 };
 
 import { useUserInfo } from '/@/stores/userInfo';
 import {useRouter} from "vue-router";
-import * as api from "/@/views/system/personal/api";
+import * as personalApi from "/@/views/system/personal/api";
+import * as homeApi from "/@/views/system/home/api";
 
 // 定义消息类型
 interface NewsItem {
@@ -136,7 +135,6 @@ export default defineComponent({
 	setup() {
     const userInfo = useUserInfo();
 		const homeLineRef = ref();
-		const homePieRef = ref();
 		const homeBarRef = ref();
 		const storesTagsViewRoutes = useTagsViewRoutes();
 		const storesThemeConfig = useThemeConfig();
@@ -149,69 +147,78 @@ export default defineComponent({
 			newsInfoList: [...defaultNewsItems] as NewsItem[],
 			homeOne: [
 				{
-					num1: '125,12',
-					num2: '-12.32',
-					num3: '订单统计信息',
-					num4: 'fa fa-meetup',
-					color1: '#FF6462',
+					num1: '0',
+					num2: '',
+					num3: '知识库总数',
+					num4: 'fa fa-book',
+					color1: '#6690F9',
 					color2: '--next-color-primary-lighter',
 					color3: '--el-color-primary',
 				},
 				{
-					num1: '653,33',
-					num2: '+42.32',
-					num3: '月度计划信息',
-					num4: 'iconfont icon-ditu',
+					num1: '0',
+					num2: '',
+					num3: '人设卡总数',
+					num4: 'fa fa-user-circle',
 					color1: '#6690F9',
 					color2: '--next-color-success-lighter',
 					color3: '--el-color-success',
 				},
 				{
-					num1: '520,43',
-					num2: '-10.01',
-					num3: '访问统计信息',
-					num4: 'fa fa-github-alt',
-					color1: '#FF6462',
+					num1: '0',
+					num2: '',
+					num3: '我的上传',
+					num4: 'fa fa-cloud-upload',
+					color1: '#6690F9',
+					color2: '--next-color-warning-lighter',
+					color3: '--el-color-warning',
+				},
+				{
+					num1: '0',
+					num2: '',
+					num3: '我的下载',
+					num4: 'fa fa-cloud-download',
+					color1: '#6690F9',
 					color2: '--next-color-danger-lighter',
 					color3: '--el-color-danger',
 				},
 			],
 			homeThree: [
 				{
-					icon: 'fa fa-user-o',
-					label: 'message.router.systemRole',
-					iconColor: 'gray',
-          url:'#/role',
+					icon: 'fa fa-book',
+					label: '浏览知识库',
+					iconColor: '#5d8b22',
+					path: '/square/knowledge',
 				},
 				{
-					icon: 'fa fa-sitemap',
-					label: 'message.router.systemDept',
-					iconColor: 'gray',
-          url:'#/dept',
+					icon: 'fa fa-user-circle',
+					label: '浏览人设卡',
+					iconColor: '#3bbc86',
+					path: '/square/persona',
 				},
 				{
-					icon: 'iconfont icon-system',
-					label: 'message.router.configSystem',
-					iconColor: 'gray',
-          url:'#/config',
+					icon: 'fa fa-cloud-upload',
+					label: '我的上传',
+					iconColor: '#FF8000',
+          path:'/content/my-uploads',
 				},
 				{
-					icon: 'iconfont icon-xiaoxizhongxin',
-					label: 'message.router.systemNotice1',
-					iconColor: 'gray',
-          url:'#/messageCenter',
+					icon: 'fa fa-cloud-download',
+					label: '我的下载',
+					iconColor: '#6690F9',
+          path:'/content/my-downloads',
 				},
 				{
-					icon: 'iconfont icon-dict',
-					label: 'message.router.configDict',
-					iconColor: 'gray',
-          url:'#/dictionary',
+					icon: 'fa fa-bell',
+					label: '消息中心',
+					iconColor: '#fe9a8b',
+          path:'/messageCenter',
 				},
 				{
-					icon: 'iconfont icon-Area',
-					label: 'message.router.configArea',
-					iconColor: 'gray',
-          url:'#/areas',
+					icon: 'fa fa-user',
+					label: '个人设置',
+					iconColor: '#9E87FF',
+          path:'/personal',
 				},
 			],
 			myCharts: [],
@@ -221,86 +228,96 @@ export default defineComponent({
 				color: '#303133',
 			},
 		});
-		// 折线图
+		// 折线图 - 内容上传趋势
 		const initLineChart = () => {
 			if (!global.dispose.some((b: any) => b === global.homeChartOne)) global.homeChartOne.dispose();
 			global.homeChartOne = <any>echarts.init(homeLineRef.value, state.charts.theme);
-			const option = {
-				backgroundColor: state.charts.bgColor,
-				title: {
-					text: '政策补贴额度',
-					x: 'left',
-					textStyle: { fontSize: '15', color: state.charts.color },
-				},
-				grid: { top: 70, right: 20, bottom: 30, left: 30 },
-				tooltip: { trigger: 'axis' },
-				legend: { data: ['预购队列', '最新成交价'], right: 0 },
-				xAxis: {
-					data: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
-				},
-				yAxis: [
-					{
-						type: 'value',
-						name: '价格',
-						splitLine: { show: true, lineStyle: { type: 'dashed', color: '#f5f5f5' } },
+			
+			// 获取月度趋势数据
+			homeApi.getMonthlyTrend().then((res: any) => {
+				const { data } = res || {};
+				const months = data?.months || [];
+				const knowledgeCounts = data?.knowledge_counts || [];
+				const personaCounts = data?.persona_counts || [];
+				
+				const option = {
+					backgroundColor: state.charts.bgColor,
+					title: {
+						text: '内容上传趋势',
+						x: 'left',
+						textStyle: { fontSize: '15', color: state.charts.color },
 					},
-				],
-				series: [
-					{
-						name: '预购队列',
-						type: 'line',
-						symbolSize: 6,
-						symbol: 'circle',
-						smooth: true,
-						data: [0, 41.1, 30.4, 65.1, 53.3, 53.3, 53.3, 41.1, 30.4, 65.1, 53.3, 10],
-						lineStyle: { color: '#fe9a8b' },
-						itemStyle: { color: '#fe9a8b', borderColor: '#fe9a8b' },
-						areaStyle: {
-							color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-								{ offset: 0, color: '#fe9a8bb3' },
-								{ offset: 1, color: '#fe9a8b03' },
-							]),
-						},
+					grid: { top: 70, right: 20, bottom: 30, left: 30 },
+					tooltip: { trigger: 'axis' },
+					legend: { data: ['知识库', '人设卡'], right: 0 },
+					xAxis: {
+						data: months,
 					},
-					{
-						name: '最新成交价',
-						type: 'line',
-						symbolSize: 6,
-						symbol: 'circle',
-						smooth: true,
-						data: [0, 24.1, 7.2, 15.5, 42.4, 42.4, 42.4, 24.1, 7.2, 15.5, 42.4, 0],
-						lineStyle: { color: '#9E87FF' },
-						itemStyle: { color: '#9E87FF', borderColor: '#9E87FF' },
-						areaStyle: {
-							color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-								{ offset: 0, color: '#9E87FFb3' },
-								{ offset: 1, color: '#9E87FF03' },
-							]),
+					yAxis: [
+						{
+							type: 'value',
+							name: '上传数量',
+							splitLine: { show: true, lineStyle: { type: 'dashed', color: '#f5f5f5' } },
 						},
-						emphasis: {
-							itemStyle: {
-								color: {
-									type: 'radial',
-									x: 0.5,
-									y: 0.5,
-									r: 0.5,
-									colorStops: [
-										{ offset: 0, color: '#9E87FF' },
-										{ offset: 0.4, color: '#9E87FF' },
-										{ offset: 0.5, color: '#fff' },
-										{ offset: 0.7, color: '#fff' },
-										{ offset: 0.8, color: '#fff' },
-										{ offset: 1, color: '#fff' },
-									],
-								},
-								borderColor: '#9E87FF',
-								borderWidth: 2,
+					],
+					series: [
+						{
+							name: '知识库',
+							type: 'line',
+							symbolSize: 6,
+							symbol: 'circle',
+							smooth: true,
+							data: knowledgeCounts,
+							lineStyle: { color: '#fe9a8b' },
+							itemStyle: { color: '#fe9a8b', borderColor: '#fe9a8b' },
+							areaStyle: {
+								color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+									{ offset: 0, color: '#fe9a8bb3' },
+									{ offset: 1, color: '#fe9a8b03' },
+								]),
 							},
 						},
+						{
+							name: '人设卡',
+							type: 'line',
+							symbolSize: 6,
+							symbol: 'circle',
+							smooth: true,
+							data: personaCounts,
+							lineStyle: { color: '#9E87FF' },
+							itemStyle: { color: '#9E87FF', borderColor: '#9E87FF' },
+							areaStyle: {
+								color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+									{ offset: 0, color: '#9E87FFb3' },
+									{ offset: 1, color: '#9E87FF03' },
+								]),
+							},
+						},
+					],
+				};
+				(<any>global.homeChartOne).setOption(option);
+			}).catch(() => {
+				// 错误时使用默认配置
+				const option = {
+					backgroundColor: state.charts.bgColor,
+					title: {
+						text: '内容上传趋势',
+						x: 'left',
+						textStyle: { fontSize: '15', color: state.charts.color },
 					},
-				],
-			};
-			(<any>global.homeChartOne).setOption(option);
+					grid: { top: 70, right: 20, bottom: 30, left: 30 },
+					tooltip: { trigger: 'axis' },
+					legend: { data: ['知识库', '人设卡'], right: 0 },
+					xAxis: { data: [] },
+					yAxis: [{ type: 'value', name: '上传数量' }],
+					series: [
+						{ name: '知识库', type: 'line', data: [] },
+						{ name: '人设卡', type: 'line', data: [] },
+					],
+				};
+				(<any>global.homeChartOne).setOption(option);
+			});
+			
 			(<any>state.myCharts).push(global.homeChartOne);
 		};
 		// 饼图
@@ -388,135 +405,91 @@ export default defineComponent({
 			(<any>global.homeChartTwo).setOption(option);
 			(<any>state.myCharts).push(global.homeChartTwo);
 		};
-		// 柱状图
+		// 柱状图 - 热门内容下载排行
 		const initBarChart = () => {
 			if (!global.dispose.some((b: any) => b === global.homeCharThree)) global.homeCharThree.dispose();
 			global.homeCharThree = <any>echarts.init(homeBarRef.value, state.charts.theme);
-			const option = {
-				backgroundColor: state.charts.bgColor,
-				title: {
-					text: '地热开发利用',
-					x: 'left',
-					textStyle: { fontSize: '15', color: state.charts.color },
-				},
-				tooltip: { trigger: 'axis' },
-				legend: { data: ['供温', '回温', '压力值(Mpa)'], right: 0 },
-				grid: { top: 70, right: 80, bottom: 30, left: 80 },
-				xAxis: [
-					{
-						type: 'category',
-						data: ['1km', '2km', '3km', '4km', '5km', '6km'],
-						boundaryGap: true,
-						axisTick: { show: false },
+			
+			// 获取热门内容数据
+			homeApi.getHotContent().then((res: any) => {
+				const { data } = res || {};
+				const hotKnowledge = data?.hot_knowledge || [];
+				const hotPersona = data?.hot_persona || [];
+				
+				// 合并并排序
+				const allContent = [
+					...hotKnowledge.map((item: any) => ({ ...item, type: '知识库' })),
+					...hotPersona.map((item: any) => ({ ...item, type: '人设卡' }))
+				].sort((a, b) => b.download_count - a.download_count).slice(0, 10);
+				
+				const names = allContent.map((item: any) => item.name);
+				const counts = allContent.map((item: any) => item.download_count);
+				const colors = allContent.map((item: any) => item.type === '知识库' ? '#fe9a8b' : '#9E87FF');
+				
+				const option = {
+					backgroundColor: state.charts.bgColor,
+					title: {
+						text: '热门内容下载排行',
+						x: 'left',
+						textStyle: { fontSize: '15', color: state.charts.color },
 					},
-				],
-				yAxis: [
-					{
-						name: '供回温度(℃）',
-						nameLocation: 'middle',
-						nameTextStyle: { padding: [3, 4, 50, 6] },
+					tooltip: { 
+						trigger: 'axis',
+						axisPointer: { type: 'shadow' }
+					},
+					grid: { top: 70, right: 80, bottom: 30, left: 150 },
+					xAxis: {
+						type: 'value',
+						name: '下载次数',
 						splitLine: { show: true, lineStyle: { type: 'dashed', color: '#f5f5f5' } },
-						axisLine: { show: false },
-						axisTick: { show: false },
-						axisLabel: { color: state.charts.color, formatter: '{value} ' },
 					},
-					{
-						name: '压力值(Mpa)',
-						nameLocation: 'middle',
-						nameTextStyle: { padding: [50, 4, 5, 6] },
-						splitLine: { show: false },
-						axisLine: { show: false },
-						axisTick: { show: false },
-						axisLabel: { color: state.charts.color, formatter: '{value} ' },
-					},
-				],
-				series: [
-					{
-						name: '供温',
-						type: 'line',
-						smooth: true,
-						showSymbol: true,
-						// 矢量画五角星
-						symbol: 'path://M150 0 L80 175 L250 75 L50 75 L220 175 Z',
-						symbolSize: 12,
-						yAxisIndex: 0,
-						areaStyle: {
-							color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-								{ offset: 0, color: 'rgba(250,180,101,0.3)' },
-								{ offset: 1, color: 'rgba(250,180,101,0)' },
-							]),
-							shadowColor: 'rgba(250,180,101,0.2)',
-							shadowBlur: 20,
+					yAxis: {
+						type: 'category',
+						data: names,
+						axisLabel: {
+							color: state.charts.color,
+							formatter: (value: string) => {
+								return value.length > 10 ? value.substring(0, 10) + '...' : value;
+							}
 						},
-						itemStyle: { color: '#FF8000' },
-						// data中可以使用对象，value代表相应的值，另外可加入自定义的属性
-						data: [
-							{ value: 1, stationName: 's1' },
-							{ value: 3, stationName: 's2' },
-							{ value: 4, stationName: 's3' },
-							{ value: 9, stationName: 's4' },
-							{ value: 3, stationName: 's5' },
-							{ value: 2, stationName: 's6' },
-						],
 					},
-					{
-						name: '回温',
-						type: 'line',
-						smooth: true,
-						showSymbol: true,
-						symbol: 'emptyCircle',
-						symbolSize: 12,
-						yAxisIndex: 0,
-						areaStyle: {
-							color: new echarts.graphic.LinearGradient(
-								0,
-								0,
-								0,
-								1,
-								[
-									{ offset: 0, color: 'rgba(199, 237, 250,0.5)' },
-									{ offset: 1, color: 'rgba(199, 237, 250,0.2)' },
-								],
-								false
-							),
+					series: [
+						{
+							type: 'bar',
+							data: counts.map((value: number, index: number) => ({
+								value,
+								itemStyle: {
+									color: colors[index],
+									borderRadius: [0, 30, 30, 0],
+								}
+							})),
+							barWidth: 20,
+							label: {
+								show: true,
+								position: 'right',
+								color: state.charts.color,
+							}
 						},
-						itemStyle: {
-							color: '#3bbc86',
-						},
-						data: [
-							{ value: 31, stationName: 's1' },
-							{ value: 36, stationName: 's2' },
-							{ value: 54, stationName: 's3' },
-							{ value: 24, stationName: 's4' },
-							{ value: 73, stationName: 's5' },
-							{ value: 22, stationName: 's6' },
-						],
+					],
+				};
+				(<any>global.homeCharThree).setOption(option);
+			}).catch(() => {
+				// 错误时使用默认配置
+				const option = {
+					backgroundColor: state.charts.bgColor,
+					title: {
+						text: '热门内容下载排行',
+						x: 'left',
+						textStyle: { fontSize: '15', color: state.charts.color },
 					},
-					{
-						name: '压力值(Mpa)',
-						type: 'bar',
-						barWidth: 30,
-						yAxisIndex: 1,
-						itemStyle: {
-							color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-								{ offset: 0, color: 'rgba(108,80,243,0.3)' },
-								{ offset: 1, color: 'rgba(108,80,243,0)' },
-							]),
-							//柱状图圆角
-							borderRadius: [30, 30, 0, 0],
-						},
-						data: [
-							{ value: 11, stationName: 's1' },
-							{ value: 34, stationName: 's2' },
-							{ value: 54, stationName: 's3' },
-							{ value: 39, stationName: 's4' },
-							{ value: 63, stationName: 's5' },
-							{ value: 24, stationName: 's6' },
-						],
-					},
-				],
-			};
-			(<any>global.homeCharThree).setOption(option);
+					grid: { top: 70, right: 60, bottom: 30, left: 150 },
+					xAxis: { type: 'value', name: '下载次数' },
+					yAxis: { type: 'category', data: [] },
+					series: [{ type: 'bar', data: [] }],
+				};
+				(<any>global.homeCharThree).setOption(option);
+			});
+			
 			(<any>state.myCharts).push(global.homeCharThree);
 		};
 		// 批量设置 echarts resize
@@ -536,6 +509,7 @@ export default defineComponent({
 		// 页面加载时
 		onMounted(() => {
 			initEchartsResize();
+			loadStats(); // 加载统计数据
 			getMsg(); // 确保组件挂载时立即获取消息列表
 		});
 		// 由于页面缓存原因，keep-alive
@@ -561,11 +535,8 @@ export default defineComponent({
 						initLineChart();
 					}, 500);
 					setTimeout(() => {
-						initPieChart();
-					}, 700);
-					setTimeout(() => {
 						initBarChart();
-					}, 1000);
+					}, 700);
 				});
 			},
 			{
@@ -573,13 +544,41 @@ export default defineComponent({
 				immediate: true,
 			}
 		);
+		
+		// 加载统计数据
+		const loadStats = (): void => {
+			// 加载平台统计
+			homeApi.getPlatformStats().then((res: any) => {
+				const { data } = res || {};
+				if (data) {
+					state.homeOne[0].num1 = String(data.total_knowledge || 0);
+					state.homeOne[1].num1 = String(data.total_persona || 0);
+				}
+			}).catch((error: Error) => {
+				console.error('获取平台统计失败:', error);
+			});
+			
+			// 加载个人统计(需要登录)
+			if (userInfo.userInfos) {
+				homeApi.getMyStats().then((res: any) => {
+					const { data } = res || {};
+					if (data) {
+						state.homeOne[2].num1 = String(data.my_uploads || 0);
+						state.homeOne[3].num1 = String(data.my_downloads || 0);
+					}
+				}).catch((error: Error) => {
+					console.error('获取个人统计失败:', error);
+				});
+			}
+		};
+		
 		// 获取消息列表
 		const getMsg = (): void => {
 			// 先重置为默认数据
 			state.newsInfoList = [...defaultNewsItems];
 			
 			// 尝试从API获取最新数据
-			api.GetSelfReceive({}).then((res: any) => {
+			personalApi.GetSelfReceive({}).then((res: any) => {
 				const { data } = res || {};
 				// 严格检查返回数据的有效性
 				if (data && Array.isArray(data) && data.length > 0) {
@@ -606,13 +605,17 @@ export default defineComponent({
 			router.push({ path: '/messageCenter' });
 		};
 
+		// 导航到指定路径
+		const navigateTo = (path: string): void => {
+			router.push({ path });
+		};
+
 		const headerTextColor = computed(() => {
 			return themeConfig.value.isIsDark ? '#e6e6e6' : '#000000';
 		});
 
 		return {
 		homeLineRef,
-		homePieRef,
 		homeBarRef,
 		userInfo,
 		...toRefs(state),
@@ -727,6 +730,7 @@ animation: scrollText 5s linear infinite;
 
             &:hover {
               background: var(--el-color-primary-light-9);
+              transform: translateY(-2px);
             }
           }
 

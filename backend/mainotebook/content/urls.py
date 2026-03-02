@@ -26,6 +26,7 @@ from mainotebook.content.views import (
     AdminExtensionViewSet,
     ModerationLogViewSet,
     AIModelViewSet,
+    TagViewSet,
 )
 from mainotebook.content.views.moderation import check_content, health_check
 
@@ -132,6 +133,14 @@ router.register(r'moderation-logs', ModerationLogViewSet, basename='moderation-l
 # - PUT /api/content/ai-models/{id}/ - 更新模型
 # - DELETE /api/content/ai-models/{id}/ - 删除模型
 router.register(r'ai-models', AIModelViewSet, basename='ai-model')
+
+# 注册标签视图集
+# Django 路径: /api/content/tags/*
+# 提供的端点：
+# - GET /api/content/tags/popular/ - 获取热门标签列表
+# - POST /api/content/tags/rebuild/ - 重建标签统计（管理员）
+# - POST /api/content/tags/clear_cache/ - 清除标签缓存（管理员）
+router.register(r'tags', TagViewSet, basename='tag')
 
 # URL 模式
 # 注意：路由器会自动生成标准的 REST 端点

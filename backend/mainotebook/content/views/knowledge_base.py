@@ -27,6 +27,7 @@ from mainotebook.content.permissions import IsOwnerOrReadOnly
 from mainotebook.content.services.knowledge_base_service import KnowledgeBaseService
 from mainotebook.content.services.file_service import FileService
 from mainotebook.content.services.star_service import StarService
+from mainotebook.content.services.tag_service import TagService
 
 import logging
 
@@ -108,6 +109,31 @@ class KnowledgeBaseViewSet(CustomModelViewSet):
             return KnowledgeBase.objects.filter(is_public=True, is_pending=False)
         return KnowledgeBase.objects.all()
     
+    def list(self, request, *args, **kwargs):
+        """获取知识库列表
+        
+        重写 list 方法以记录标签搜索统计。
+        
+        Args:
+            request: HTTP 请求对象
+            
+        Returns:
+            Response: 知识库列表响应
+        """
+        # 记录标签搜索统计
+        tags_param = request.query_params.get('tags', '')
+        if tags_param:
+            # 解析标签参数（可能是逗号分隔的多个标签）
+            tags = [tag.strip() for tag in tags_param.split(',') if tag.strip()]
+            for tag in tags:
+                try:
+                    TagService.increment_search_count(tag, tag_type='knowledge')
+                except Exception as e:
+                    logger.warning(f"记录标签搜索统计失败: {tag}, {e}")
+        
+        # 调用父类的 list 方法
+        return super().list(request, *args, **kwargs)
+    
     def perform_create(self, serializer):
         """创建知识库后处理上传的文件，用户选择公开时自动提交审核
 
@@ -121,6 +147,14 @@ class KnowledgeBaseViewSet(CustomModelViewSet):
         want_public = str(self.request.data.get('is_public', '')).lower() == 'true'
 
         knowledge_base = serializer.save()
+
+        # 更新标签使用统计
+        if knowledge_base.tags:
+            tags = [tag.strip() for tag in knowledge_base.tags.split(',') if tag.strip()]
+            try:
+                TagService.update_tag_usage(tags, tag_type='knowledge')
+            except Exception as e:
+                logger.warning(f"更新标签使用统计失败: {e}")
 
         # 处理上传的文件
         files = self.request.FILES.getlist('files')
@@ -152,6 +186,33 @@ class KnowledgeBaseViewSet(CustomModelViewSet):
                 logger.warning(
                     f"知识库 {knowledge_base.id} 创建时自动提交审核失败: {e}"
                 )
+    
+    def perform_update(self, serializer):
+        """更新知识库后更新标签使用统计
+        
+        Args:
+            serializer: 知识库更新序列化器
+        """
+        # 获取旧的标签
+        old_tags = set()
+        if serializer.instance.tags:
+            old_tags = set(tag.strip() for tag in serializer.instance.tags.split(',') if tag.strip())
+        
+        # 保存更新
+        knowledge_base = serializer.save()
+        
+        # 获取新的标签
+        new_tags = set()
+        if knowledge_base.tags:
+            new_tags = set(tag.strip() for tag in knowledge_base.tags.split(',') if tag.strip())
+        
+        # 计算新增的标签
+        added_tags = new_tags - old_tags
+        if added_tags:
+            try:
+                TagService.update_tag_usage(list(added_tags), tag_type='knowledge')
+            except Exception as e:
+                logger.warning(f"更新标签使用统计失败: {e}")
     
     @swagger_auto_schema(
         operation_summary='获取当前用户的知识库列表',
@@ -286,6 +347,21 @@ class KnowledgeBaseViewSet(CustomModelViewSet):
         
         # GET: 下载文件
         try:
+            # 增加下载计数
+            from django.db.models import F
+            KnowledgeBase.objects.filter(id=knowledge_base.id).update(
+                downloads=F('downloads') + 1
+            )
+            
+            # 记录下载记录
+            from mainotebook.content.models import DownloadRecord
+            DownloadRecord.objects.create(
+                target_id=str(knowledge_base.id),
+                target_type='knowledge'
+            )
+            
+            logger.info(f"用户 {request.user.id} 下载知识库 {knowledge_base.id} 的文件 {kb_file.original_name}")
+            
             return FileService.get_file_response(kb_file.file_path, kb_file.original_name)
         except FileNotFoundError:
             return ErrorResponse(msg="文件不存在", status=status.HTTP_404_NOT_FOUND)

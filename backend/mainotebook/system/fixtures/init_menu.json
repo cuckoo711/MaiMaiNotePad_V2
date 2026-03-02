@@ -1752,5 +1752,102 @@
         ],
         "menu_button": [],
         "menu_field": []
+    },
+    {
+        "name": "广场",
+        "icon": "ele-ShoppingCart",
+        "sort": 4,
+        "is_link": false,
+        "is_catalog": true,
+        "web_path": "/square",
+        "component": "",
+        "component_name": "",
+        "status": true,
+        "cache": false,
+        "visible": true,
+        "children": [
+            {
+                "name": "知识库广场",
+                "icon": "ele-Compass",
+                "sort": 1,
+                "is_link": false,
+                "is_catalog": false,
+                "web_path": "/square/knowledge",
+                "component": "content/knowledge/index",
+                "component_name": "squareKnowledge",
+                "status": true,
+                "cache": true,
+                "visible": true,
+                "children": [],
+                "menu_button": [
+                    {
+                        "name": "查询",
+                        "value": "knowledge_square:List",
+                        "api": "/api/content/knowledge/",
+                        "method": 0
+                    },
+                    {
+                        "name": "详情",
+                        "value": "knowledge_square:Detail",
+                        "api": "/api/content/knowledge/{id}/",
+                        "method": 0
+                    },
+                    {
+                        "name": "收藏",
+                        "value": "knowledge_square:Star",
+                        "api": "/api/content/knowledge/{id}/star/",
+                        "method": 1
+                    },
+                    {
+                        "name": "下载",
+                        "value": "knowledge_square:Download",
+                        "api": "/api/content/knowledge/{id}/files/{file_id}/",
+                        "method": 0
+                    }
+                ]
+            },
+            {
+                "name": "人设卡广场",
+                "icon": "ele-UserFilled",
+                "sort": 2,
+                "is_link": false,
+                "is_catalog": false,
+                "web_path": "/square/persona",
+                "component": "content/persona/index",
+                "component_name": "squarePersona",
+                "status": true,
+                "cache": true,
+                "visible": true,
+                "children": [],
+                "menu_button": [
+                    {
+                        "name": "查询",
+                        "value": "persona_square:List",
+                        "api": "/api/content/persona/",
+                        "method": 0
+                    },
+                    {
+                        "name": "详情",
+                        "value": "persona_square:Detail",
+                        "api": "/api/content/persona/{id}/",
+                        "method": 0
+                    },
+                    {
+                        "name": "收藏",
+                        "value": "persona_square:Star",
+                        "api": "/api/content/persona/{id}/star/",
+                        "method": 1
+                    },
+                    {
+                        "name": "下载",
+                        "value": "persona_square:Download",
+                        "api": "/api/content/persona/{id}/files/{file_id}/",
+                        "method": 0
+                    }
+                ]
+            }
+        ],
+        "menu_button": [],
+        "menu_field": []
     }
 ]

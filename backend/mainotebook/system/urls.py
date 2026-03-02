@@ -19,6 +19,7 @@ from mainotebook.system.views.system_config import SystemConfigViewSet
 from mainotebook.system.views.user import UserViewSet
 from mainotebook.system.views.menu_field import MenuFieldViewSet
 from mainotebook.system.views.download_center import DownloadCenterViewSet
+from mainotebook.system.views.home_stats import HomeStatsViewSet
 
 system_url = routers.SimpleRouter()
 system_url.register(r'menu', MenuViewSet)
@@ -38,6 +39,7 @@ system_url.register(r'role_menu_permission', RoleMenuPermissionViewSet)
 system_url.register(r'column', MenuFieldViewSet)
 system_url.register(r'login_log', LoginLogViewSet)
 system_url.register(r'download_center', DownloadCenterViewSet)
+system_url.register(r'home_stats', HomeStatsViewSet, basename='home_stats')
 
 
 urlpatterns = [

@@ -1179,3 +1179,83 @@ class ModerationLog(CoreModel):
     def __str__(self) -> str:
         return f"[{self.get_source_display()}] {self.get_decision_display()} - {self.input_text[:30]}"
 
+
+class TagStatistics(CoreModel):
+    """标签统计模型
+    
+    记录标签的使用次数和搜索次数，用于生成热门标签列表。
+    支持定时任务更新缓存。
+    """
+    
+    TAG_TYPE_CHOICES = [
+        ('knowledge', '知识库'),
+        ('persona', '人设卡'),
+    ]
+    
+    tag = models.CharField(
+        max_length=50,
+        verbose_name="标签名称",
+        help_text="标签名称"
+    )
+    tag_type = models.CharField(
+        max_length=20,
+        choices=TAG_TYPE_CHOICES,
+        default='knowledge',
+        verbose_name="标签类型",
+        help_text="标签类型：knowledge-知识库，persona-人设卡"
+    )
+    usage_count = models.IntegerField(
+        default=0,
+        verbose_name="使用次数",
+        help_text="标签在知识库和人设卡中的使用次数"
+    )
+    search_count = models.IntegerField(
+        default=0,
+        verbose_name="搜索次数",
+        help_text="用户搜索该标签的次数"
+    )
+    hot_score = models.FloatField(
+        default=0.0,
+        verbose_name="热度分数",
+        help_text="综合使用次数和搜索次数计算的热度分数"
+    )
+    last_used_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="最后使用时间",
+        help_text="标签最后一次被使用的时间"
+    )
+    
+    def calculate_hot_score(self) -> float:
+        """计算热度分数
+        
+        热度分数 = 使用次数 * 0.6 + 搜索次数 * 0.4
+        
+        Returns:
+            float: 热度分数
+        """
+        return self.usage_count * 0.6 + self.search_count * 0.4
+    
+    def update_hot_score(self) -> None:
+        """更新热度分数"""
+        self.hot_score = self.calculate_hot_score()
+        self.save(update_fields=['hot_score'])
+    
+    class Meta:
+        db_table = table_prefix + "content_tag_statistics"
+        verbose_name = "标签统计"
+        verbose_name_plural = verbose_name
+        ordering = ("-hot_score", "-usage_count")
+        unique_together = [['tag', 'tag_type']]
+        indexes = [
+            models.Index(fields=['tag']),
+            models.Index(fields=['tag_type']),
+            models.Index(fields=['hot_score']),
+            models.Index(fields=['usage_count']),
+            models.Index(fields=['search_count']),
+            models.Index(fields=['last_used_at']),
+        ]
+    
+    def __str__(self) -> str:
+        return f"{self.tag} (热度: {self.hot_score:.2f})"
+

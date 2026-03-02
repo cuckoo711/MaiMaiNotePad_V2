@@ -13,6 +13,7 @@ from .user_extension import UserExtensionViewSet
 from .admin_extension import AdminExtensionViewSet
 from .moderation_log import ModerationLogViewSet
 from .ai_model import AIModelViewSet
+from .tag import TagViewSet
 
 __all__ = [
     'KnowledgeBaseViewSet',
@@ -24,4 +25,5 @@ __all__ = [
     'AdminExtensionViewSet',
     'ModerationLogViewSet',
     'AIModelViewSet',
+    'TagViewSet',
 ]
