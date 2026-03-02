@@ -52,14 +52,29 @@ class PersonaCardViewSet(CustomModelViewSet):
     search_fields = ['name', 'description', 'tags']
     ordering_fields = ['create_datetime', 'update_datetime', 'name', 'star_count', 'downloads']
     ordering = ['-create_datetime']
-    permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
     # 前台内容接口不使用后台数据级权限过滤，避免无部门用户查不到数据
     extra_filter_class = []
+    
+    def get_permissions(self):
+        """根据操作类型返回不同的权限类
+        
+        Returns:
+            list: 权限类列表
+        """
+        if self.action in ['create', 'my', 'files', 'file_detail', 'submit', 'star', 'unstar']:
+            # 需要认证的操作
+            return [IsAuthenticated()]
+        elif self.action in ['update', 'partial_update', 'destroy']:
+            # 需要认证且仅创建者可操作
+            return [IsAuthenticated(), IsOwnerOrReadOnly()]
+        else:
+            # list 和 retrieve 允许所有人访问
+            return []
 
     def get_queryset(self):
         """获取查询集
         
-        - list: 只返回公开且已审核的人设卡
+        - list: 只返回公开且已审核的人设卡，支持收藏筛选
         - retrieve/file_detail: 管理员/审核员可查看所有，普通用户只能看公开内容和自己的
         - 其他操作: 返回所有人设卡
         
@@ -69,6 +84,30 @@ class PersonaCardViewSet(CustomModelViewSet):
         queryset = super().get_queryset()
         if self.action == 'list':
             queryset = queryset.filter(is_public=True, is_pending=False)
+            
+            # 处理收藏筛选
+            starred_param = self.request.query_params.get('starred', '').lower()
+            if starred_param == 'true' and self.request.user.is_authenticated:
+                # 只返回当前用户收藏的人设卡
+                from mainotebook.content.models import StarRecord
+                import uuid as uuid_module
+                
+                # 获取收藏的 target_id（字符串格式）
+                starred_id_strs = StarRecord.objects.filter(
+                    user=self.request.user,
+                    target_type='persona'
+                ).values_list('target_id', flat=True)
+                
+                # 将字符串转换为 UUID 对象
+                starred_ids = []
+                for id_str in starred_id_strs:
+                    try:
+                        starred_ids.append(uuid_module.UUID(id_str))
+                    except (ValueError, AttributeError):
+                        continue
+                
+                queryset = queryset.filter(id__in=starred_ids)
+                
         elif self.action in ('retrieve', 'file_detail'):
             user = self.request.user
             if user and user.is_authenticated:
@@ -399,7 +438,7 @@ class PersonaCardViewSet(CustomModelViewSet):
         
         return DetailResponse(data=[], msg='收藏成功')
     
-    @action(methods=['DELETE'], detail=True, url_path='star')
+    @action(methods=['DELETE'], detail=True)
     def unstar(self, request, pk=None):
         """取消收藏人设卡
         

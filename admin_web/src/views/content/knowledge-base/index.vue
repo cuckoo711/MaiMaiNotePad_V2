@@ -57,7 +57,7 @@
 				<template #row-handle="{ row }">
 					<el-button
 						v-if="auth('knowledge_base:Update')"
-						type="text"
+						link
 						size="small"
 						@click="handleEdit(row)"
 					>
@@ -65,7 +65,7 @@
 					</el-button>
 					<el-button
 						v-if="auth('knowledge_base:Delete')"
-						type="text"
+						link
 						size="small"
 						@click="handleDelete(row)"
 					>
@@ -73,7 +73,7 @@
 					</el-button>
 					<el-button
 						v-if="auth('knowledge_base:Approve') && row.is_pending"
-						type="text"
+						link
 						size="small"
 						@click="handleApprove(row)"
 					>
@@ -81,7 +81,7 @@
 					</el-button>
 					<el-button
 						v-if="auth('knowledge_base:Approve') && row.is_pending"
-						type="text"
+						link
 						size="small"
 						@click="handleReject(row)"
 					>
@@ -89,7 +89,7 @@
 					</el-button>
 					<el-button
 						v-if="auth('knowledge_base:List')"
-						type="text"
+						link
 						size="small"
 						@click="handleViewFiles(row)"
 					>
@@ -195,7 +195,7 @@
 		>
 			<el-form label-width="100px">
 				<el-form-item label="导入模板">
-					<el-button type="text" @click="handleDownloadTemplate">下载导入模板</el-button>
+					<el-button link @click="handleDownloadTemplate">下载导入模板</el-button>
 				</el-form-item>
 				<el-form-item label="选择文件">
 					<el-upload

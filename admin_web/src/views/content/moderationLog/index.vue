@@ -99,7 +99,7 @@
 				<!-- 行操作 -->
 				<template #row-handle="{ row }">
 					<el-button
-						type="text"
+						link
 						size="small"
 						@click="handleViewDetail(row)"
 					>

@@ -220,6 +220,12 @@ class PersonaCardFilter(filters.FilterSet):
         label='最大下载次数'
     )
     
+    # 版本号筛选（支持泛筛选）
+    version = filters.CharFilter(
+        method='filter_version',
+        label='版本号'
+    )
+    
     # 综合搜索（名称、描述、标签）
     # 注意：字段名不能用 search，会和 DRF SearchFilter 自动生成的 search 参数冲突
     keyword = filters.CharFilter(
@@ -235,8 +241,49 @@ class PersonaCardFilter(filters.FilterSet):
             'create_datetime_after', 'create_datetime_before',
             'star_count_min', 'star_count_max',
             'downloads_min', 'downloads_max',
-            'keyword'
+            'version', 'keyword'
         ]
+    
+    def filter_version(self, queryset, name, value):
+        """版本号筛选过滤方法
+        
+        支持以下格式：
+        - 精确匹配：1.2.3
+        - 主版本泛筛选：1.* 或 1（匹配 1.x.x）
+        - 主次版本泛筛选：1.2.* 或 1.2（匹配 1.2.x）
+        
+        Args:
+            queryset: 查询集
+            name: 字段名
+            value: 版本号字符串
+            
+        Returns:
+            QuerySet: 过滤后的查询集
+        """
+        if not value:
+            return queryset
+        
+        # 移除空格
+        value = value.strip()
+        
+        # 处理通配符 *
+        if value.endswith('.*'):
+            # 移除 .* 后缀
+            prefix = value[:-2]
+            return queryset.filter(version__startswith=prefix + '.')
+        elif value.endswith('*'):
+            # 移除 * 后缀
+            prefix = value[:-1]
+            return queryset.filter(version__startswith=prefix)
+        elif '.' not in value:
+            # 只有主版本号，如 "1"，匹配 1.x.x
+            return queryset.filter(version__startswith=value + '.')
+        elif value.count('.') == 1:
+            # 主次版本号，如 "1.2"，匹配 1.2.x
+            return queryset.filter(version__startswith=value + '.')
+        else:
+            # 完整版本号，精确匹配
+            return queryset.filter(version=value)
     
     def filter_search(self, queryset, name, value):
         """综合搜索过滤方法

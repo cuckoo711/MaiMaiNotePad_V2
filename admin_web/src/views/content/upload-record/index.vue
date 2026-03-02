@@ -48,7 +48,7 @@
 				<template #row-handle="{ row }">
 					<el-button
 						v-if="auth('upload_record:View')"
-						type="text"
+						link
 						size="small"
 						@click="handleViewDetail(row)"
 					>
@@ -56,7 +56,7 @@
 					</el-button>
 					<el-button
 						v-if="auth('upload_record:Approve') && row.status === 'pending'"
-						type="text"
+						link
 						size="small"
 						@click="handleApprove(row)"
 					>
@@ -64,7 +64,7 @@
 					</el-button>
 					<el-button
 						v-if="auth('upload_record:Approve') && row.status === 'pending'"
-						type="text"
+						link
 						size="small"
 						@click="handleReject(row)"
 					>

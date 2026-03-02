@@ -1,0 +1,876 @@
+<template>
+  <div class="knowledge-plaza-container">
+    <!-- 左侧导航 -->
+    <div class="left-sidebar">
+      <div class="sidebar-header">
+        <h3>知识库广场</h3>
+      </div>
+      
+      <div class="sidebar-menu">
+        <div class="menu-item" :class="{ active: activeCategory === 'all' }" @click="selectCategory('all')">
+          <i class="fa fa-th"></i>
+          <span>全部</span>
+        </div>
+        <div class="menu-item" :class="{ active: activeCategory === 'hot' }" @click="selectCategory('hot')">
+          <i class="fa fa-fire"></i>
+          <span>热门推荐</span>
+        </div>
+        <div class="menu-item" :class="{ active: activeCategory === 'new' }" @click="selectCategory('new')">
+          <i class="fa fa-clock-o"></i>
+          <span>最新上传</span>
+        </div>
+        <div class="menu-item" :class="{ active: activeCategory === 'starred' }" @click="selectCategory('starred')">
+          <i class="fa fa-star"></i>
+          <span>我的收藏</span>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-title">标签筛选</div>
+        <div class="tag-list">
+          <div 
+            v-for="tag in popularTags" 
+            :key="tag" 
+            class="tag-item"
+            :class="{ active: selectedTags.includes(tag) }"
+            @click="toggleTag(tag)"
+          >
+            {{ tag }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="main-content">
+      <!-- 搜索栏 -->
+      <div class="search-bar">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="请输入关键词搜索"
+          class="search-input"
+          @keyup.enter="handleSearch"
+        >
+          <template #prefix>
+            <i class="fa fa-search"></i>
+          </template>
+        </el-input>
+        <el-button type="primary" @click="handleSearch">
+          <i class="fa fa-search"></i> 搜索
+        </el-button>
+      </div>
+
+      <!-- 知识库卡片列表 -->
+      <div class="knowledge-list" v-loading="loading">
+        <div 
+          v-for="item in knowledgeList" 
+          :key="item.id" 
+          class="knowledge-card"
+          @click="showDetail(item)"
+        >
+          <div class="card-header">
+            <div class="card-icon">
+              <el-avatar 
+                v-if="item.uploader_avatar" 
+                :src="getBaseURL(item.uploader_avatar)" 
+                :size="40"
+              />
+              <el-avatar v-else :size="40">
+                {{ (item.uploader_name || '匿名')[0] }}
+              </el-avatar>
+            </div>
+            <div class="card-title-area">
+              <h4 class="card-title">{{ item.name }}</h4>
+              <div class="card-meta">
+                <span class="uploader">
+                  <i class="fa fa-user"></i> {{ item.uploader_name || '匿名' }}
+                </span>
+                <span class="upload-time" v-if="item.create_datetime">
+                  <i class="fa fa-clock-o"></i> {{ formatDate(item.create_datetime) }}
+                </span>
+              </div>
+            </div>
+            <div class="card-badge" v-if="item.is_new">
+              <span class="badge-new">New</span>
+            </div>
+          </div>
+
+          <div class="card-description">
+            {{ item.description || '暂无描述' }}
+          </div>
+
+          <div class="card-tags" v-if="parseTagsString(item.tags).length > 0">
+            <span v-for="tag in parseTagsString(item.tags).slice(0, 3)" :key="tag" class="tag">
+              {{ tag }}
+            </span>
+            <span v-if="parseTagsString(item.tags).length > 3" class="tag-more">
+              +{{ parseTagsString(item.tags).length - 3 }}
+            </span>
+          </div>
+
+          <div class="card-footer">
+            <div class="card-stats">
+              <span class="stat-item">
+                <i class="fa fa-download"></i> {{ item.downloads || 0 }}
+              </span>
+              <span class="stat-item">
+                <i class="fa fa-star"></i> {{ item.star_count || 0 }}
+              </span>
+            </div>
+            <div class="card-actions" @click.stop>
+              <el-button 
+                size="small" 
+                :type="item.is_starred ? 'warning' : 'default'"
+                @click="toggleStar(item)"
+              >
+                <i class="fa" :class="item.is_starred ? 'fa-star' : 'fa-star-o'"></i>
+                {{ item.is_starred ? '已收藏' : '收藏' }}
+              </el-button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 空状态 -->
+        <div v-if="!loading && knowledgeList.length === 0" class="empty-state">
+          <i class="fa fa-inbox"></i>
+          <p>暂无知识库</p>
+        </div>
+      </div>
+
+      <!-- 分页 -->
+      <div class="pagination-container" v-if="total > pageSize">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[12, 24, 48, 96]"
+          :total="total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handlePageChange"
+        />
+      </div>
+    </div>
+
+    <!-- 详情弹窗 -->
+    <el-dialog
+      v-model="detailVisible"
+      :title="currentDetail?.name"
+      width="800px"
+      class="detail-dialog"
+    >
+      <div v-if="currentDetail" class="detail-content">
+        <el-tabs v-model="activeTab">
+          <!-- 基本信息 -->
+          <el-tab-pane label="基本信息" name="info">
+            <div class="info-section">
+              <div class="info-row">
+                <span class="info-label">知识库名称:</span>
+                <span class="info-value">{{ currentDetail.name }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">上传者:</span>
+                <span class="info-value">{{ currentDetail.uploader_name || '匿名' }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">版权所有者:</span>
+                <span class="info-value">{{ currentDetail.copyright_owner || '未知' }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">下载次数:</span>
+                <span class="info-value">{{ currentDetail.downloads || 0 }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">收藏数:</span>
+                <span class="info-value">{{ currentDetail.star_count || 0 }}</span>
+              </div>
+              <div class="info-row full-width">
+                <span class="info-label">描述:</span>
+                <div class="info-value">{{ currentDetail.description || '暂无描述' }}</div>
+              </div>
+              <div class="info-row full-width" v-if="currentDetail.content">
+                <span class="info-label">内容:</span>
+                <div class="info-value content-text">{{ currentDetail.content }}</div>
+              </div>
+            </div>
+          </el-tab-pane>
+
+          <!-- 文件列表 -->
+          <el-tab-pane label="文件列表" name="files">
+            <div class="files-list">
+              <div 
+                v-for="file in currentDetail.files" 
+                :key="file.id" 
+                class="file-item"
+              >
+                <div class="file-info">
+                  <i class="fa fa-file-o"></i>
+                  <span class="file-name">{{ file.original_name }}</span>
+                  <span class="file-size">{{ formatFileSize(file.file_size) }}</span>
+                </div>
+                <el-button size="small" type="primary" @click="downloadFile(file)">
+                  <i class="fa fa-download"></i> 下载
+                </el-button>
+              </div>
+              <div v-if="!currentDetail.files || currentDetail.files.length === 0" class="empty-files">
+                <i class="fa fa-folder-open-o"></i>
+                <p>暂无文件</p>
+              </div>
+            </div>
+          </el-tab-pane>
+        </el-tabs>
+      </div>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="detailVisible = false">关闭</el-button>
+          <el-button type="primary" @click="handleStar">
+            <i class="fa" :class="currentDetail?.is_starred ? 'fa-star' : 'fa-star-o'"></i>
+            {{ currentDetail?.is_starred ? '取消收藏' : '收藏' }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { ref, reactive, onMounted, computed } from 'vue';
+import { ElMessage } from 'element-plus';
+import * as api from './api';
+import { getBaseURL } from '/@/utils/baseUrl';
+
+// 状态管理
+const loading = ref(false);
+const activeCategory = ref('all');
+const searchKeyword = ref('');
+const selectedTags = ref<string[]>([]);
+const knowledgeList = ref<any[]>([]);
+const currentPage = ref(1);
+const pageSize = ref(12);
+const total = ref(0);
+
+// 详情弹窗
+const detailVisible = ref(false);
+const currentDetail = ref<any>(null);
+const activeTab = ref('info');
+
+// 热门标签
+const popularTags = ref<string[]>([]);
+
+// 加载热门标签
+const loadPopularTags = async () => {
+  try {
+    const res = await api.getPopularTags(12, 'knowledge');
+    if (res.code === 2000 && res.data) {
+      popularTags.value = res.data.map((item: any) => item.tag);
+    }
+  } catch (error) {
+    console.error('加载热门标签失败:', error);
+  }
+};
+
+// 加载知识库列表
+const loadKnowledgeList = async () => {
+  loading.value = true;
+  try {
+    const params: any = {
+      page: currentPage.value,
+      page_size: pageSize.value,
+    };
+
+    // 搜索关键词
+    if (searchKeyword.value) {
+      params.search = searchKeyword.value;
+    }
+
+    // 分类筛选
+    if (activeCategory.value === 'hot') {
+      params.ordering = '-downloads';
+    } else if (activeCategory.value === 'new') {
+      params.ordering = '-create_datetime';
+    } else if (activeCategory.value === 'starred') {
+      params.starred = true;
+    }
+
+    // 标签筛选
+    if (selectedTags.value.length > 0) {
+      params.tags = selectedTags.value.join(',');
+    }
+
+    const res = await api.getKnowledgeList(params);
+    if (res.code === 2000) {
+      // 后端返回的 data 可能是数组或对象
+      if (Array.isArray(res.data)) {
+        knowledgeList.value = res.data;
+        total.value = res.total || res.data.length;
+      } else {
+        knowledgeList.value = res.data.results || res.data || [];
+        total.value = res.data.count || res.total || knowledgeList.value.length;
+      }
+    }
+  } catch (error) {
+    console.error('加载知识库列表失败:', error);
+    ElMessage.error('加载失败');
+  } finally {
+    loading.value = false;
+  }
+};
+
+// 选择分类
+const selectCategory = (category: string) => {
+  activeCategory.value = category;
+  currentPage.value = 1;
+  loadKnowledgeList();
+};
+
+// 切换标签
+const toggleTag = (tag: string) => {
+  const index = selectedTags.value.indexOf(tag);
+  if (index > -1) {
+    selectedTags.value.splice(index, 1);
+  } else {
+    selectedTags.value.push(tag);
+  }
+  currentPage.value = 1;
+  loadKnowledgeList();
+};
+
+// 搜索
+const handleSearch = () => {
+  currentPage.value = 1;
+  loadKnowledgeList();
+};
+
+// 分页
+const handlePageChange = (page: number) => {
+  currentPage.value = page;
+  loadKnowledgeList();
+};
+
+const handleSizeChange = (size: number) => {
+  pageSize.value = size;
+  currentPage.value = 1;
+  loadKnowledgeList();
+};
+
+// 显示详情
+const showDetail = async (item: any) => {
+  try {
+    const res = await api.getKnowledgeDetail(item.id);
+    if (res.code === 2000) {
+      currentDetail.value = res.data;
+      detailVisible.value = true;
+      activeTab.value = 'info';
+    }
+  } catch (error) {
+    console.error('加载详情失败:', error);
+    ElMessage.error('加载详情失败');
+  }
+};
+
+// 刷新详情数据
+const refreshDetailData = async () => {
+  if (!currentDetail.value) return;
+  try {
+    const res = await api.getKnowledgeDetail(currentDetail.value.id);
+    if (res.code === 2000) {
+      currentDetail.value = res.data;
+    }
+  } catch (error) {
+    console.error('刷新详情失败:', error);
+  }
+};
+
+// 收藏/取消收藏（卡片上的按钮）
+const toggleStar = async (item: any) => {
+  try {
+    if (item.is_starred) {
+      await api.unstarKnowledge(item.id);
+      ElMessage.success('取消收藏成功');
+      item.is_starred = false;
+      item.star_count = (item.star_count || 1) - 1;
+    } else {
+      await api.starKnowledge(item.id);
+      ElMessage.success('收藏成功');
+      item.is_starred = true;
+      item.star_count = (item.star_count || 0) + 1;
+    }
+  } catch (error) {
+    console.error('操作失败:', error);
+    ElMessage.error('操作失败');
+  }
+};
+
+// 收藏/取消收藏（详情弹窗中的按钮）
+const handleStar = async () => {
+  if (!currentDetail.value) return;
+  
+  try {
+    if (currentDetail.value.is_starred) {
+      await api.unstarKnowledge(currentDetail.value.id);
+      ElMessage.success('取消收藏成功');
+      currentDetail.value.is_starred = false;
+      currentDetail.value.star_count = (currentDetail.value.star_count || 1) - 1;
+    } else {
+      await api.starKnowledge(currentDetail.value.id);
+      ElMessage.success('收藏成功');
+      currentDetail.value.is_starred = true;
+      currentDetail.value.star_count = (currentDetail.value.star_count || 0) + 1;
+    }
+    // 刷新列表
+    loadKnowledgeList();
+  } catch (error) {
+    console.error('操作失败:', error);
+    ElMessage.error('操作失败');
+  }
+};
+
+// 下载文件
+const downloadFile = async (file: any) => {
+  try {
+    const res = await api.downloadKnowledgeFile(currentDetail.value.id, file.id);
+    // 创建下载链接
+    const url = window.URL.createObjectURL(new Blob([res]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', file.original_name);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    ElMessage.success('下载成功');
+    
+    // 下载成功后刷新详情数据和列表
+    await refreshDetailData();
+    await loadKnowledgeList();
+  } catch (error) {
+    console.error('下载失败:', error);
+    ElMessage.error('下载失败');
+  }
+};
+
+// 解析标签字符串
+const parseTags = (tagsString: string): string[] => {
+  if (!tagsString) return [];
+  return tagsString.split(',').map(tag => tag.trim()).filter(tag => tag);
+};
+
+// 格式化文件大小
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+};
+
+// 页面加载
+onMounted(() => {
+  loadPopularTags();
+  loadKnowledgeList();
+});
+</script>
+
+<script lang="ts">
+export default {
+  name: 'KnowledgePlaza',
+  methods: {
+    parseTagsString(tagsString: string): string[] {
+      if (!tagsString) return [];
+      return tagsString.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag);
+    },
+    
+    formatDate(dateString: string): string {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      const now = new Date();
+      const diff = now.getTime() - date.getTime();
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      
+      if (days === 0) return '今天';
+      if (days === 1) return '昨天';
+      if (days < 7) return `${days}天前`;
+      if (days < 30) return `${Math.floor(days / 7)}周前`;
+      if (days < 365) return `${Math.floor(days / 30)}个月前`;
+      return `${Math.floor(days / 365)}年前`;
+    }
+  }
+};
+</script>
+
+<style scoped lang="scss">
+.knowledge-plaza-container {
+  display: flex;
+  height: calc(100vh - 84px);
+  background: #f5f5f5;
+
+  // 左侧导航
+  .left-sidebar {
+    width: 240px;
+    background: white;
+    border-right: 1px solid #e0e0e0;
+    overflow-y: auto;
+
+    .sidebar-header {
+      padding: 20px;
+      border-bottom: 1px solid #e0e0e0;
+
+      h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+      }
+    }
+
+    .sidebar-menu {
+      padding: 10px 0;
+
+      .menu-item {
+        padding: 12px 20px;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+
+        i {
+          width: 20px;
+          font-size: 16px;
+        }
+
+        &:hover {
+          background: #f5f5f5;
+        }
+
+        &.active {
+          background: #e3f2fd;
+          color: #1976d2;
+          border-right: 3px solid #1976d2;
+        }
+      }
+    }
+
+    .sidebar-section {
+      padding: 15px 20px;
+      border-top: 1px solid #e0e0e0;
+
+      .section-title {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 10px;
+        color: #666;
+      }
+
+      .tag-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+
+        .tag-item {
+          padding: 4px 12px;
+          background: #f5f5f5;
+          border-radius: 12px;
+          font-size: 12px;
+          cursor: pointer;
+          transition: all 0.3s;
+
+          &:hover {
+            background: #e0e0e0;
+          }
+
+          &.active {
+            background: #1976d2;
+            color: white;
+          }
+        }
+      }
+    }
+  }
+
+  // 主内容区
+  .main-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+
+    .search-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+
+      .search-input {
+        flex: 1;
+      }
+    }
+
+    .knowledge-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 20px;
+      min-height: 400px;
+
+      .knowledge-card {
+        background: white;
+        border-radius: 8px;
+        padding: 16px;
+        cursor: pointer;
+        transition: all 0.3s;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+        height: 220px; // 固定高度，降低卡片高度
+
+        &:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .card-header {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          margin-bottom: 10px;
+          position: relative;
+
+          .card-icon {
+            flex-shrink: 0;
+          }
+
+          .card-title-area {
+            flex: 1;
+            min-width: 0;
+
+            .card-title {
+              margin: 0 0 6px 0;
+              font-size: 15px;
+              font-weight: 600;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+
+            .card-meta {
+              font-size: 12px;
+              color: #999;
+              display: flex;
+              gap: 12px;
+
+              .uploader, .upload-time {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                
+                i {
+                  font-size: 11px;
+                }
+              }
+            }
+          }
+
+          .card-badge {
+            position: absolute;
+            top: 0;
+            right: 0;
+
+            .badge-new {
+              background: #ff4444;
+              color: white;
+              padding: 2px 8px;
+              border-radius: 4px;
+              font-size: 11px;
+            }
+          }
+        }
+
+        .card-description {
+          font-size: 13px;
+          color: #666;
+          line-height: 1.5;
+          margin-bottom: 10px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          display: -webkit-box;
+          -webkit-line-clamp: 2; // 限制2行
+          -webkit-box-orient: vertical;
+          flex: 1; // 占据剩余空间
+        }
+
+        .card-tags {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-bottom: 10px;
+          min-height: 24px; // 保证即使没有标签也有高度
+
+          .tag {
+            padding: 2px 8px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            font-size: 11px;
+            color: #666;
+          }
+          
+          .tag-more {
+            padding: 2px 8px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            font-size: 11px;
+            color: #999;
+          }
+        }
+
+        .card-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding-top: 10px;
+          border-top: 1px solid #f0f0f0;
+          margin-top: auto; // 推到底部
+
+          .card-stats {
+            display: flex;
+            gap: 15px;
+
+            .stat-item {
+              font-size: 12px;
+              color: #999;
+              display: flex;
+              align-items: center;
+              gap: 4px;
+
+              i {
+                font-size: 13px;
+              }
+            }
+          }
+          
+          .card-actions {
+            .el-button {
+              padding: 5px 12px;
+              font-size: 12px;
+            }
+          }
+        }
+      }
+
+      .empty-state {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 60px 20px;
+        color: #999;
+
+        i {
+          font-size: 64px;
+          margin-bottom: 20px;
+          display: block;
+        }
+
+        p {
+          font-size: 16px;
+        }
+      }
+    }
+
+    .pagination-container {
+      margin-top: 30px;
+      display: flex;
+      justify-content: center;
+    }
+  }
+}
+
+// 详情弹窗样式
+.detail-dialog {
+  .detail-content {
+    .info-section {
+      .info-row {
+        display: flex;
+        padding: 12px 0;
+        border-bottom: 1px solid #f0f0f0;
+
+        &.full-width {
+          flex-direction: column;
+
+          .info-value {
+            margin-top: 8px;
+          }
+        }
+
+        .info-label {
+          width: 120px;
+          color: #666;
+          flex-shrink: 0;
+        }
+
+        .info-value {
+          flex: 1;
+          color: #333;
+
+          &.content-text {
+            white-space: pre-wrap;
+            line-height: 1.6;
+          }
+        }
+      }
+    }
+
+    .files-list {
+      .file-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        margin-bottom: 10px;
+
+        .file-info {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex: 1;
+
+          i {
+            font-size: 20px;
+            color: #666;
+          }
+
+          .file-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .file-size {
+            color: #999;
+            font-size: 12px;
+          }
+        }
+      }
+
+      .empty-files {
+        text-align: center;
+        padding: 40px;
+        color: #999;
+
+        i {
+          font-size: 48px;
+          margin-bottom: 10px;
+          display: block;
+        }
+      }
+    }
+  }
+
+  .dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+}
+</style>

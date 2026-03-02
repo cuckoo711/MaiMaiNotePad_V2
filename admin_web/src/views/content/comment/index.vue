@@ -68,7 +68,7 @@
 				<template #row-handle="{ row }">
 					<el-button
 						v-if="auth('comment:List')"
-						type="text"
+						link
 						size="small"
 						@click="handleViewDetail(row)"
 					>
@@ -76,7 +76,7 @@
 					</el-button>
 					<el-button
 						v-if="auth('comment:List') && !row.parent"
-						type="text"
+						link
 						size="small"
 						@click="handleViewReplies(row)"
 					>
@@ -84,7 +84,7 @@
 					</el-button>
 					<el-button
 						v-if="auth('comment:Delete') && !row.is_deleted"
-						type="text"
+						link
 						size="small"
 						@click="handleDelete(row)"
 					>
@@ -92,7 +92,7 @@
 					</el-button>
 					<el-button
 						v-if="auth('comment:Delete') && row.is_deleted"
-						type="text"
+						link
 						size="small"
 						@click="handleRestore(row)"
 					>
@@ -100,7 +100,7 @@
 					</el-button>
 					<el-button
 						v-if="auth('comment:Delete') && !row.is_deleted"
-						type="text"
+						link
 						size="small"
 						style="color: #f56c6c"
 						@click="handleBanUser(row)"

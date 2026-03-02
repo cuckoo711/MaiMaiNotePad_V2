@@ -7,6 +7,7 @@
 #   bash start_backend.sh              # 日常启动
 #   bash start_backend.sh --init       # 首次启动（含数据初始化）
 #   bash start_backend.sh --reset      # 全量重置后启动
+#   bash start_backend.sh --debug      # 调试模式（自动重载）
 #   bash start_backend.sh --help       # 显示帮助
 
 set -euo pipefail
@@ -29,6 +30,7 @@ REDIS_CONTAINER="mai_notebook_redis"
 # 解析参数
 FLAG_INIT=false
 FLAG_RESET=false
+FLAG_DEBUG=false
 PYTHON_CMD=""
 ENV_TYPE=""
 
@@ -65,12 +67,14 @@ show_help() {
 选项:
     --init      首次启动：生成配置 + 数据库迁移 + 初始化数据
     --reset     全量重置：重置数据库/缓存 + 重新配置 + 重新初始化
+    --debug     调试模式：启用自动重载（代码修改后自动重启）
     --help      显示此帮助信息
 
 示例:
     bash start_backend.sh              # 日常启动（迁移 + 启动服务）
     bash start_backend.sh --init       # 第一次部署
     bash start_backend.sh --reset      # 全量重置（危险操作，会清空数据）
+    bash start_backend.sh --debug      # 开发调试模式
 EOF
     exit 0
 }
@@ -82,6 +86,7 @@ parse_args() {
         case "$1" in
             --init)   FLAG_INIT=true ;;
             --reset)  FLAG_RESET=true ;;
+            --debug)  FLAG_DEBUG=true ;;
             --help|-h) show_help ;;
             *) warn "未知参数: $1" ;;
         esac
@@ -487,6 +492,11 @@ run_full_reset() {
 start_backend() {
     header "启动后端服务"
 
+    if [[ "$FLAG_DEBUG" == true ]]; then
+        echo -e "  ${YELLOW}🔧 调试模式${NC}（自动重载已启用）"
+        echo ""
+    fi
+
     echo -e "  访问地址:  ${GREEN}http://localhost:8000${NC}"
     echo -e "  API 文档:  ${GREEN}http://localhost:8000/swagger/${NC}"
     echo -e "  ReDoc:     ${GREEN}http://localhost:8000/redoc/${NC}"
@@ -495,7 +505,14 @@ start_backend() {
     echo ""
 
     cd "$BACKEND_DIR"
-    "$PYTHON_CMD" main.py
+    
+    if [[ "$FLAG_DEBUG" == true ]]; then
+        # 调试模式：启用自动重载
+        "$PYTHON_CMD" main.py --reload
+    else
+        # 正常模式
+        "$PYTHON_CMD" main.py
+    fi
 }
 
 # ==================== 清理 ====================

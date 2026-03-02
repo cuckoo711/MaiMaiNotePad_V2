@@ -6,7 +6,7 @@
         {{ item.toLocaleDateString('en-CA') }}
       </el-tag>
       <el-tag v-else closable @close="handleTagClose(data)">{{ data?.toLocaleDateString('en-CA') }}</el-tag>
-      <el-button v-if="props.modelValue" size="small" type="text" @click="clear">清空</el-button>
+      <el-button v-if="props.modelValue" size="small" link @click="clear">清空</el-button>
     </div>
     <div class="controls">
       <div>
@@ -21,7 +21,7 @@
         <el-button-group size="small" type="default" v-if="props.pageTurn">
           <el-popover trigger="click" width="160px">
             <template #reference>
-              <el-button type="text" size="small">节假日设置</el-button>
+              <el-button link size="small">节假日设置</el-button>
             </template>
             <el-switch v-model="showHoliday" active-text="显示节日" inactive-text="关闭节日" inline-prompt />
             <el-checkbox v-model="showLunarHoliday" label="农历节日" />

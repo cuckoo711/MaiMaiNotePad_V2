@@ -23,7 +23,7 @@
 				<template #row-handle="{ row }">
 					<el-button
 						v-if="auth('download_record:View')"
-						type="text"
+						link
 						size="small"
 						@click="handleViewDetail(row)"
 					>

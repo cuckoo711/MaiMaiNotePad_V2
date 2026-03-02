@@ -1,14 +1,14 @@
 <template>
-  <div class="knowledge-plaza-wrapper">
+  <div class="persona-plaza-wrapper">
     <PlazaView
       :loading="loading"
-      :data-list="knowledgeList"
+      :data-list="personaList"
       :total="total"
       :popular-tags="popularTags"
-      :hot-list="hotKnowledge"
-      :new-list="newKnowledge"
-      :show-version-filter="false"
-      empty-text="暂无知识库"
+      :hot-list="hotPersonas"
+      :new-list="newPersonas"
+      :show-version-filter="true"
+      empty-text="暂无人设卡"
       @search="handleSearch"
       @show-detail="showDetail"
       @toggle-star="toggleStar"
@@ -27,7 +27,7 @@
         <el-tab-pane label="基本信息" name="info">
           <div class="info-section">
             <div class="info-row">
-              <span class="info-label">知识库名称:</span>
+              <span class="info-label">人设卡名称:</span>
               <span class="info-value">{{ currentDetail.name }}</span>
             </div>
             <div class="info-row">
@@ -37,6 +37,12 @@
             <div class="info-row">
               <span class="info-label">版权所有者:</span>
               <span class="info-value">{{ currentDetail.copyright_owner || '未知' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">版本号:</span>
+              <span class="info-value">
+                <span class="version-badge">v{{ currentDetail.version || '1.0' }}</span>
+              </span>
             </div>
             <div class="info-row">
               <span class="info-label">下载次数:</span>
@@ -104,7 +110,7 @@ import * as api from './api';
 
 // 状态管理
 const loading = ref(false);
-const knowledgeList = ref<any[]>([]);
+const personaList = ref<any[]>([]);
 const total = ref(0);
 
 // 详情弹窗
@@ -116,13 +122,13 @@ const activeTab = ref('info');
 const popularTags = ref<string[]>([]);
 
 // 右侧卡片数据
-const hotKnowledge = ref<any[]>([]);
-const newKnowledge = ref<any[]>([]);
+const hotPersonas = ref<any[]>([]);
+const newPersonas = ref<any[]>([]);
 
 // 加载热门标签
 const loadPopularTags = async () => {
   try {
-    const res = await api.getPopularTags(12, 'knowledge');
+    const res = await api.getPopularTags(12, 'persona');
     if (res.code === 2000 && res.data) {
       popularTags.value = res.data.map((item: any) => item.tag);
     }
@@ -131,8 +137,8 @@ const loadPopularTags = async () => {
   }
 };
 
-// 加载知识库列表
-const loadKnowledgeList = async (searchParams: any) => {
+// 加载人设卡列表
+const loadPersonaList = async (searchParams: any) => {
   loading.value = true;
   try {
     const params: any = {
@@ -168,18 +174,23 @@ const loadKnowledgeList = async (searchParams: any) => {
       params.tags = searchParams.tags.join(',');
     }
 
-    const res = await api.getKnowledgeList(params);
+    // 版本号筛选
+    if (searchParams.version) {
+      params.version = searchParams.version;
+    }
+
+    const res = await api.getPersonaList(params);
     if (res.code === 2000) {
       if (Array.isArray(res.data)) {
-        knowledgeList.value = res.data;
+        personaList.value = res.data;
         total.value = res.total || res.data.length;
       } else {
-        knowledgeList.value = res.data.results || res.data || [];
-        total.value = res.data.count || res.total || knowledgeList.value.length;
+        personaList.value = res.data.results || res.data || [];
+        total.value = res.data.count || res.total || personaList.value.length;
       }
     }
   } catch (error) {
-    console.error('加载知识库列表失败:', error);
+    console.error('加载人设卡列表失败:', error);
     ElMessage.error('加载失败');
   } finally {
     loading.value = false;
@@ -188,13 +199,13 @@ const loadKnowledgeList = async (searchParams: any) => {
 
 // 处理搜索
 const handleSearch = (params: any) => {
-  loadKnowledgeList(params);
+  loadPersonaList(params);
 };
 
 // 显示详情
 const showDetail = async (item: any) => {
   try {
-    const res = await api.getKnowledgeDetail(item.id);
+    const res = await api.getPersonaDetail(item.id);
     if (res.code === 2000) {
       currentDetail.value = res.data;
       detailVisible.value = true;
@@ -210,7 +221,7 @@ const showDetail = async (item: any) => {
 const refreshDetailData = async () => {
   if (!currentDetail.value) return;
   try {
-    const res = await api.getKnowledgeDetail(currentDetail.value.id);
+    const res = await api.getPersonaDetail(currentDetail.value.id);
     if (res.code === 2000) {
       currentDetail.value = res.data;
     }
@@ -223,12 +234,12 @@ const refreshDetailData = async () => {
 const toggleStar = async (item: any) => {
   try {
     if (item.is_starred) {
-      await api.unstarKnowledge(item.id);
+      await api.unstarPersona(item.id);
       ElMessage.success('取消收藏成功');
       item.is_starred = false;
       item.star_count = (item.star_count || 1) - 1;
     } else {
-      await api.starKnowledge(item.id);
+      await api.starPersona(item.id);
       ElMessage.success('收藏成功');
       item.is_starred = true;
       item.star_count = (item.star_count || 0) + 1;
@@ -245,12 +256,12 @@ const handleStar = async () => {
   
   try {
     if (currentDetail.value.is_starred) {
-      await api.unstarKnowledge(currentDetail.value.id);
+      await api.unstarPersona(currentDetail.value.id);
       ElMessage.success('取消收藏成功');
       currentDetail.value.is_starred = false;
       currentDetail.value.star_count = (currentDetail.value.star_count || 1) - 1;
     } else {
-      await api.starKnowledge(currentDetail.value.id);
+      await api.starPersona(currentDetail.value.id);
       ElMessage.success('收藏成功');
       currentDetail.value.is_starred = true;
       currentDetail.value.star_count = (currentDetail.value.star_count || 0) + 1;
@@ -273,7 +284,7 @@ const handleStar = async () => {
 // 下载文件
 const downloadFile = async (file: any) => {
   try {
-    const res = await api.downloadKnowledgeFile(currentDetail.value.id, file.id);
+    const res = await api.downloadPersonaFile(currentDetail.value.id, file.id);
     const url = window.URL.createObjectURL(new Blob([res]));
     const link = document.createElement('a');
     link.href = url;
@@ -312,30 +323,30 @@ const formatFileSize = (bytes: number): string => {
 const loadSidebarData = async () => {
   try {
     // 加载热门推荐
-    const hotRes = await api.getKnowledgeList({
+    const hotRes = await api.getPersonaList({
       page: 1,
       page_size: 5,
       ordering: '-downloads'
     });
     if (hotRes.code === 2000) {
       if (Array.isArray(hotRes.data)) {
-        hotKnowledge.value = hotRes.data;
+        hotPersonas.value = hotRes.data;
       } else {
-        hotKnowledge.value = hotRes.data.results || hotRes.data || [];
+        hotPersonas.value = hotRes.data.results || hotRes.data || [];
       }
     }
 
     // 加载最新上传
-    const newRes = await api.getKnowledgeList({
+    const newRes = await api.getPersonaList({
       page: 1,
       page_size: 5,
       ordering: '-create_datetime'
     });
     if (newRes.code === 2000) {
       if (Array.isArray(newRes.data)) {
-        newKnowledge.value = newRes.data;
+        newPersonas.value = newRes.data;
       } else {
-        newKnowledge.value = newRes.data.results || newRes.data || [];
+        newPersonas.value = newRes.data.results || newRes.data || [];
       }
     }
   } catch (error) {
@@ -361,12 +372,12 @@ onMounted(() => {
 
 <script lang="ts">
 export default {
-  name: 'KnowledgePlaza'
+  name: 'PersonaPlaza'
 };
 </script>
 
 <style scoped lang="scss">
-.knowledge-plaza-wrapper {
+.persona-plaza-wrapper {
   width: 100%;
   height: 100%;
 }
@@ -401,6 +412,18 @@ export default {
           &.content-text {
             white-space: pre-wrap;
             line-height: 1.6;
+          }
+
+          .version-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 12px;
+            background: rgba(160, 82, 45, 0.1);
+            color: #A0522D;
+            border-radius: 14px;
+            font-size: 12px;
+            font-weight: 500;
           }
         }
       }

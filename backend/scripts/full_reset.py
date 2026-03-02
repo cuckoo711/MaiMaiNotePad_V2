@@ -10,6 +10,7 @@ MaiMaiNotePad 全量重置脚本
 5. 清理迁移文件
 6. 重新生成 Django SECRET_KEY
 7. 重新执行数据库迁移
+8. 初始化基础数据（包括 Celery 定时任务插件菜单）
 
 警告：此操作不可逆，所有数据将被永久删除！
 """
@@ -330,9 +331,10 @@ def run_migrations() -> bool:
 
 
 def init_data(include_test: bool = False) -> bool:
-    """执行初始化数据（部门、角色、用户、菜单、权限、字典、系统配置等）
+    """执行初始化数据（部门、角色、用户、菜单、权限、字典、系统配置、插件等）
 
     通过 mainotebook.system.fixtures.initialize.Initialize 加载 JSON fixtures。
+    会自动初始化已安装的插件（如 dvadmin3_celery 定时任务插件）。
 
     Args:
         include_test: 是否同时创建测试用户

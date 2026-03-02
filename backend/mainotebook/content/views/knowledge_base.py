@@ -86,7 +86,7 @@ class KnowledgeBaseViewSet(CustomModelViewSet):
     def get_queryset(self):
         """根据操作类型返回不同的查询集
         
-        - list: 只返回公开且已审核的知识库
+        - list: 只返回公开且已审核的知识库，支持收藏筛选
         - retrieve/file_detail: 管理员/审核员可查看所有，普通用户只能看公开内容和自己的
         - 其他操作: 返回所有知识库
         
@@ -94,10 +94,36 @@ class KnowledgeBaseViewSet(CustomModelViewSet):
             QuerySet: 知识库查询集
         """
         if self.action == 'list':
-            return KnowledgeBase.objects.filter(
+            queryset = KnowledgeBase.objects.filter(
                 is_public=True,
                 is_pending=False
             )
+            
+            # 处理收藏筛选
+            starred_param = self.request.query_params.get('starred', '').lower()
+            if starred_param == 'true' and self.request.user.is_authenticated:
+                # 只返回当前用户收藏的知识库
+                from mainotebook.content.models import StarRecord
+                import uuid as uuid_module
+                
+                # 获取收藏的 target_id（字符串格式）
+                starred_id_strs = StarRecord.objects.filter(
+                    user=self.request.user,
+                    target_type='knowledge'
+                ).values_list('target_id', flat=True)
+                
+                # 将字符串转换为 UUID 对象
+                starred_ids = []
+                for id_str in starred_id_strs:
+                    try:
+                        starred_ids.append(uuid_module.UUID(id_str))
+                    except (ValueError, AttributeError):
+                        continue
+                
+                queryset = queryset.filter(id__in=starred_ids)
+            
+            return queryset
+            
         if self.action in ('retrieve', 'file_detail'):
             user = self.request.user
             if user and user.is_authenticated:

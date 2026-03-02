@@ -32,7 +32,7 @@
 				<template #row-handle="{ row }">
 					<el-button
 						v-if="auth('star_record:View')"
-						type="text"
+						link
 						size="small"
 						@click="handleViewDetail(row)"
 					>
@@ -40,7 +40,7 @@
 					</el-button>
 					<el-button
 						v-if="auth('star_record:Delete')"
-						type="text"
+						link
 						size="small"
 						@click="handleDelete(row)"
 					>

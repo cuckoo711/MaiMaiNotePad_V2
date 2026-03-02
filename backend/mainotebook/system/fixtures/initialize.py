@@ -58,6 +58,21 @@ class Initialize(CoreInitialize):
         """初始化系统配置表"""
         self.init_base(SystemConfigInitSerializer, unique_fields=['key', 'parent'])
 
+    def init_celery_plugin(self):
+        """初始化 Celery 定时任务插件菜单
+        
+        如果安装了 dvadmin3_celery 插件，则初始化其菜单数据。
+        """
+        try:
+            from dvadmin3_celery.fixtures.initialize import Initialize as CeleryInitialize
+            celery_init = CeleryInitialize(app='dvadmin3_celery')
+            celery_init.run()
+            print("[dvadmin3_celery][插件菜单]初始化完成")
+        except ImportError:
+            print("[dvadmin3_celery]插件未安装，跳过初始化")
+        except Exception as e:
+            print(f"[dvadmin3_celery]插件初始化失败: {e}")
+
     def init_test_users(self):
         """初始化测试用户（可选）
 
@@ -98,6 +113,8 @@ class Initialize(CoreInitialize):
         self.init_api_white_list()
         self.init_dictionary()
         self.init_system_config()
+        # 初始化插件（如 Celery 定时任务）
+        self.init_celery_plugin()
 
     def run_with_test_data(self):
         """执行基础数据初始化 + 测试用户
