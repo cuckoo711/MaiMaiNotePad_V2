@@ -1112,6 +1112,7 @@ class ModerationLog(CoreModel):
 
     # ==================== 审核结果 ====================
     DECISION_CHOICES = (
+        ('pending', '请求中'),
         ('true', '通过'),
         ('false', '拒绝'),
         ('unknown', '不确定'),
@@ -1121,6 +1122,7 @@ class ModerationLog(CoreModel):
     decision = models.CharField(
         max_length=10,
         choices=DECISION_CHOICES,
+        default='pending',
         verbose_name="审核决策",
         help_text="AI 返回的审核决策"
     )

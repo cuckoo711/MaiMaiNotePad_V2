@@ -61,7 +61,7 @@
             <el-col class="personal-item mb6">
                       <div style="display: flex;">
                         <div style="flex: 1;">已绑定邮箱：</div>
-                        <div style="flex: 1;">{{ state.personalForm.email }}</div>
+                        <div style="flex: 1;">{{ originalEmail }}</div>
                       </div>
             </el-col>
           </el-col>

@@ -41,7 +41,7 @@ class AutoReviewService:
     def execute_auto_review(content_id: str, content_type: str) -> dict:
         """执行 AI 自动审核主流程
 
-        组装完整审核流程：查找内容 → 创建初始报告 → 拼接文本 → 审核文本字段 → 获取并审核文件
+        组装完整审核流程：查找内容 → 检查或创建报告 → 拼接文本 → 审核文本字段 → 获取并审核文件
         → 聚合结果 → 执行决策 → 更新报告 → 通知上传者。
 
         Args:
@@ -56,6 +56,7 @@ class AutoReviewService:
             get_moderation_service,
         )
         from django.utils import timezone
+        from datetime import timedelta
 
         # 1. 查找内容对象
         if content_type == "knowledge":
@@ -80,7 +81,22 @@ class AutoReviewService:
             )
             return {"error": "内容不在待审核状态"}
 
-        # 2. 创建初始审核报告（状态为 pending_ai）
+        # 2. 检查是否有正在进行中的审核（防止重复执行）
+        recent_cutoff = timezone.now() - timedelta(minutes=2)
+        existing_report = ReviewReport.objects.filter(
+            content_id=content_id,
+            content_type=content_type,
+            create_datetime__gte=recent_cutoff,
+        ).first()
+        
+        if existing_report:
+            logger.warning(
+                "该内容已有正在进行或刚完成的审核: content_id=%s, content_type=%s, report_id=%s",
+                content_id, content_type, existing_report.id,
+            )
+            return {"error": "该内容的 AI 审核正在进行中或刚刚完成"}
+
+        # 3. 创建初始审核报告（状态为 pending_ai）
         report = ReviewReport.objects.create(
             content_id=content_id,
             content_type=content_type,

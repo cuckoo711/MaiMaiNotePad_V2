@@ -353,6 +353,7 @@ class ModerationService:
         source: Optional[str] = None,
         content_id: Optional[str] = None,
         user=None,
+        timeout: int = 60,
     ) -> Dict[str, Any]:
         """对文本进行内容审核（带多模型负载均衡）
 
@@ -367,6 +368,7 @@ class ModerationService:
             source: 审核来源（comment/knowledge/persona/knowledge_file），不传则从 text_type 推断
             content_id: 关联的内容 ID（可选）
             user: 触发审核的用户对象（可选）
+            timeout: 单次 API 请求超时时间（秒），默认 30 秒
 
         Returns:
             dict: 审核结果字典，包含以下字段：
@@ -376,6 +378,7 @@ class ModerationService:
                 - _meta: dict, 元数据
         """
         import time
+        from mainotebook.content.models import ModerationLog
 
         if not text or not text.strip():
             logger.warning("输入文本为空，返回默认通过结果")
@@ -388,6 +391,7 @@ class ModerationService:
         # 最多尝试所有模型各一次
         max_attempts = self.model_pool.model_count * 3
         last_error = None
+        moderation_log = None
 
         for attempt in range(max_attempts):
             model_info = self.model_pool.get_next_model()
@@ -401,10 +405,14 @@ class ModerationService:
                 logger.info("等待模型 %s 冷却结束...", model_name)
                 time.sleep(5)
 
+            # 在请求前创建审核日志（状态为 pending）
+            moderation_log = self._create_pending_log(
+                log_source, content_id, user, model_name, temperature, text_type, text
+            )
+
             start_time = time.monotonic()
             try:
                 # 构造 API 请求参数
-                
                 api_params = {
                     "model": model_name,
                     "messages": [
@@ -416,11 +424,10 @@ class ModerationService:
                     "temperature": temperature,
                     "max_tokens": max_tokens,
                     "stream": False,
+                    "timeout": timeout,
                 }
                 
                 # 仅当模型支持且需要禁用思考时，才通过 extra_body 传递参数
-                # 这里假设如果模型支持 enable_thinking，我们默认将其设为 False 以加速审核
-                # 如果未来需要启用思考，可以在 AIModel 中增加字段控制默认值
                 if enable_thinking_supported:
                     api_params["extra_body"] = {"enable_thinking": False}
 
@@ -463,10 +470,12 @@ class ModerationService:
                     result['violation_types'], total_tokens, latency_ms,
                 )
 
-                ModerationService.save_moderation_log(
-                    result=result, source=log_source, text_type=text_type,
-                    input_text=text, content_id=content_id, user=user,
+                # 更新审核日志为成功状态
+                self._update_log_success(
+                    moderation_log, result, prompt_tokens, completion_tokens, 
+                    total_tokens, output, latency_ms
                 )
+
                 return result
 
             except (json.JSONDecodeError, ValueError) as e:
@@ -475,10 +484,15 @@ class ModerationService:
                     "模型 %s JSON 解析失败: %s, 原始输出: %s",
                     model_name, e, output if 'output' in locals() else 'N/A',
                 )
-                # JSON 解析失败不代表模型不可用，不标记限速，但记录错误并继续尝试下一个模型
-                # (或者也可以选择直接返回错误，取决于策略。这里选择尝试下一个模型可能更好，或者直接返回错误)
-                # 为了稳健性，JSON解析失败视为该模型本次调用失败，尝试下一个模型
+                
+                # 更新日志为错误状态
+                self._update_log_error(
+                    moderation_log, f"JSON 解析失败: {str(e)}", 
+                    latency_ms, False, output if 'output' in locals() else None
+                )
+                
                 last_error = e
+                moderation_log = None
                 continue
 
             except Exception as e:
@@ -487,61 +501,46 @@ class ModerationService:
                 is_rate_limited = '429' in error_str or 'rate' in error_str.lower()
 
                 if is_rate_limited:
-                    # 429 限速：标记冷却，记录日志（不计入成功率），切换模型重试
+                    # 429 限速：标记冷却，更新日志
                     self.model_pool.mark_rate_limited(model_name)
                     logger.warning(
                         "模型 %s 触发 429 限速（第 %d/%d 次尝试），切换下一个模型",
                         model_name, attempt + 1, max_attempts,
                     )
-                    # 记录限速日志
-                    rate_limit_result = self._get_default_unknown_result()
-                    rate_limit_result['_meta'] = {
-                        'model_name': model_name,
-                        'api_provider': 'siliconflow',
-                        'temperature': temperature,
-                        'prompt_tokens': 0,
-                        'completion_tokens': 0,
-                        'total_tokens': 0,
-                        'latency_ms': latency_ms,
-                        'raw_output': None,
-                        'is_success': True,  # 限速不计入失败
-                        'error_message': f"429 Rate Limited: {error_str}",
-                    }
-                    ModerationService.save_moderation_log(
-                        result=rate_limit_result, source=log_source,
-                        text_type=text_type, input_text=text,
-                        content_id=content_id, user=user,
+                    
+                    # 更新日志（限速不计入失败）
+                    self._update_log_error(
+                        moderation_log, f"429 Rate Limited: {error_str}", 
+                        latency_ms, True
                     )
+                    
                     last_error = e
-                    continue  # 切换到下一个模型
+                    moderation_log = None
+                    continue
 
-                # 非 429 错误（如网络超时、API 500 等），也记录日志并尝试切换下一个模型
+                # 非 429 错误
                 logger.error(
                     "模型 %s 审核异常: %s", model_name, e, exc_info=True,
                 )
-                # 记录异常日志
-                error_result = self._get_default_unknown_result()
-                error_result['_meta'] = {
-                    'model_name': model_name,
-                    'api_provider': 'siliconflow',
-                    'temperature': temperature,
-                    'prompt_tokens': 0,
-                    'completion_tokens': 0,
-                    'total_tokens': 0,
-                    'latency_ms': latency_ms,
-                    'raw_output': None,
-                    'is_success': False,
-                    'error_message': error_str,
-                }
-                ModerationService.save_moderation_log(
-                    result=error_result, source=log_source, text_type=text_type,
-                    input_text=text, content_id=content_id, user=user,
+                
+                # 更新日志为错误状态
+                self._update_log_error(
+                    moderation_log, error_str, latency_ms, False
                 )
+                
                 last_error = e
-                continue # 继续尝试下一个模型，而不是直接返回错误
+                moderation_log = None
+                continue
 
-        # 所有模型都尝试失败（被限速或报错）
+        # 所有模型都尝试失败
         logger.error("所有模型均不可用（限速或异常），最后一次错误: %s", last_error)
+        
+        # 如果还有未更新的日志，更新为错误状态
+        if moderation_log and moderation_log.decision == 'pending':
+            self._update_log_error(
+                moderation_log, "所有模型均被限速或异常", 0, False
+            )
+        
         result = self._get_default_unknown_result()
         result['_meta'] = {
             'model_name': 'all_rate_limited',
@@ -552,14 +551,137 @@ class ModerationService:
             'total_tokens': 0,
             'latency_ms': 0,
             'raw_output': None,
-            'is_success': True,  # 限速不计入失败
+            'is_success': True,
             'error_message': "所有模型均被限速",
         }
-        ModerationService.save_moderation_log(
-            result=result, source=log_source, text_type=text_type,
-            input_text=text, content_id=content_id, user=user,
-        )
         return result
+
+    def _create_pending_log(
+        self,
+        source: str,
+        content_id: Optional[str],
+        user,
+        model_name: str,
+        temperature: float,
+        text_type: str,
+        text: str,
+    ):
+        """创建待审核状态的日志记录
+
+        Args:
+            source: 审核来源
+            content_id: 内容 ID
+            user: 用户对象
+            model_name: 模型名称
+            temperature: 温度参数
+            text_type: 文本类型
+            text: 审核文本
+
+        Returns:
+            ModerationLog: 创建的日志对象，失败时返回 None
+        """
+        try:
+            from mainotebook.content.models import ModerationLog
+            
+            log = ModerationLog.objects.create(
+                source=source,
+                content_id=content_id,
+                user=user,
+                model_name=model_name,
+                api_provider='siliconflow',
+                temperature=temperature,
+                text_type=text_type,
+                input_text=text,
+                input_text_length=len(text),
+                decision='pending',
+                confidence=0.0,
+                violation_types=[],
+                is_success=False,
+            )
+            logger.debug("审核日志已创建（请求中）: log_id=%s, model=%s", log.id, model_name)
+            return log
+        except Exception as e:
+            logger.error("创建审核日志失败: %s", e, exc_info=True)
+            return None
+
+    def _update_log_success(
+        self,
+        log,
+        result: Dict[str, Any],
+        prompt_tokens: int,
+        completion_tokens: int,
+        total_tokens: int,
+        raw_output: str,
+        latency_ms: int,
+    ) -> None:
+        """更新日志为成功状态
+
+        Args:
+            log: 日志对象
+            result: 审核结果
+            prompt_tokens: 提示词 token 数
+            completion_tokens: 生成 token 数
+            total_tokens: 总 token 数
+            raw_output: 原始输出
+            latency_ms: 耗时（毫秒）
+        """
+        if not log:
+            return
+        
+        try:
+            log.decision = result['decision']
+            log.confidence = result['confidence']
+            log.violation_types = result['violation_types']
+            log.prompt_tokens = prompt_tokens
+            log.completion_tokens = completion_tokens
+            log.total_tokens = total_tokens
+            log.raw_output = raw_output
+            log.latency_ms = latency_ms
+            log.is_success = True
+            log.save(update_fields=[
+                'decision', 'confidence', 'violation_types', 
+                'prompt_tokens', 'completion_tokens', 'total_tokens',
+                'raw_output', 'latency_ms', 'is_success'
+            ])
+            logger.debug("审核日志已更新: log_id=%s", log.id)
+        except Exception as e:
+            logger.error("更新审核日志失败: %s", e, exc_info=True)
+
+    def _update_log_error(
+        self,
+        log,
+        error_message: str,
+        latency_ms: int,
+        is_rate_limit: bool,
+        raw_output: Optional[str] = None,
+    ) -> None:
+        """更新日志为错误状态
+
+        Args:
+            log: 日志对象
+            error_message: 错误消息
+            latency_ms: 耗时（毫秒）
+            is_rate_limit: 是否为限速错误（限速不计入失败）
+            raw_output: 原始输出（可选）
+        """
+        if not log:
+            return
+        
+        try:
+            log.decision = 'error'
+            log.latency_ms = latency_ms
+            log.is_success = is_rate_limit  # 限速不计入失败
+            log.error_message = error_message
+            if raw_output:
+                log.raw_output = raw_output
+            
+            update_fields = ['decision', 'latency_ms', 'is_success', 'error_message']
+            if raw_output:
+                update_fields.append('raw_output')
+            
+            log.save(update_fields=update_fields)
+        except Exception as e:
+            logger.error("更新审核日志失败: %s", e, exc_info=True)
 
     def _validate_result(self, result: dict) -> bool:
         """验证审核结果格式是否正确

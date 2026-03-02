@@ -496,22 +496,6 @@ class ReviewViewSet(viewsets.ViewSet):
                     status=http_status.HTTP_400_BAD_REQUEST
                 )
 
-            # 检查是否有正在进行中的 AI 审核（2 分钟内已创建过报告）
-            from django.utils import timezone
-            from datetime import timedelta
-            recent_cutoff = timezone.now() - timedelta(minutes=2)
-            recent_report = ReviewReport.objects.filter(
-                content_id=pk,
-                content_type=content_type,
-                create_datetime__gte=recent_cutoff,
-            ).exists()
-            if recent_report:
-                return ErrorResponse(
-                    msg="该内容的 AI 审核正在进行中或刚刚完成，请稍后再试",
-                    code=409,
-                    status=http_status.HTTP_409_CONFLICT
-                )
-
             # 调度 Celery 异步任务
             task_result = auto_review_task.delay(str(pk), content_type)
 
