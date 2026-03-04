@@ -27,6 +27,31 @@
       
       <!-- 富文本内容 -->
       <div class="detail-content" v-html="message.content"></div>
+      
+      <!-- 快捷回复 - 仅评论和回复类型显示 -->
+      <div v-if="message.message_type === 1 || message.message_type === 2" class="quick-reply">
+        <el-divider />
+        <div class="reply-title">快捷回复</div>
+        <el-input
+          v-model="replyContent"
+          type="textarea"
+          :rows="3"
+          placeholder="输入回复内容..."
+          maxlength="500"
+          show-word-limit
+          :disabled="replying"
+        />
+        <div class="reply-actions">
+          <el-button 
+            type="primary" 
+            @click="handleReply"
+            :loading="replying"
+            :disabled="!replyContent.trim()"
+          >
+            发送回复
+          </el-button>
+        </div>
+      </div>
     </div>
   </el-dialog>
 </template>
@@ -35,6 +60,7 @@
 import { ref, watch } from 'vue';
 import { formatDate } from '/@/utils/formatTime';
 import { request } from '/@/utils/service';
+import { ElMessage } from 'element-plus';
 
 // Props
 interface Props {
@@ -52,6 +78,8 @@ const emit = defineEmits<{
 
 // 本地状态
 const visible = ref(props.modelValue);
+const replyContent = ref('');
+const replying = ref(false);
 
 // 监听外部变化
 watch(() => props.modelValue, (newVal) => {
@@ -60,6 +88,11 @@ watch(() => props.modelValue, (newVal) => {
   // 弹窗打开时，如果消息未读，标记为已读
   if (newVal && props.message && !props.message.is_read) {
     markAsRead(props.message);
+  }
+  
+  // 弹窗打开时，清空回复内容
+  if (newVal) {
+    replyContent.value = '';
   }
 });
 
@@ -133,6 +166,47 @@ const markAsRead = async (message: any) => {
 const handleClose = () => {
   visible.value = false;
 };
+
+// 发送回复
+const handleReply = async () => {
+  if (!replyContent.value.trim()) {
+    ElMessage.warning('请输入回复内容');
+    return;
+  }
+  
+  const extraData = props.message?.extra_data;
+  if (!extraData?.comment_id || !extraData?.target_id || !extraData?.target_type) {
+    ElMessage.error('无法获取评论信息');
+    return;
+  }
+  
+  replying.value = true;
+  try {
+    const response = await request({
+      url: '/api/content/comments/',
+      method: 'post',
+      data: {
+        target_id: extraData.target_id,
+        target_type: extraData.target_type,
+        content: replyContent.value.trim(),
+        parent: extraData.comment_id
+      }
+    });
+    
+    if (response && response.code === 2000) {
+      ElMessage.success('回复成功');
+      replyContent.value = '';
+      // 关闭弹窗
+      visible.value = false;
+    } else {
+      ElMessage.error(response?.msg || '回复失败');
+    }
+  } catch (error: any) {
+    ElMessage.error(error?.msg || error?.message || '回复失败');
+  } finally {
+    replying.value = false;
+  }
+};
 </script>
 
 <style scoped lang="scss">
@@ -175,6 +249,23 @@ const handleClose = () => {
       max-width: 100%;
       border-radius: 4px;
       margin: 8px 0;
+    }
+  }
+  
+  .quick-reply {
+    margin-top: 16px;
+    
+    .reply-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--el-text-color-primary);
+      margin-bottom: 12px;
+    }
+    
+    .reply-actions {
+      margin-top: 12px;
+      display: flex;
+      justify-content: flex-end;
     }
   }
 }

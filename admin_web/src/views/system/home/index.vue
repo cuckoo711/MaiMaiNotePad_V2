@@ -64,12 +64,12 @@
               </span>
                 </button>
               </div>
-						<div v-for="(v, k) in newsInfoList" :key="k" class="personal-info-li flex-margin flex w100" >
+						<div v-for="(v, k) in newsInfoList" :key="k" class="personal-info-li flex-margin flex w100" @click="handleMessageClick(v)" style="cursor: pointer;">
               <div class="home-card-item-icon flex" style="margin: 5px;" :style="{ background: `#f8f8f8` }">
                 <i class="flex-margin font24" :class="`fa fa-commenting-o`" :style="{ color: `#5d8b22` }"></i>
 						</div>
               <div class="flex-auto" style="margin-top: 10px">
-							  <span class="font14">[{{ v.creator_name }}]</span>
+							  <span class="font14">[{{ getMessageSender(v) }}]</span>
 							  <span style=" color: grey; float: right; font-style:italic;">&nbsp;{{ v.create_datetime }}&nbsp;&nbsp;</span>
 							  <div class="text-container" style="font-size: 12px; margin-top: 5px"> {{ v.title }}</div>
 						  </div>
@@ -102,6 +102,13 @@
       </el-col>
     </el-row>
   </div>
+  
+  <!-- 消息详情弹窗 -->
+  <MessageDetailDialog
+    v-model="dialogVisible"
+    :message="currentMessage"
+    @read="handleMessageRead"
+  />
 </template>
 
 <script lang="ts">
@@ -122,6 +129,7 @@ import { useUserInfo } from '/@/stores/userInfo';
 import {useRouter} from "vue-router";
 import * as personalApi from "/@/views/system/personal/api";
 import * as homeApi from "/@/views/system/home/api";
+import MessageDetailDialog from '/@/components/MessageDetailDialog.vue';
 
 // 定义消息类型
 interface NewsItem {
@@ -142,6 +150,10 @@ export default defineComponent({
 		const { isTagsViewCurrenFull } = storeToRefs(storesTagsViewRoutes);
 		const router = useRouter(); // 将router移到组件级别
 		const defaultNewsItems: NewsItem[] = [];
+		
+		// 消息详情弹窗相关状态
+		const dialogVisible = ref(false);
+		const currentMessage = ref<any>(null);
 		
 		const state = reactive({
 			newsInfoList: [...defaultNewsItems] as NewsItem[],
@@ -583,12 +595,8 @@ export default defineComponent({
 				// 严格检查返回数据的有效性
 				if (data && Array.isArray(data) && data.length > 0) {
 					try {
-						// 安全地进行类型转换并更新状态
-						state.newsInfoList = data.map((item: any): NewsItem => ({
-							creator_name: String(item.creator_name || '未知用户'),
-							create_datetime: String(item.create_datetime || ''),
-							title: String(item.title || '')
-						}));
+						// 保留完整的消息对象，以便弹窗使用
+						state.newsInfoList = data;
 					} catch (typeError) {
 						console.error('数据类型转换失败:', typeError);
 						// 类型转换失败时保持默认数据
@@ -602,7 +610,42 @@ export default defineComponent({
 
 		// 跳转消息中心
 		const msgMore = (): void => {
-			router.push({ path: '/messageCenter' });
+			router.push({ path: '/user/messages' });
+		};
+		
+		/**
+		 * 点击消息项，打开详情弹窗
+		 */
+		const handleMessageClick = (message: any) => {
+			currentMessage.value = message;
+			dialogVisible.value = true;
+		};
+		
+		/**
+		 * 获取消息发送者名称
+		 */
+		const getMessageSender = (message: any) => {
+			// 优先使用 extra_data 中的发送者信息
+			if (message.extra_data?.sender_name) {
+				return message.extra_data.sender_name;
+			}
+			// 如果是系统消息
+			if (message.message_type === 0 || message.message_type === 4) {
+				return '系统';
+			}
+			// 默认返回系统
+			return '系统';
+		};
+		
+		/**
+		 * 消息已读回调
+		 */
+		const handleMessageRead = (message: any) => {
+			// 更新本地消息列表中的已读状态
+			const index = state.newsInfoList.findIndex((m: any) => m.id === message.id);
+			if (index !== -1) {
+				(state.newsInfoList[index] as any).is_read = true;
+			}
 		};
 
 		// 导航到指定路径
@@ -622,6 +665,11 @@ export default defineComponent({
 		HomeBg,
 		msgMore,
 		headerTextColor,
+		dialogVisible,
+		currentMessage,
+		handleMessageClick,
+		getMessageSender,
+		handleMessageRead,
 		};
 	},
 });
