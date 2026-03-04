@@ -10,12 +10,11 @@
         <el-col
 				    :xs="24"
 				    :sm="12"
-				    :md="12"
-				    :lg="8"
+				    :md="8"
+				    :lg="6"
 				    :xl="6"
 				    v-for="(v, k) in homeOne"
 				    :key="k"
-				    :class="{ 'home-media home-media-lg': k > 1, 'home-media-sm': k === 1 }"
 			>
 				<div class="home-card-item flex" style="padding: 0;">
 					<div class="flex-margin flex w100" :class="` home-one-animation${k}`">
@@ -83,7 +82,7 @@
 					<div class="home-card-item-title">{{$t('message.home.quickNavigationTool')}}</div>
 					<div class="home-monitor">
 						<div class="flex-warp">
-							<div class="flex-warp-item" v-for="(v, k) in homeThree" :key="k">
+							<div class="flex-warp-item" v-for="(v, k) in filteredHomeThree" :key="k">
 								<div class="flex-warp-item-box" :class="`home-animation${k}`" @click="navigateTo(v.path)">
 									<div class="flex-margin">
                     <div class="home-card-item-icon flex" style="margin: 20px;" :style="{ background: '#f8f8f8' }">
@@ -101,14 +100,14 @@
       </div>
       </el-col>
     </el-row>
+    
+    <!-- 消息详情弹窗 -->
+    <MessageDetailDialog
+      v-model="dialogVisible"
+      :message="currentMessage"
+      @read="handleMessageRead"
+    />
   </div>
-  
-  <!-- 消息详情弹窗 -->
-  <MessageDetailDialog
-    v-model="dialogVisible"
-    :message="currentMessage"
-    @read="handleMessageRead"
-  />
 </template>
 
 <script lang="ts">
@@ -117,6 +116,7 @@ import * as echarts from 'echarts';
 import { storeToRefs } from 'pinia';
 import { useThemeConfig } from '/@/stores/themeConfig';
 import { useTagsViewRoutes } from '/@/stores/tagsViewRoutes';
+import { useRoutesList } from '/@/stores/routesList';
 import HomeBg from '/@/assets/home-bg.png';
 
 let global: any = {
@@ -149,8 +149,10 @@ export default defineComponent({
 		const homeBarRef = ref();
 		const storesTagsViewRoutes = useTagsViewRoutes();
 		const storesThemeConfig = useThemeConfig();
+		const storesRoutesList = useRoutesList();
 		const { themeConfig } = storeToRefs(storesThemeConfig);
 		const { isTagsViewCurrenFull } = storeToRefs(storesTagsViewRoutes);
+		const { routesList } = storeToRefs(storesRoutesList);
 		const router = useRouter(); // 将router移到组件级别
 		const defaultNewsItems: NewsItem[] = [];
 		
@@ -182,8 +184,8 @@ export default defineComponent({
 				{
 					num1: '0',
 					num2: '',
-					num3: '我的上传',
-					num4: 'fa fa-cloud-upload',
+					num3: '我的创作',
+					num4: 'fa fa-pencil',
 					color1: '#6690F9',
 					color2: '--next-color-warning-lighter',
 					color3: '--el-color-warning',
@@ -191,8 +193,8 @@ export default defineComponent({
 				{
 					num1: '0',
 					num2: '',
-					num3: '我的下载',
-					num4: 'fa fa-cloud-download',
+					num3: '我的收藏',
+					num4: 'fa fa-star',
 					color1: '#6690F9',
 					color2: '--next-color-danger-lighter',
 					color3: '--el-color-danger',
@@ -201,39 +203,39 @@ export default defineComponent({
 			homeThree: [
 				{
 					icon: 'fa fa-book',
-					label: '浏览知识库',
+					label: '知识库广场',
 					iconColor: '#5d8b22',
 					path: '/square/knowledge',
 				},
 				{
 					icon: 'fa fa-user-circle',
-					label: '浏览人设卡',
+					label: '人设卡广场',
 					iconColor: '#3bbc86',
 					path: '/square/persona',
 				},
 				{
 					icon: 'fa fa-cloud-upload',
-					label: '我的上传',
+					label: '创建知识库',
 					iconColor: '#FF8000',
-          path:'/content/my-uploads',
+					path: '/content/knowledge-base',
 				},
 				{
-					icon: 'fa fa-cloud-download',
-					label: '我的下载',
+					icon: 'fa fa-user-plus',
+					label: '创建人设卡',
 					iconColor: '#6690F9',
-          path:'/content/my-downloads',
+					path: '/content/persona-card',
 				},
 				{
 					icon: 'fa fa-bell',
 					label: '消息中心',
 					iconColor: '#fe9a8b',
-          path:'/messageCenter',
+					path: '/user/messages',
 				},
 				{
 					icon: 'fa fa-user',
 					label: '个人设置',
 					iconColor: '#9E87FF',
-          path:'/personal',
+					path: '/personal',
 				},
 			],
 			myCharts: [],
@@ -578,8 +580,8 @@ export default defineComponent({
 				homeApi.getMyStats().then((res: any) => {
 					const { data } = res || {};
 					if (data) {
-						state.homeOne[2].num1 = String(data.my_uploads || 0);
-						state.homeOne[3].num1 = String(data.my_downloads || 0);
+						state.homeOne[2].num1 = String(data.my_creations || 0);
+						state.homeOne[3].num1 = String(data.my_favorites || 0);
 					}
 				}).catch((error: Error) => {
 					console.error('获取个人统计失败:', error);
@@ -659,6 +661,39 @@ export default defineComponent({
 		const headerTextColor = computed(() => {
 			return themeConfig.value.isIsDark ? '#e6e6e6' : '#000000';
 		});
+		
+		// 根据用户权限过滤快捷导航
+		const filteredHomeThree = computed(() => {
+			// 如果是超级管理员，显示所有导航
+			if (userInfo.userInfos.is_superuser) {
+				return state.homeThree;
+			}
+			
+			// 根据路由权限过滤
+			return state.homeThree.filter((item) => {
+				// 这些页面对所有登录用户可见
+				const publicPaths = [
+					'/square/knowledge',           // 浏览知识库
+					'/square/persona',             // 浏览人设卡
+					'/content/knowledge-base',     // 创建知识库
+					'/content/persona-card',       // 创建人设卡
+					'/user/messages',              // 消息中心
+					'/personal'                    // 个人设置
+				];
+				
+				if (publicPaths.includes(item.path)) {
+					return true;
+				}
+				
+				// 检查用户是否有该路由的访问权限
+				return routesList.value.some((route: any) => {
+					if (typeof route === 'string') {
+						return route === item.path;
+					}
+					return route.path === item.path;
+				});
+			});
+		});
 
 		return {
 		homeLineRef,
@@ -673,6 +708,8 @@ export default defineComponent({
 		handleMessageClick,
 		getMessageSender,
 		handleMessageRead,
+		navigateTo,
+		filteredHomeThree,
 		};
 	},
 });
