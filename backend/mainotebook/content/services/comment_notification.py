@@ -39,6 +39,7 @@ class CommentNotificationService:
             extra_data: 扩展数据，如评论 ID、目标内容 ID 等
         """
         from mainotebook.system.views.message_center import websocket_push
+        from mainotebook.system.models import UserNotificationPreference
 
         # 创建 MessageCenter 记录（target_type=0 表示指定用户）
         message = MessageCenter.objects.create(
@@ -49,22 +50,35 @@ class CommentNotificationService:
             extra_data=extra_data or {},
         )
 
-        # 创建目标用户关联记录
+        # 检查用户是否对该类型消息设置了免打扰
+        # 系统通知(0)和审核通知(4)不受免打扰影响
+        is_muted = False
+        if message_type not in [0, 4]:
+            is_muted = UserNotificationPreference.objects.filter(
+                user_id=user_id,
+                message_type=message_type,
+                is_muted=True
+            ).exists()
+
+        # 创建目标用户关联记录，免打扰用户自动标记为已读
         MessageCenterTargetUser.objects.create(
             messagecenter=message,
-            users_id=user_id
+            users_id=user_id,
+            is_read=is_muted
         )
 
-        # 获取未读消息数并通过 WebSocket 推送
-        unread_count = MessageCenterTargetUser.objects.filter(
-            users_id=user_id, is_read=False
-        ).count()
-        websocket_push(user_id, message={
-            "sender": "system",
-            "contentType": "SYSTEM",
-            "content": "您有一条新消息~",
-            "unread": unread_count
-        })
+        # 只向未免打扰的用户推送 WebSocket 通知
+        if not is_muted:
+            # 获取未读消息数并通过 WebSocket 推送
+            unread_count = MessageCenterTargetUser.objects.filter(
+                users_id=user_id, is_read=False
+            ).count()
+            websocket_push(user_id, message={
+                "sender": "system",
+                "contentType": "SYSTEM",
+                "content": "您有一条新消息~",
+                "unread": unread_count
+            })
 
     @staticmethod
     def notify_new_reply(

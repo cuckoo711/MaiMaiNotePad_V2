@@ -15,7 +15,7 @@
           <el-icon 
             class="mute-settings-icon" 
             @click="showMuteDialog = true"
-            title="免打扰设置"
+            title="通知设置"
           >
             <ele-Setting />
           </el-icon>
@@ -83,10 +83,10 @@
         @read="handleMessageRead"
       />
 
-      <!-- 免打扰设置对话框 -->
+      <!-- 通知设置对话框 -->
       <el-dialog
         v-model="showMuteDialog"
-        title="免打扰设置"
+        title="通知设置"
         width="500px"
       >
         <div class="mute-settings-content" v-loading="loadingPreferences">
@@ -97,7 +97,7 @@
             show-icon
             style="margin-bottom: 20px;"
           >
-            开启免打扰后，该类型的新消息将自动标记为已读，不再提醒。系统通知和审核通知不可设置免打扰。
+            关闭通知后，该类型的新消息将自动标记为已读，不再提醒。系统通知和审核通知始终接收。
           </el-alert>
 
           <div class="mute-item" v-for="item in muteSettings" :key="item.type">
@@ -111,7 +111,7 @@
               <div class="mute-item-desc">{{ item.description }}</div>
             </div>
             <el-switch
-              v-model="item.muted"
+              v-model="item.enabled"
               :disabled="item.disabled"
               @change="handleMuteChange(item)"
             />
@@ -153,7 +153,7 @@ const messageListRef = ref<HTMLElement | null>(null);
 const loadMoreTrigger = ref<HTMLElement | null>(null);
 const observer = ref<IntersectionObserver | null>(null);
 
-// 免打扰设置相关
+// 通知设置相关
 const showMuteDialog = ref(false);
 const loadingPreferences = ref(false);
 const savingPreferences = ref(false);
@@ -164,7 +164,7 @@ const muteSettings = ref([
     description: '当有人评论您的内容时',
     icon: 'ChatDotRound',
     color: '#67C23A',
-    muted: false,
+    enabled: true,  // true=接收通知，false=不接收
     disabled: false,
     changed: false
   },
@@ -174,7 +174,7 @@ const muteSettings = ref([
     description: '当有人回复您的评论时',
     icon: 'ChatLineRound',
     color: '#409EFF',
-    muted: false,
+    enabled: true,
     disabled: false,
     changed: false
   },
@@ -184,7 +184,7 @@ const muteSettings = ref([
     description: '当有人点赞您的内容或评论时',
     icon: 'Star',
     color: '#F56C6C',
-    muted: false,
+    enabled: true,
     disabled: false,
     changed: false
   }
@@ -384,7 +384,7 @@ const handleMarkAllRead = async () => {
   }
 };
 
-// 加载免打扰偏好设置
+// 加载通知偏好设置
 const loadMutePreferences = async () => {
   loadingPreferences.value = true;
   try {
@@ -395,27 +395,27 @@ const loadMutePreferences = async () => {
     
     if (response && response.code === 2000) {
       const preferences = response.data || {};
-      // 更新设置状态
+      // 更新设置状态（注意：后端 is_muted=true 表示免打扰，前端 enabled=false 表示不接收）
       muteSettings.value.forEach(item => {
         if (preferences[item.type]) {
-          item.muted = preferences[item.type].is_muted;
+          item.enabled = !preferences[item.type].is_muted;  // 反转逻辑
         }
         item.changed = false;
       });
     }
   } catch (error: any) {
-    console.error('加载免打扰设置失败:', error);
+    console.error('加载通知设置失败:', error);
   } finally {
     loadingPreferences.value = false;
   }
 };
 
-// 处理免打扰开关变化
+// 处理通知开关变化
 const handleMuteChange = (item: any) => {
   item.changed = true;
 };
 
-// 保存免打扰设置
+// 保存通知设置
 const handleSaveMuteSettings = async () => {
   // 找出有变化的设置项
   const changedItems = muteSettings.value.filter(item => item.changed);
@@ -429,7 +429,9 @@ const handleSaveMuteSettings = async () => {
   try {
     // 批量处理所有变化的设置
     const promises = changedItems.map(item => {
-      const url = item.muted
+      // enabled=false 表示不接收通知，需要调用 set_mute
+      // enabled=true 表示接收通知，需要调用 cancel_mute
+      const url = !item.enabled
         ? '/api/system/user_notification_preference/set_mute/'
         : '/api/system/user_notification_preference/cancel_mute/';
       
@@ -446,7 +448,7 @@ const handleSaveMuteSettings = async () => {
     const allSuccess = results.every(res => res && res.code === 2000);
     
     if (allSuccess) {
-      ElMessage.success('免打扰设置已保存');
+      ElMessage.success('通知设置已保存');
       // 重置变化标记
       muteSettings.value.forEach(item => {
         item.changed = false;
