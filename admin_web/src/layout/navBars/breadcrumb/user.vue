@@ -58,32 +58,30 @@
 				:class="!state.isScreenfull ? 'icon-fullscreen' : 'icon-tuichuquanping'"
 			></i>
 		</div>
-    <div>
-      <span v-if="!isSocketOpen" class="online-status-span">
-        <el-popconfirm
-            width="250"
-            ref="onlinePopoverRef"
-            :confirm-button-text="$t('message.user.retry')"
-            :icon="InfoFilled"
-            trigger="hover"
-            icon-color="#626AEF"
-            :title="$t('message.user.onlinePrompt')"
-            @confirm="onlineConfirmEvent"
-        >
-          <template #reference>
-            <el-badge is-dot class="item" :class="{'online-status': isSocketOpen,'online-down':!isSocketOpen}">
-              <img :src="getBaseURL(userInfos.avatar) || headerImage" class="layout-navbars-breadcrumb-user-link-photo mr5" />
-            </el-badge>
-          </template>
-        </el-popconfirm>
-      </span>
-    </div>
-		<div></div>
+		<div class="layout-navbars-breadcrumb-user-icon">
+			<el-popconfirm
+				v-if="!isSocketOpen"
+				width="250"
+				ref="onlinePopoverRef"
+				:confirm-button-text="$t('message.user.retry')"
+				:icon="InfoFilled"
+				trigger="hover"
+				icon-color="#626AEF"
+				:title="$t('message.user.onlinePrompt')"
+				@confirm="onlineConfirmEvent"
+			>
+				<template #reference>
+					<el-badge is-dot class="item online-down">
+						<img :src="userInfos.avatar ? getBaseURL(userInfos.avatar) : headerImage" class="layout-navbars-breadcrumb-user-link-photo mr5" />
+					</el-badge>
+				</template>
+			</el-popconfirm>
+			<el-badge v-else is-dot class="item online-status">
+				<img :src="userInfos.avatar ? getBaseURL(userInfos.avatar) : headerImage" class="layout-navbars-breadcrumb-user-link-photo mr5" />
+			</el-badge>
+		</div>
 		<el-dropdown :show-timeout="70" :hide-timeout="50" @command="onHandleCommandClick">
 			<span class="layout-navbars-breadcrumb-user-link">
-<!--				<el-badge is-dot class="item online-status">-->
-<!--					<img :src="userInfos.avatar || headerImage" class="layout-navbars-breadcrumb-user-link-photo mr5" />-->
-<!--				</el-badge>-->
 				{{ userInfos.username === '' ? 'common' : userInfos.username }}
 				<el-icon class="el-icon--right">
 					<ele-ArrowDown />

@@ -41,7 +41,8 @@ export const useUserInfo = defineStore('userInfo', {
 		async updateUserInfos(userInfos:any) {
 			this.userInfos.id = userInfos.id;
 			this.userInfos.username = userInfos.name;
-			this.userInfos.avatar = userInfos.avatar;
+			// 只有当 avatar 存在且不是前端资源路径时才使用
+			this.userInfos.avatar = userInfos.avatar && !userInfos.avatar.includes('src/assets') ? userInfos.avatar : '';
 			this.userInfos.name = userInfos.name;
 			this.userInfos.email = userInfos.email;
 			this.userInfos.mobile = userInfos.mobile;
@@ -60,7 +61,8 @@ export const useUserInfo = defineStore('userInfo', {
 				let userInfos: any = await this.getApiUserInfo();
 				this.userInfos.id = userInfos.id;
 				this.userInfos.username = userInfos.data.name;
-				this.userInfos.avatar = userInfos.data.avatar;
+				// 只有当 avatar 存在且不是前端资源路径时才使用
+				this.userInfos.avatar = userInfos.data.avatar && !userInfos.data.avatar.includes('src/assets') ? userInfos.data.avatar : '';
 				this.userInfos.name = userInfos.data.name;
 				this.userInfos.email = userInfos.data.email;
 				this.userInfos.mobile = userInfos.data.mobile;
@@ -82,7 +84,8 @@ export const useUserInfo = defineStore('userInfo', {
 			}).then((res:any)=>{
 				this.userInfos.id = res.data.id;
 				this.userInfos.username = res.data.name;
-				this.userInfos.avatar = (res.data.avatar && getBaseURL(res.data.avatar)) || headerImage;
+				// 只有当 avatar 存在且不是前端资源路径时才处理
+				this.userInfos.avatar = res.data.avatar && !res.data.avatar.includes('src/assets') ? res.data.avatar : '';
 				this.userInfos.name = res.data.name;
 				this.userInfos.email = res.data.email;
 				this.userInfos.mobile = res.data.mobile;

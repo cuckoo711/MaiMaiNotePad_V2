@@ -1576,24 +1576,7 @@
                         "method": 0
                     }
                 ]
-            }
-        ],
-        "menu_button": [],
-        "menu_field": []
-    },
-    {
-        "name": "社区管理",
-        "icon": "ele-ChatDotRound",
-        "sort": 11,
-        "is_link": false,
-        "is_catalog": true,
-        "web_path": "/community",
-        "component": "",
-        "component_name": "",
-        "status": true,
-        "cache": false,
-        "visible": true,
-        "children": [
+            },
             {
                 "name": "评论管理",
                 "icon": "ele-ChatDotRound",
@@ -1639,24 +1622,7 @@
                         "method": 0
                     }
                 ]
-            }
-        ],
-        "menu_button": [],
-        "menu_field": []
-    },
-    {
-        "name": "审核管理",
-        "icon": "ele-Checked",
-        "sort": 12,
-        "is_link": false,
-        "is_catalog": true,
-        "web_path": "/review-management",
-        "component": "",
-        "component_name": "",
-        "status": true,
-        "cache": false,
-        "visible": true,
-        "children": [
+            },
             {
                 "name": "内容审核",
                 "icon": "ele-Checked",
@@ -1712,7 +1678,7 @@
             {
                 "name": "AI审核日志",
                 "icon": "ele-Document",
-                "sort": 2,
+                "sort": 5,
                 "is_link": false,
                 "is_catalog": false,
                 "web_path": "/content/moderation-log",
@@ -1746,7 +1712,7 @@
             {
                 "name": "AI模型管理",
                 "icon": "ele-Cpu",
-                "sort": 3,
+                "sort": 6,
                 "is_link": false,
                 "is_catalog": false,
                 "web_path": "/content/ai-model",
