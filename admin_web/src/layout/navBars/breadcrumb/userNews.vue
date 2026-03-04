@@ -5,6 +5,7 @@
 				<el-tab-pane label="通知" name="notification"></el-tab-pane>
 				<el-tab-pane label="评论" name="comment"></el-tab-pane>
 				<el-tab-pane label="回复" name="reply"></el-tab-pane>
+				<el-tab-pane label="赞" name="like"></el-tab-pane>
 			</el-tabs>
 		</div>
 		<div class="content-box">
@@ -118,8 +119,11 @@ const getLastMsg = () => {
 		// 评论：评论(1)
 		params.message_type = '1';
 	} else if (activeTab.value === 'reply') {
-		// 回复：回复(2) 和 点赞(3)
-		params.message_type = '2,3';
+		// 回复：回复(2)
+		params.message_type = '2';
+	} else if (activeTab.value === 'like') {
+		// 收到的赞：点赞(3)
+		params.message_type = '3';
 	}
 	
 	console.log('获取消息，参数:', params);

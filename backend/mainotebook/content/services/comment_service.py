@@ -4,7 +4,7 @@
 """
 
 from typing import List, Optional
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q
 from django.utils import timezone
 from django.core.exceptions import ValidationError, PermissionDenied
 
@@ -19,47 +19,216 @@ class CommentService:
     """
     
     @staticmethod
-    def get_comments_tree(target_id: str, target_type: str) -> List[Comment]:
-        """获取评论树形结构
+    @staticmethod
+    def get_comments_tree(target_id: str, target_type: str, page: int = 1, page_size: int = 10, user=None) -> dict:
+        """获取评论树形结构（个性化推荐排序）
         
-        获取指定目标的所有评论，并构建树形结构（包含嵌套回复）。
+        使用个性化推荐算法对评论进行排序：
+        1. 基础热度分数：综合时间、点赞、回复
+        2. 用户兴趣权重：基于用户历史互动（点赞、回复、浏览）
+        3. 多样性因子：避免信息茧房，保证内容多样性
+        4. 向量相似度：使用 BGE-M3 嵌入模型计算语义相似度
+        5. 重排序：使用 BGE-Reranker 精细调整（可选）
+        
+        排序策略：
+        - 已登录用户：个性化排序（70%兴趣 + 30%热度）
+        - 未登录用户：纯热度排序
         
         Args:
             target_id: 目标 ID（知识库或人设卡的 UUID）
             target_type: 目标类型（'knowledge' 或 'persona'）
+            page: 页码（从1开始）
+            page_size: 每页数量（默认10）
+            user: 当前用户对象（可选，用于个性化）
             
         Returns:
-            List[Comment]: 根评论列表，每个评论包含 _prefetched_replies 属性存储子评论
+            dict: {
+                'comments': 根评论列表，
+                'total': 总数，
+                'page': 当前页，
+                'page_size': 每页数量，
+                'has_more': 是否还有更多
+            }
         """
-        # 获取所有评论（包括回复），排除已删除和 AI 拒绝的评论
-        comments = Comment.objects.filter(
+        from django.utils import timezone
+        from django.db.models import Count, Q
+        from mainotebook.content.services.recommendation_service import RecommendationService
+        import math
+        
+        # 获取所有根评论（parent_id 为 None），排除已删除和 AI 拒绝的评论
+        root_comments_query = Comment.objects.filter(
             target_id=target_id,
             target_type=target_type,
             is_deleted=False,
+            parent_id__isnull=True,
         ).exclude(
             moderation_status='rejected',
-        ).select_related('user', 'reply_to', 'reply_to__user').prefetch_related('replies').order_by('create_datetime')
+        ).select_related('user').annotate(
+            reply_count=Count('replies', filter=~Q(replies__is_deleted=True) & ~Q(replies__moderation_status='rejected'))
+        )
         
-        # 构建树形结构
-        comment_dict = {}
-        root_comments = []
+        now = timezone.now()
+        comments_with_score = []
         
-        # 第一遍遍历：建立字典映射，初始化回复列表
-        for comment in comments:
-            comment_dict[comment.id] = comment
-            comment._prefetched_replies = []
+        # 获取用户兴趣数据（带缓存）
+        user_interests = None
+        if user and user.is_authenticated:
+            user_interests = RecommendationService.get_user_interests(user)
         
-        # 第二遍遍历：构建父子关系
-        for comment in comments:
-            if comment.parent_id:
-                parent = comment_dict.get(comment.parent_id)
-                if parent:
-                    parent._prefetched_replies.append(comment)
+        for comment in root_comments_query:
+            # ========== 1. 基础热度分数 ==========
+            time_diff_hours = (now - comment.create_datetime).total_seconds() / 3600
+            
+            # 双阶段时间衰减
+            if time_diff_hours < 24:
+                # 24小时内不衰减（黄金期）
+                time_decay = 1.0
+            elif time_diff_hours < 168:  # 7天内
+                # 每48小时衰减50%
+                time_decay = math.pow(0.5, (time_diff_hours - 24) / 48)
             else:
-                # 没有父评论的是根评论
-                root_comments.append(comment)
+                # 7天后快速衰减
+                time_decay = math.pow(0.5, (time_diff_hours - 24) / 48) * 0.1
+            
+            # 互动分数（点赞权重更高，回复次之）
+            engagement_score = (
+                comment.like_count * 2.0 +
+                comment.reply_count * 1.5 -
+                comment.dislike_count * 0.5
+            )
+            
+            # 质量加成（高互动评论额外加分，上限10分）
+            quality_bonus = min(engagement_score * 0.1, 10)
+            
+            # 基础热度分数
+            base_hot_score = engagement_score * time_decay + quality_bonus + 10
+            
+            # ========== 2. 用户兴趣权重 ==========
+            interest_weight = 1.0
+            if user_interests:
+                # 评论作者兴趣匹配
+                if comment.user_id in user_interests['favorite_authors']:
+                    interest_weight *= 1.5  # 喜欢的作者，权重提升50%
+                
+                # 内容相似度（使用推荐服务计算）
+                content_similarity = RecommendationService.calculate_content_similarity(
+                    comment.content,
+                    user_interests
+                )
+                interest_weight *= (1.0 + content_similarity * 0.5)  # 最多提升50%
+            
+            # ========== 3. 多样性因子 ==========
+            diversity_factor = 1.0
+            if user_interests and comment.user_id in user_interests.get('recent_seen_authors', []):
+                diversity_factor = 0.7  # 最近看过该作者的评论，降低权重
+            
+            # ========== 4. 最终分数计算 ==========
+            if user and user.is_authenticated:
+                # 个性化排序：70%兴趣 + 30%热度
+                final_score = (
+                    base_hot_score * 0.3 +
+                    base_hot_score * interest_weight * 0.7
+                ) * diversity_factor
+            else:
+                # 未登录用户：纯热度排序
+                final_score = base_hot_score
+            
+            comments_with_score.append((comment, final_score))
         
-        return root_comments
+        # 按最终分数降序排序
+        comments_with_score.sort(key=lambda x: x[1], reverse=True)
+        
+        # 提取评论列表
+        sorted_comments = [item[0] for item in comments_with_score]
+        
+        # ========== 5. 重排序（可选，仅对前30条）==========
+        # 对于已登录用户，使用 BGE-Reranker 对候选集进行精细重排序
+        if user and user.is_authenticated and user_interests and len(sorted_comments) > 5:
+            # 只对前30条候选进行重排序（平衡效果和性能）
+            candidates = sorted_comments[:30]
+            reranked = RecommendationService.rerank_comments(
+                candidates,
+                user_interests,
+                top_k=None
+            )
+            # 合并重排序结果和剩余评论
+            sorted_comments = reranked + sorted_comments[30:]
+        
+        # 分页
+        total = len(sorted_comments)
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_comments = sorted_comments[start:end]
+        
+        # 为每个根评论加载前10条二级评论
+        for comment in page_comments:
+            replies = Comment.objects.filter(
+                parent_id=comment.id,
+                is_deleted=False,
+            ).exclude(
+                moderation_status='rejected',
+            ).select_related('user', 'reply_to', 'reply_to__user').order_by('create_datetime')[:10]
+            
+            comment._prefetched_replies = list(replies)
+            comment._reply_total = Comment.objects.filter(
+                parent_id=comment.id,
+                is_deleted=False,
+            ).exclude(
+                moderation_status='rejected',
+            ).count()
+        
+        # 记录用户浏览行为（用于后续个性化）
+        if user and user.is_authenticated and page_comments:
+            RecommendationService.record_user_view(user.id, page_comments)
+        
+        return {
+            'comments': page_comments,
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'has_more': end < total
+        }
+    
+    
+    @staticmethod
+    def get_replies(parent_id: str, page: int = 1, page_size: int = 10) -> dict:
+        """获取指定评论的二级回复（分页）
+        
+        Args:
+            parent_id: 父评论 ID
+            page: 页码（从1开始）
+            page_size: 每页数量（默认10条）
+            
+        Returns:
+            dict: {
+                'replies': 回复列表，
+                'total': 总数，
+                'page': 当前页，
+                'page_size': 每页数量，
+                'has_more': 是否还有更多
+            }
+        """
+        # 获取二级回复，按时间正序排列
+        replies_query = Comment.objects.filter(
+            parent_id=parent_id,
+            is_deleted=False,
+        ).exclude(
+            moderation_status='rejected',
+        ).select_related('user', 'reply_to', 'reply_to__user').order_by('create_datetime')
+        
+        total = replies_query.count()
+        start = (page - 1) * page_size
+        end = start + page_size
+        
+        replies = list(replies_query[start:end])
+        
+        return {
+            'replies': replies,
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'has_more': end < total
+        }
     
     @staticmethod
     def create_comment(user: Users, data: dict) -> Comment:
@@ -126,9 +295,14 @@ class CommentService:
             target_type=data['target_type'],
             content=content,
             parent_id=parent_id,
+            reply_to_id=data.get('reply_to'),
             moderation_status=moderation_status,
             moderation_detail=moderation_detail,
         )
+        
+        # 清除用户推荐缓存（回复是强兴趣信号）
+        from mainotebook.content.services.recommendation_service import RecommendationService
+        RecommendationService.clear_user_cache(user.id)
 
         return comment
     @staticmethod
@@ -136,7 +310,7 @@ class CommentService:
         """调用 AI 审核评论内容
 
         使用 ModerationService 对评论内容进行审核，并记录审核日志。
-        评论审核优先使用 Qwen/Qwen3-8B 模型，如果该模型失败则自动切换到模型池的其他模型。
+        评论审核优先使用 THUDM/glm-4-9b-chat 模型，如果该模型失败则自动切换到模型池的其他模型。
         AI 异常时默认放行（返回 uncertain），不阻塞用户发言。
 
         Args:
@@ -160,9 +334,9 @@ class CommentService:
             from mainotebook.content.models import ModerationLog
             
             service = get_moderation_service()
-            preferred_model = 'Qwen/Qwen3-8B'
+            preferred_model = 'THUDM/glm-4-9b-chat'
             
-            # 第一步：尝试使用 Qwen/Qwen3-8B
+            # 第一步：尝试使用 THUDM/glm-4-9b-chat
             try:
                 logger.info("评论审核优先使用模型: %s", preferred_model)
                 
@@ -293,10 +467,10 @@ class CommentService:
                     moderation_log.error_message = error_str
                     moderation_log.save()
             
-            # 第二步：使用模型池的其他模型（跳过 Qwen/Qwen3-8B）
+            # 第二步：使用模型池的其他模型（跳过 THUDM/glm-4-9b-chat）
             logger.info("使用模型池进行审核（跳过 %s）", preferred_model)
             
-            # 临时从模型池中移除 Qwen/Qwen3-8B
+            # 临时从模型池中移除 THUDM/glm-4-9b-chat
             with service.model_pool._lock:
                 original_models = service.model_pool._models[:]
                 filtered_models = [m for m in original_models if m[0] != preferred_model]
@@ -434,6 +608,11 @@ class CommentService:
             my_reaction = action
         
         comment.refresh_from_db()
+        
+        # 清除用户推荐缓存（点赞是兴趣信号）
+        from mainotebook.content.services.recommendation_service import RecommendationService
+        RecommendationService.clear_user_cache(user.id)
+        
         return {
             'like_count': comment.like_count,
             'dislike_count': comment.dislike_count,

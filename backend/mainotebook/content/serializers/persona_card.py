@@ -52,6 +52,9 @@ class PersonaCardSerializer(CustomModelSerializer):
     has_valid_toml = serializers.SerializerMethodField(
         help_text="是否包含有效的 bot_config.toml 文件"
     )
+    comment_count = serializers.SerializerMethodField(
+        help_text="评论数量"
+    )
     
     class Meta:
         model = PersonaCard
@@ -60,7 +63,8 @@ class PersonaCardSerializer(CustomModelSerializer):
             'uploader_avatar', 'copyright_owner', 'content', 'tags',
             'star_count', 'downloads', 'is_public', 'is_pending',
             'rejection_reason', 'version', 'create_datetime',
-            'update_datetime', 'files', 'is_starred', 'has_valid_toml'
+            'update_datetime', 'files', 'is_starred', 'has_valid_toml',
+            'comment_count'
         ]
         read_only_fields = [
             'id', 'star_count', 'downloads', 'create_datetime', 
@@ -110,6 +114,22 @@ class PersonaCardSerializer(CustomModelSerializer):
         """
         toml_files = obj.files.filter(original_name='bot_config.toml')
         return toml_files.count() == 1
+    
+    def get_comment_count(self, obj):
+        """获取评论数量
+        
+        Args:
+            obj: PersonaCard 实例
+            
+        Returns:
+            int: 评论数量（包括所有层级的评论和回复）
+        """
+        from mainotebook.content.models import Comment
+        return Comment.objects.filter(
+            target_id=str(obj.id),
+            target_type='persona',
+            is_deleted=False
+        ).count()
     
     def to_representation(self, instance):
         """序列化输出，隐藏非创建者的 content（补充说明）字段

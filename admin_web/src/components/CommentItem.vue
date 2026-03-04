@@ -71,8 +71,20 @@
           @reply="$emit('reply', $event)"
           @delete="$emit('delete', $event)"
           @react="$emit('react', $event)"
-          @refresh="$emit('refresh')"
         />
+        
+        <!-- 展开更多回复按钮 -->
+        <div v-if="hasMoreReplies && !isReply" class="load-more-replies">
+          <el-button 
+            text 
+            :loading="loadingMoreReplies" 
+            @click="loadMoreReplies"
+            class="load-more-replies-btn"
+          >
+            <i v-if="!loadingMoreReplies" class="fa fa-angle-down"></i>
+            {{ loadingMoreReplies ? '加载中...' : `展开更多回复 (还有 ${replyTotal - comment.replies.length} 条)` }}
+          </el-button>
+        </div>
       </div>
     </div>
   </div>
@@ -111,15 +123,22 @@ const showReplyInput = ref(false);
 const replyContent = ref('');
 const replying = ref(false);
 
-// 监听评论变化，当评论列表刷新后重置回复状态
+// 回复分页状态
+const replyPage = ref(1);
+const replyPageSize = ref(10);
+const replyTotal = ref(0);
+const hasMoreReplies = ref(false);
+const loadingMoreReplies = ref(false);
+
+// 监听评论变化，更新回复分页状态
 watch(() => props.comment, () => {
-  if (replying.value) {
-    // 评论列表刷新了，说明回复成功，重置状态
-    replying.value = false;
-    showReplyInput.value = false;
-    replyContent.value = '';
+  // 更新回复分页状态
+  if (props.comment.reply_total !== undefined) {
+    replyTotal.value = props.comment.reply_total;
+    const currentRepliesCount = props.comment.replies?.length || 0;
+    hasMoreReplies.value = currentRepliesCount < props.comment.reply_total;
   }
-}, { deep: true });
+}, { deep: true, immediate: true });
 
 // ==================== 计算属性 ====================
 const isAuthenticated = computed(() => userStore.userInfos && userStore.userInfos.id);
@@ -189,15 +208,20 @@ const submitReply = async () => {
   // 找到根评论 ID（parent 为 null 的评论）
   const parentId = props.comment.parent || props.comment.id;
   
+  // 发送回复事件
   emit('reply', {
     parentId: parentId,
     replyToId: props.comment.id,
     content: replyContent.value.trim()
   });
   
-  // 注意：不在这里关闭输入框和重置状态
-  // 等待父组件的 handleReply 完成后会触发 refresh 事件
-  // 我们在 watch 中监听 refresh 来重置状态
+  // 等待一小段时间让父组件处理完成，然后重置状态
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  // 重置回复状态
+  replying.value = false;
+  showReplyInput.value = false;
+  replyContent.value = '';
 };
 
 /**
@@ -218,6 +242,39 @@ const handleReact = (action: string) => {
     commentId: props.comment.id,
     action: finalAction
   });
+};
+
+/**
+ * 加载更多回复
+ */
+const loadMoreReplies = async () => {
+  if (loadingMoreReplies.value || !hasMoreReplies.value) return;
+  
+  loadingMoreReplies.value = true;
+  replyPage.value += 1;
+  
+  try {
+    const { getReplies } = await import('/@/api/comment');
+    const response = await getReplies(props.comment.id, replyPage.value, replyPageSize.value);
+    
+    if (response.code === 2000) {
+      const newReplies = response.data || [];
+      
+      // 将新回复添加到现有回复列表
+      if (props.comment.replies) {
+        props.comment.replies.push(...newReplies);
+      } else {
+        props.comment.replies = newReplies;
+      }
+      
+      // 更新分页状态
+      hasMoreReplies.value = response.has_more || false;
+    }
+  } catch (error: any) {
+    ElMessage.error(error.msg || '加载回复失败');
+  } finally {
+    loadingMoreReplies.value = false;
+  }
 };
 
 /**
@@ -383,5 +440,25 @@ export default {
   margin-top: 16px;
   padding-left: 20px;
   border-left: 2px solid #f0f0f0;
+}
+
+.load-more-replies {
+  margin-top: 12px;
+  text-align: center;
+  
+  .load-more-replies-btn {
+    color: #a0522d;
+    font-size: 13px;
+    padding: 6px 16px;
+    
+    &:hover {
+      background: rgba(160, 82, 45, 0.05);
+    }
+    
+    i {
+      margin-right: 4px;
+      font-size: 14px;
+    }
+  }
 }
 </style>

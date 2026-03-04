@@ -1,24 +1,35 @@
 <template>
   <fs-page>
     <div class="user-messages-container">
-      <!-- 顶部区域：标签页 + 全部已读按钮 -->
+      <!-- 顶部区域：标签页 + 免打扰设置 + 全部已读按钮 -->
       <div class="message-header">
         <el-tabs v-model="activeTab" @tab-change="handleTabChange" class="message-tabs">
           <el-tab-pane label="全部" name="all"></el-tab-pane>
           <el-tab-pane label="通知" name="notice"></el-tab-pane>
           <el-tab-pane label="评论" name="comment"></el-tab-pane>
           <el-tab-pane label="回复" name="reply"></el-tab-pane>
+          <el-tab-pane label="赞" name="like"></el-tab-pane>
         </el-tabs>
         
-        <el-button 
-          type="primary" 
-          size="default" 
-          @click="handleMarkAllRead"
-          :loading="markingAllRead"
-          class="mark-all-btn"
-        >
-          全部已读
-        </el-button>
+        <div class="header-actions">
+          <el-icon 
+            class="mute-settings-icon" 
+            @click="showMuteDialog = true"
+            title="免打扰设置"
+          >
+            <ele-Setting />
+          </el-icon>
+          
+          <el-button 
+            type="primary" 
+            size="default" 
+            @click="handleMarkAllRead"
+            :loading="markingAllRead"
+            class="mark-all-btn"
+          >
+            全部已读
+          </el-button>
+        </div>
       </div>
 
       <!-- 消息列表 -->
@@ -71,13 +82,58 @@
         :message="currentMessage"
         @read="handleMessageRead"
       />
+
+      <!-- 免打扰设置对话框 -->
+      <el-dialog
+        v-model="showMuteDialog"
+        title="免打扰设置"
+        width="500px"
+      >
+        <div class="mute-settings-content" v-loading="loadingPreferences">
+          <el-alert
+            title="提示"
+            type="info"
+            :closable="false"
+            show-icon
+            style="margin-bottom: 20px;"
+          >
+            开启免打扰后，该类型的新消息将自动标记为已读，不再提醒。系统通知和审核通知不可设置免打扰。
+          </el-alert>
+
+          <div class="mute-item" v-for="item in muteSettings" :key="item.type">
+            <div class="mute-item-info">
+              <div class="mute-item-title">
+                <el-icon :style="{ color: item.color }">
+                  <component :is="item.icon" />
+                </el-icon>
+                <span>{{ item.label }}</span>
+              </div>
+              <div class="mute-item-desc">{{ item.description }}</div>
+            </div>
+            <el-switch
+              v-model="item.muted"
+              :disabled="item.disabled"
+              @change="handleMuteChange(item)"
+            />
+          </div>
+        </div>
+
+        <template #footer>
+          <span class="dialog-footer">
+            <el-button @click="showMuteDialog = false">取消</el-button>
+            <el-button type="primary" @click="handleSaveMuteSettings" :loading="savingPreferences">
+              确定
+            </el-button>
+          </span>
+        </template>
+      </el-dialog>
     </div>
   </fs-page>
 </template>
 
 <script setup lang="ts" name="userMessages">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue';
-import { ElMessage } from 'element-plus';
+import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { formatDate } from '/@/utils/formatTime';
 import { request } from '/@/utils/service';
 import MessageDetailDialog from '/@/components/MessageDetailDialog.vue';
@@ -96,6 +152,43 @@ const hasMore = ref(true);
 const messageListRef = ref<HTMLElement | null>(null);
 const loadMoreTrigger = ref<HTMLElement | null>(null);
 const observer = ref<IntersectionObserver | null>(null);
+
+// 免打扰设置相关
+const showMuteDialog = ref(false);
+const loadingPreferences = ref(false);
+const savingPreferences = ref(false);
+const muteSettings = ref([
+  {
+    type: 1,
+    label: '评论通知',
+    description: '当有人评论您的内容时',
+    icon: 'ChatDotRound',
+    color: '#67C23A',
+    muted: false,
+    disabled: false,
+    changed: false
+  },
+  {
+    type: 2,
+    label: '回复通知',
+    description: '当有人回复您的评论时',
+    icon: 'ChatLineRound',
+    color: '#409EFF',
+    muted: false,
+    disabled: false,
+    changed: false
+  },
+  {
+    type: 3,
+    label: '点赞通知',
+    description: '当有人点赞您的内容或评论时',
+    icon: 'Star',
+    color: '#F56C6C',
+    muted: false,
+    disabled: false,
+    changed: false
+  }
+]);
 
 // 消息类型映射
 const MESSAGE_TYPE_MAP = {
@@ -151,7 +244,9 @@ const getMessageTypeFilter = () => {
     case 'comment':
       return '1'; // 评论
     case 'reply':
-      return '2,3'; // 回复和点赞
+      return '2'; // 回复
+    case 'like':
+      return '3'; // 点赞
     default:
       return ''; // 全部
   }
@@ -288,6 +383,94 @@ const handleMarkAllRead = async () => {
     markingAllRead.value = false;
   }
 };
+
+// 加载免打扰偏好设置
+const loadMutePreferences = async () => {
+  loadingPreferences.value = true;
+  try {
+    const response = await request({
+      url: '/api/system/user_notification_preference/get_preferences/',
+      method: 'get'
+    });
+    
+    if (response && response.code === 2000) {
+      const preferences = response.data || {};
+      // 更新设置状态
+      muteSettings.value.forEach(item => {
+        if (preferences[item.type]) {
+          item.muted = preferences[item.type].is_muted;
+        }
+        item.changed = false;
+      });
+    }
+  } catch (error: any) {
+    console.error('加载免打扰设置失败:', error);
+  } finally {
+    loadingPreferences.value = false;
+  }
+};
+
+// 处理免打扰开关变化
+const handleMuteChange = (item: any) => {
+  item.changed = true;
+};
+
+// 保存免打扰设置
+const handleSaveMuteSettings = async () => {
+  // 找出有变化的设置项
+  const changedItems = muteSettings.value.filter(item => item.changed);
+  
+  if (changedItems.length === 0) {
+    showMuteDialog.value = false;
+    return;
+  }
+  
+  savingPreferences.value = true;
+  try {
+    // 批量处理所有变化的设置
+    const promises = changedItems.map(item => {
+      const url = item.muted
+        ? '/api/system/user_notification_preference/set_mute/'
+        : '/api/system/user_notification_preference/cancel_mute/';
+      
+      return request({
+        url,
+        method: 'post',
+        data: { message_type: item.type }
+      });
+    });
+    
+    const results = await Promise.all(promises);
+    
+    // 检查是否全部成功
+    const allSuccess = results.every(res => res && res.code === 2000);
+    
+    if (allSuccess) {
+      ElMessage.success('免打扰设置已保存');
+      // 重置变化标记
+      muteSettings.value.forEach(item => {
+        item.changed = false;
+      });
+      showMuteDialog.value = false;
+      
+      // 刷新当前消息列表
+      await loadMessages();
+    } else {
+      ElMessage.error('部分设置保存失败，请重试');
+    }
+  } catch (error: any) {
+    ElMessage.error(error?.msg || error?.message || '保存失败');
+  } finally {
+    savingPreferences.value = false;
+  }
+};
+
+// 监听对话框状态，打开时加载最新设置
+watch(showMuteDialog, (newVal) => {
+  if (newVal) {
+    loadMutePreferences();
+  }
+});
 
 // 初始化
 onMounted(async () => {

@@ -1,6 +1,6 @@
 <template>
   <div class="comment-section">
-    <div class="comment-header">
+    <div v-if="showHeader" class="comment-header">
       <h3>
         <i class="fa fa-comments"></i>
         评论 <span class="comment-count">({{ totalComments }})</span>
@@ -13,7 +13,7 @@
         v-model="newCommentContent"
         type="textarea"
         :rows="3"
-        placeholder="发表你的看法...（评论将经过 AI 内容审核）"
+        placeholder="发表你的看法..."
         maxlength="500"
         show-word-limit
         class="comment-textarea"
@@ -26,7 +26,7 @@
       </div>
       <div class="comment-tips">
         <i class="fa fa-info-circle"></i>
-        <span>评论将经过 AI 内容审核，请文明发言</span>
+        <span>评论将经过内容审核，请文明发言</span>
       </div>
     </div>
     <div v-else class="login-prompt">
@@ -50,8 +50,19 @@
         @reply="handleReply"
         @delete="handleDelete"
         @react="handleReact"
-        @refresh="loadComments"
       />
+      
+      <!-- 加载更多按钮 -->
+      <div v-if="hasMore && !loading" class="load-more-wrapper">
+        <el-button 
+          :loading="loadingMore" 
+          @click="loadMoreComments"
+          class="load-more-btn"
+        >
+          <i v-if="!loadingMore" class="fa fa-angle-down"></i>
+          {{ loadingMore ? '加载中...' : '加载更多评论' }}
+        </el-button>
+      </div>
     </div>
   </div>
 </template>
@@ -72,6 +83,10 @@ const props = defineProps({
     type: String,
     required: true,
     validator: (value: string) => ['knowledge', 'persona'].includes(value)
+  },
+  showHeader: {
+    type: Boolean,
+    default: true
   }
 });
 
@@ -82,48 +97,69 @@ const submitting = ref(false);
 const comments = ref<any[]>([]);
 const newCommentContent = ref('');
 
+// 分页状态
+const page = ref(1);
+const pageSize = ref(10);
+const total = ref(0);
+const hasMore = ref(false);
+const loadingMore = ref(false);
+
 // ==================== 计算属性 ====================
 const isAuthenticated = computed(() => userStore.userInfos && userStore.userInfos.id);
 
-const totalComments = computed(() => {
-  const countReplies = (comment: any): number => {
-    let count = 1;
-    if (comment.replies && comment.replies.length > 0) {
-      comment.replies.forEach((reply: any) => {
-        count += countReplies(reply);
-      });
-    }
-    return count;
-  };
-  
-  return comments.value.reduce((total, comment) => total + countReplies(comment), 0);
-});
+const totalComments = computed(() => total.value);
 
 // ==================== 方法 ====================
 /**
  * 加载评论列表
  */
-const loadComments = async () => {
+const loadComments = async (reset: boolean = true) => {
   if (!props.targetId || !props.targetType) return;
   
-  loading.value = true;
+  if (reset) {
+    loading.value = true;
+    page.value = 1;
+    comments.value = [];
+  } else {
+    loadingMore.value = true;
+  }
+  
   try {
     const { getComments } = await import('/@/api/comment');
-    const response = await getComments(props.targetId, props.targetType);
+    const response = await getComments(props.targetId, props.targetType, page.value, pageSize.value);
     
     if (response.code === 2000) {
-      comments.value = response.data || [];
+      const newComments = response.data || [];
+      
+      if (reset) {
+        comments.value = newComments;
+      } else {
+        comments.value = [...comments.value, ...newComments];
+      }
+      
+      total.value = response.total || 0;
+      hasMore.value = response.has_more || false;
     }
   } catch (error) {
-    console.error('加载评论失败:', error);
     ElMessage.error('加载评论失败');
   } finally {
     loading.value = false;
+    loadingMore.value = false;
   }
 };
 
 /**
- * 提交评论
+ * 加载更多评论
+ */
+const loadMoreComments = async () => {
+  if (loadingMore.value || !hasMore.value) return;
+  
+  page.value += 1;
+  await loadComments(false);
+};
+
+/**
+ * 提交评论（局部更新）
  */
 const submitComment = async () => {
   if (!newCommentContent.value.trim()) {
@@ -151,10 +187,20 @@ const submitComment = async () => {
           showClose: true
         });
       } else {
-        // 成功
+        // 成功：将新评论添加到列表顶部
         ElMessage.success('评论发表成功');
         newCommentContent.value = '';
-        await loadComments();
+        
+        const newComment = response.data;
+        // 初始化回复列表
+        newComment.replies = [];
+        newComment.reply_total = 0;
+        
+        // 添加到列表顶部
+        comments.value.unshift(newComment);
+        
+        // 更新总数
+        total.value += 1;
       }
     } else {
       // 其他错误
@@ -170,7 +216,7 @@ const submitComment = async () => {
 };
 
 /**
- * 处理回复
+ * 处理回复（局部更新）
  */
 const handleReply = async (data: { parentId: string; replyToId?: string; content: string }) => {
   try {
@@ -193,30 +239,54 @@ const handleReply = async (data: { parentId: string; replyToId?: string; content
           duration: 5000,
           showClose: true
         });
-        // 刷新评论列表以重置子组件状态
-        await loadComments();
-      } else {
-        // 成功
-        ElMessage.success('回复成功');
-        await loadComments();
+        return;
       }
+      
+      // 成功：局部更新，将新回复添加到对应的根评论下
+      ElMessage.success('回复成功');
+      
+      const newReply = response.data;
+      
+      // 查找根评论并添加回复
+      const addReplyToComment = (comment: any) => {
+        if (comment.id === data.parentId) {
+          // 找到根评论，添加回复
+          if (!comment.replies) {
+            comment.replies = [];
+          }
+          comment.replies.push(newReply);
+          
+          // 更新回复总数
+          if (comment.reply_total !== undefined) {
+            comment.reply_total += 1;
+          }
+          return true;
+        }
+        return false;
+      };
+      
+      // 在评论列表中查找并添加回复
+      for (const comment of comments.value) {
+        if (addReplyToComment(comment)) {
+          break;
+        }
+      }
+      
+      // 更新总评论数
+      total.value += 1;
     } else {
       // 其他错误
       ElMessage.error(response.msg || '回复失败');
-      // 刷新评论列表以重置子组件状态
-      await loadComments();
     }
   } catch (error: any) {
     // 网络错误或其他异常
     const errorMsg = error.response?.data?.msg || error.msg || '回复失败';
     ElMessage.error(errorMsg);
-    // 刷新评论列表以重置子组件状态
-    await loadComments();
   }
 };
 
 /**
- * 处理删除
+ * 处理删除（局部更新）
  */
 const handleDelete = async (commentId: string) => {
   try {
@@ -225,16 +295,43 @@ const handleDelete = async (commentId: string) => {
     
     if (response.code === 2000) {
       ElMessage.success('删除成功');
-      await loadComments();
+      
+      // 局部更新：从列表中移除评论
+      const removeComment = (commentList: any[], parentComment?: any) => {
+        const index = commentList.findIndex(c => c.id === commentId);
+        if (index !== -1) {
+          commentList.splice(index, 1);
+          
+          // 更新父评论的回复总数
+          if (parentComment && parentComment.reply_total !== undefined) {
+            parentComment.reply_total -= 1;
+          }
+          
+          // 更新总评论数
+          total.value -= 1;
+          return true;
+        }
+        
+        // 递归查找子评论
+        for (const comment of commentList) {
+          if (comment.replies && comment.replies.length > 0) {
+            if (removeComment(comment.replies, comment)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      };
+      
+      removeComment(comments.value);
     }
   } catch (error: any) {
-    console.error('删除失败:', error);
     ElMessage.error(error.msg || '删除失败');
   }
 };
 
 /**
- * 处理点赞/点踩
+ * 处理点赞/点踩（局部更新）
  */
 const handleReact = async (data: { commentId: string; action: string }) => {
   try {
@@ -242,10 +339,33 @@ const handleReact = async (data: { commentId: string; action: string }) => {
     const response = await reactComment(data.commentId, data.action);
     
     if (response.code === 2000) {
-      await loadComments();
+      // 局部更新：只更新对应评论的点赞数据
+      const updateComment = (comment: any) => {
+        if (comment.id === data.commentId) {
+          comment.like_count = response.data.like_count;
+          comment.dislike_count = response.data.dislike_count;
+          comment.my_reaction = response.data.my_reaction;
+          return true;
+        }
+        // 递归更新子评论
+        if (comment.replies && comment.replies.length > 0) {
+          for (const reply of comment.replies) {
+            if (updateComment(reply)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      };
+      
+      // 在评论列表中查找并更新
+      for (const comment of comments.value) {
+        if (updateComment(comment)) {
+          break;
+        }
+      }
     }
   } catch (error: any) {
-    console.error('操作失败:', error);
     ElMessage.error(error.msg || '操作失败');
   }
 };
@@ -397,6 +517,32 @@ export default {
   p {
     margin: 0;
     font-size: 15px;
+  }
+}
+
+.load-more-wrapper {
+  text-align: center;
+  padding: 24px 0;
+  
+  .load-more-btn {
+    padding: 10px 32px;
+    border-radius: 8px;
+    background: white;
+    border: 2px solid #f0f0f0;
+    color: #666;
+    font-size: 14px;
+    transition: all 0.3s;
+    
+    &:hover {
+      border-color: #a0522d;
+      color: #a0522d;
+      background: rgba(160, 82, 45, 0.05);
+    }
+    
+    i {
+      margin-right: 6px;
+      font-size: 16px;
+    }
   }
 }
 </style>

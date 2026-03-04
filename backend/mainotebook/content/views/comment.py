@@ -112,20 +112,25 @@ class CommentViewSet(CustomModelViewSet):
             return []
     
     def list(self, request, *args, **kwargs):
-        """获取评论列表
+        """获取评论列表（分页）
         
         支持按 target_id 和 target_type 筛选，返回树形结构。
+        使用混合排序算法，综合考虑时间、点赞数、回复数。
         
         Query Parameters:
             target_id (str): 目标 ID（必需）
             target_type (str): 目标类型（'knowledge' 或 'persona'，必需）
+            page (int): 页码（默认1）
+            page_size (int): 每页数量（默认10）
             
         Returns:
-            Response: 评论树形结构列表
+            Response: 评论树形结构列表（分页）
         """
         # 获取查询参数
         target_id = request.query_params.get('target_id')
         target_type = request.query_params.get('target_type')
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 10))
         
         # 验证必需参数
         if not target_id or not target_type:
@@ -147,18 +152,28 @@ class CommentViewSet(CustomModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # 使用服务层获取评论树形结构
+        # 使用服务层获取评论树形结构（分页，个性化）
         try:
-            root_comments = CommentService.get_comments_tree(target_id, target_type)
+            result = CommentService.get_comments_tree(
+                target_id, 
+                target_type, 
+                page, 
+                page_size,
+                user=request.user if request.user.is_authenticated else None
+            )
             
             # 序列化评论
-            serializer = self.get_serializer(root_comments, many=True)
+            serializer = self.get_serializer(result['comments'], many=True)
             
             return Response(
                 {
                     'code': 2000,
                     'msg': '获取成功',
-                    'data': serializer.data
+                    'data': serializer.data,
+                    'total': result['total'],
+                    'page': result['page'],
+                    'page_size': result['page_size'],
+                    'has_more': result['has_more']
                 },
                 status=status.HTTP_200_OK
             )
@@ -378,6 +393,53 @@ class CommentViewSet(CustomModelViewSet):
                 {
                     'code': 5000,
                     'msg': f'操作失败: {str(e)}'
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(methods=['GET'], detail=True, url_path='replies')
+    def get_replies(self, request, pk=None):
+        """获取指定评论的二级回复（分页）
+        
+        用于"展开更多回复"功能。
+        
+        Path Parameters:
+            pk (uuid): 父评论 ID
+            
+        Query Parameters:
+            page (int): 页码（默认1）
+            page_size (int): 每页数量（默认10）
+            
+        Returns:
+            Response: 回复列表（分页）
+        """
+        try:
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 10))
+            
+            # 使用服务层获取回复
+            result = CommentService.get_replies(str(pk), page, page_size)
+            
+            # 序列化回复
+            serializer = self.get_serializer(result['replies'], many=True)
+            
+            return Response(
+                {
+                    'code': 2000,
+                    'msg': '获取成功',
+                    'data': serializer.data,
+                    'total': result['total'],
+                    'page': result['page'],
+                    'page_size': result['page_size'],
+                    'has_more': result['has_more']
+                },
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {
+                    'code': 5000,
+                    'msg': f'获取回复失败: {str(e)}'
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

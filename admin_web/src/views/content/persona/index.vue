@@ -150,6 +150,24 @@
                 </div>
               </div>
             </el-tab-pane>
+
+            <!-- 评论区 -->
+            <el-tab-pane name="comments">
+              <template #label>
+                <span class="tab-label">
+                  <i class="fa fa-comments"></i>
+                  评论<span v-if="currentDetail?.comment_count" class="comment-badge">（{{ formatCommentCount(currentDetail.comment_count) }}）</span>
+                </span>
+              </template>
+              <div class="comments-content">
+                <CommentSection
+                  v-if="currentDetail?.id"
+                  :target-id="String(currentDetail.id)"
+                  target-type="persona"
+                  :show-header="false"
+                />
+              </div>
+            </el-tab-pane>
           </el-tabs>
         </div>
 
@@ -185,6 +203,7 @@ import { ElMessage } from 'element-plus';
 import { Download } from '@element-plus/icons-vue';
 import { PlazaView } from '/@/components/plaza';
 import FileViewerDialog from '/@/components/FileViewerDialog.vue';
+import CommentSection from '/@/components/CommentSection.vue';
 import * as api from './api';
 
 // 状态管理
@@ -432,6 +451,13 @@ const formatFileSize = (bytes: number): string => {
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+};
+
+// 格式化评论数量
+const formatCommentCount = (count: number): string => {
+  if (!count) return '0';
+  if (count > 999) return '999+';
+  return count.toString();
 };
 
 // 加载右侧卡片数据
@@ -885,6 +911,19 @@ export default {
         color: #a0522d;
       }
     }
+  }
+}
+
+// 评论区内容
+.comments-content {
+  padding: 0;
+  
+  :deep(.comment-section) {
+    margin-top: 0;
+    padding: 24px 32px 32px;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
   }
 }
 </style>

@@ -1,15 +1,31 @@
 import { request } from '/@/utils/service';
 
 /**
- * 获取评论列表
+ * 获取评论列表（支持分页）
  */
-export function getComments(targetId: string, targetType: string) {
+export function getComments(targetId: string, targetType: string, page: number = 1, pageSize: number = 10) {
 	return request({
 		url: '/api/content/comments/',
 		method: 'get',
 		params: {
 			target_id: targetId,
-			target_type: targetType
+			target_type: targetType,
+			page,
+			page_size: pageSize
+		}
+	});
+}
+
+/**
+ * 获取指定评论的二级回复（分页）
+ */
+export function getReplies(commentId: string, page: number = 1, pageSize: number = 10) {
+	return request({
+		url: `/api/content/comments/${commentId}/replies/`,
+		method: 'get',
+		params: {
+			page,
+			page_size: pageSize
 		}
 	});
 }

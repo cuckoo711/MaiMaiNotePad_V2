@@ -299,9 +299,43 @@ const handleReply = async () => {
     font-size: 14px;
     line-height: 1.8;
     color: var(--el-text-color-regular);
+    min-height: 100px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 12px;
+    background: var(--el-fill-color-blank);
+    border-radius: 4px;
+    border: 1px solid var(--el-border-color-lighter);
+    
+    /* 自定义滚动条样式 */
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    &::-webkit-scrollbar-track {
+      background: var(--el-fill-color-light);
+      border-radius: 3px;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background: var(--el-border-color);
+      border-radius: 3px;
+      
+      &:hover {
+        background: var(--el-border-color-dark);
+      }
+    }
     
     :deep(p) {
       margin: 8px 0;
+      
+      &:first-child {
+        margin-top: 0;
+      }
+      
+      &:last-child {
+        margin-bottom: 0;
+      }
     }
     
     :deep(img) {

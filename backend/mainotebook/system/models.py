@@ -788,3 +788,66 @@ class DownloadCenter(CoreModel):
         verbose_name = "下载中心"
         verbose_name_plural = verbose_name
         ordering = ("-create_datetime",)
+
+
+class UserNotificationPreference(CoreModel):
+    """用户通知偏好设置
+    
+    记录用户对不同类型消息的通知偏好，支持免打扰功能。
+    当某类消息被设置为免打扰时，新消息会自动标记为已读。
+    
+    注意：系统通知（0）和审核通知（4）不可设置免打扰。
+    
+    Attributes:
+        user: 用户（外键）
+        message_type: 消息类型（1=评论, 2=回复, 3=点赞）
+        is_muted: 是否免打扰
+        muted_at: 设置免打扰的时间
+    """
+    
+    user = models.ForeignKey(
+        to='Users',
+        on_delete=models.CASCADE,
+        verbose_name='用户',
+        db_constraint=False,
+        related_name='notification_preferences'
+    )
+    
+    message_type = models.IntegerField(
+        verbose_name='消息类型',
+        help_text='1=评论, 2=回复, 3=点赞',
+        db_index=True
+    )
+    
+    is_muted = models.BooleanField(
+        default=False,
+        verbose_name='是否免打扰',
+        help_text='开启后，该类型的新消息会自动标记为已读'
+    )
+    
+    muted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='设置免打扰时间',
+        help_text='最后一次设置免打扰的时间'
+    )
+    
+    class Meta:
+        db_table = table_prefix + 'system_user_notification_preference'
+        verbose_name = '用户通知偏好'
+        verbose_name_plural = verbose_name
+        ordering = ['-create_datetime']
+        unique_together = [['user', 'message_type']]
+        indexes = [
+            models.Index(fields=['user', 'message_type']),
+            models.Index(fields=['user', 'is_muted']),
+        ]
+    
+    def __str__(self):
+        type_names = {
+            1: '评论',
+            2: '回复',
+            3: '点赞'
+        }
+        status = '免打扰' if self.is_muted else '正常'
+        return f"{self.user.name} - {type_names.get(self.message_type, '未知')} - {status}"

@@ -7,6 +7,7 @@
 .message-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 16px;
   background: var(--el-bg-color);
   padding: 0 20px;
@@ -39,6 +40,25 @@
   
   :deep(.el-tabs__active-bar) {
     height: 2px;
+  }
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.mute-settings-icon {
+  font-size: 20px;
+  color: var(--el-text-color-regular);
+  cursor: pointer;
+  transition: all 0.3s;
+  
+  &:hover {
+    color: var(--el-color-primary);
+    transform: rotate(90deg);
   }
 }
 
@@ -149,4 +169,51 @@
   text-align: center;
   color: var(--el-text-color-placeholder);
   font-size: 13px;
+}
+
+// 免打扰设置对话框样式
+.mute-settings-content {
+  .mute-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    background: var(--el-fill-color-lighter);
+    transition: all 0.3s;
+    
+    &:hover {
+      background: var(--el-fill-color-light);
+    }
+    
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+  
+  .mute-item-info {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .mute-item-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--el-text-color-primary);
+    margin-bottom: 4px;
+    
+    .el-icon {
+      font-size: 18px;
+    }
+  }
+  
+  .mute-item-desc {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+    padding-left: 26px;
+  }
 }

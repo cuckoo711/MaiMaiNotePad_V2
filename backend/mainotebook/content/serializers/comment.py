@@ -40,6 +40,9 @@ class CommentSerializer(CustomModelSerializer):
     my_reaction = serializers.SerializerMethodField(
         help_text="当前用户的反应类型（like/dislike/null）"
     )
+    reply_total = serializers.SerializerMethodField(
+        help_text="二级回复总数"
+    )
     
     class Meta:
         model = Comment
@@ -48,7 +51,8 @@ class CommentSerializer(CustomModelSerializer):
             'target_type', 'parent', 'reply_to', 'reply_to_name',
             'content', 'is_deleted', 'moderation_status',
             'like_count', 'dislike_count', 'create_datetime',
-            'update_datetime', 'replies', 'is_liked', 'my_reaction'
+            'update_datetime', 'replies', 'is_liked', 'my_reaction',
+            'reply_total'
         ]
         read_only_fields = [
             'id', 'like_count', 'dislike_count', 'moderation_status',
@@ -149,6 +153,26 @@ class CommentSerializer(CustomModelSerializer):
             if reaction:
                 return reaction.reaction_type
         return None
+    
+    def get_reply_total(self, obj):
+        """获取二级回复总数
+        
+        Args:
+            obj: Comment 实例
+            
+        Returns:
+            int: 回复总数
+        """
+        # 如果服务层已经设置了 _reply_total，直接使用
+        if hasattr(obj, '_reply_total'):
+            return obj._reply_total
+        # 否则查询数据库
+        return Comment.objects.filter(
+            parent_id=obj.id,
+            is_deleted=False,
+        ).exclude(
+            moderation_status='rejected',
+        ).count()
 
 
 class CommentCreateSerializer(CustomModelSerializer):

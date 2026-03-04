@@ -19,7 +19,7 @@ from rest_framework import serializers
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 
-from mainotebook.system.models import MessageCenter, Users, MessageCenterTargetUser
+from mainotebook.system.models import MessageCenter, Users, MessageCenterTargetUser, UserNotificationPreference
 from mainotebook.utils.json_response import SuccessResponse, DetailResponse
 from mainotebook.utils.serializers import CustomModelSerializer
 from mainotebook.utils.viewset import CustomModelViewSet
@@ -117,6 +117,36 @@ class MessageCenterTargetUserListSerializer(CustomModelSerializer):
         read_only_fields = ["id"]
 
 
+class MessageCenterDetailSerializer(CustomModelSerializer):
+    """消息详情-序列化器（用户端，用于 retrieve 获取完整内容）
+    
+    与列表序列化器的区别：
+    - 返回完整的 content 字段，不进行截断
+    - 返回完整的 extra_data 字段
+    - 用于消息详情弹窗展示
+    """
+    is_read = serializers.SerializerMethodField()
+
+    def get_is_read(self, instance):
+        """获取当前用户对该消息的已读状态
+        
+        中间表无记录时视为未读（懒创建模式）
+        """
+        user_id = self.request.user.id
+        record = MessageCenterTargetUser.objects.filter(
+            messagecenter__id=instance.id, users_id=user_id
+        ).first()
+        return record.is_read if record else False
+
+    class Meta:
+        model = MessageCenter
+        fields = [
+            'id', 'title', 'content', 'message_type', 'target_type',
+            'create_datetime', 'update_datetime', 'extra_data', 'is_read'
+        ]
+        read_only_fields = ["id"]
+
+
 def websocket_push(user_id, message):
     """通过 WebSocket 向指定用户推送消息
     
@@ -158,27 +188,58 @@ class MessageCenterCreateSerializer(CustomModelSerializer):
     """
 
     def save(self, **kwargs):
-        """保存消息并根据 target_type 执行不同的投递策略"""
+        """保存消息并根据 target_type 执行不同的投递策略
+        
+        创建消息时会检查用户的免打扰偏好：
+        - 如果用户对该类型消息设置了免打扰，则自动标记为已读
+        - 系统通知（message_type=0）不受免打扰影响
+        """
         data = super().save(**kwargs)
         initial_data = self.initial_data
         target_type = initial_data.get('target_type')
+        message_type = initial_data.get('message_type', 0)
         ws_message = {"sender": "system", "contentType": "SYSTEM",
                       "content": "您有一条新消息~", "unread": 1}
 
         if target_type == 0:
             # 指定用户：写入中间表并逐个推送
             users = initial_data.get('target_user', [])
-            targetuser_data = [{"messagecenter": data.id, "users": uid} for uid in users]
+            
+            # 查询这些用户中哪些设置了该类型消息的免打扰
+            muted_users = set()
+            if message_type not in [0, 4]:  # 系统通知和审核通知不受免打扰影响
+                muted_prefs = UserNotificationPreference.objects.filter(
+                    user_id__in=users,
+                    message_type=message_type,
+                    is_muted=True
+                ).values_list('user_id', flat=True)
+                muted_users = set(muted_prefs)
+            
+            # 为所有用户创建中间表记录
+            targetuser_data = []
+            for uid in users:
+                # 如果用户设置了免打扰，直接标记为已读
+                is_read = uid in muted_users
+                targetuser_data.append({
+                    "messagecenter": data.id,
+                    "users": uid,
+                    "is_read": is_read
+                })
+            
             targetuser_instance = MessageCenterTargetUserSerializer(
                 data=targetuser_data, many=True, request=self.request
             )
             targetuser_instance.is_valid(raise_exception=True)
             targetuser_instance.save()
+            
+            # 推送 WebSocket 通知（只推送给未免打扰的用户）
             for uid in users:
-                unread_count = MessageCenterTargetUser.objects.filter(
-                    users__id=uid, is_read=False
-                ).count()
-                websocket_push(uid, message={**ws_message, "unread": unread_count})
+                if uid not in muted_users:
+                    unread_count = MessageCenterTargetUser.objects.filter(
+                        users__id=uid, is_read=False
+                    ).count()
+                    websocket_push(uid, message={**ws_message, "unread": unread_count})
+                    
         elif target_type == 1:
             # 按角色：不写中间表，推送给角色下的在线用户
             target_role = initial_data.get('target_role', [])
@@ -186,6 +247,7 @@ class MessageCenterCreateSerializer(CustomModelSerializer):
                 role__id__in=target_role
             ).values_list('id', flat=True).distinct()
             _broadcast_websocket(user_ids, ws_message)
+            
         elif target_type == 2:
             # 按部门：不写中间表，推送给部门下的在线用户
             target_dept = initial_data.get('target_dept', [])
@@ -193,6 +255,7 @@ class MessageCenterCreateSerializer(CustomModelSerializer):
                 dept__id__in=target_dept
             ).values_list('id', flat=True).distinct()
             _broadcast_websocket(user_ids, ws_message)
+            
         elif target_type == 3:
             # 系统通知：不写中间表，广播所有在线用户
             user_ids = Users.objects.values_list('id', flat=True)
@@ -241,7 +304,9 @@ class MessageCenterViewSet(CustomModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         """查看消息详情并标记已读
         
-        所有类型的消息统一采用懒创建：用户首次查看时创建中间表记录并标记已读
+        所有类型的消息统一采用懒创建：用户首次查看时创建中间表记录并标记已读。
+        如果用户对该类型消息设置了免打扰，懒创建时也会自动标记为已读。
+        使用 MessageCenterDetailSerializer 返回完整的消息内容。
         """
         pk = kwargs.get('pk')
         user_id = self.request.user.id
@@ -251,17 +316,31 @@ class MessageCenterViewSet(CustomModelViewSet):
         target_record = MessageCenterTargetUser.objects.filter(
             users__id=user_id, messagecenter__id=pk
         ).first()
+        
         if target_record:
             if not target_record.is_read:
                 target_record.is_read = True
                 target_record.save()
         else:
             # 懒创建：用户首次查看该消息
+            # 检查用户是否对该类型消息设置了免打扰
+            # 系统通知(0)和审核通知(4)不受免打扰影响
+            is_muted = False
+            if instance.message_type not in [0, 4]:
+                is_muted = UserNotificationPreference.objects.filter(
+                    user_id=user_id,
+                    message_type=instance.message_type,
+                    is_muted=True
+                ).exists()
+            
             MessageCenterTargetUser.objects.create(
-                users_id=user_id, messagecenter_id=pk, is_read=True
+                users_id=user_id,
+                messagecenter_id=pk,
+                is_read=True  # 查看时总是标记为已读
             )
 
-        serializer = self.get_serializer(instance)
+        # 使用详情序列化器返回完整内容
+        serializer = MessageCenterDetailSerializer(instance, request=request)
 
         # 计算未读数：中间表中的未读 + 没有中间表记录的群发消息
         read_msg_ids = set(MessageCenterTargetUser.objects.filter(
@@ -370,6 +449,86 @@ class MessageCenterViewSet(CustomModelViewSet):
         })
         
         return DetailResponse(data={"count": len(visible_msg_ids)}, msg="全部已读成功")
+
+    @action(methods=['POST'], detail=False, permission_classes=[IsAuthenticated])
+    def mark_type_read(self, request):
+        """标记指定类型的消息为已读
+        
+        用于批量标记某一类型的消息（如点赞通知）为已读。
+        
+        Request Body:
+            message_type (int): 消息类型（0=系统通知, 1=评论, 2=回复, 3=点赞, 4=审核）
+            
+        Returns:
+            Response: 标记成功的消息数量
+        """
+        user_id = self.request.user.id
+        message_type = request.data.get('message_type')
+        
+        if message_type is None:
+            return ErrorResponse(msg="缺少 message_type 参数")
+        
+        try:
+            message_type = int(message_type)
+        except (ValueError, TypeError):
+            return ErrorResponse(msg="message_type 必须是整数")
+        
+        # 获取用户可见的指定类型消息
+        visible_messages = self._get_user_visible_queryset(user_id).filter(
+            message_type=message_type
+        )
+        visible_msg_ids = list(visible_messages.values_list('id', flat=True))
+        
+        if not visible_msg_ids:
+            return DetailResponse(data={"count": 0}, msg="没有需要标记的消息")
+        
+        # 获取已有的中间表记录
+        existing_records = MessageCenterTargetUser.objects.filter(
+            users_id=user_id,
+            messagecenter_id__in=visible_msg_ids
+        )
+        
+        # 更新已有记录为已读
+        existing_records.update(is_read=True)
+        
+        # 找出没有中间表记录的消息
+        existing_msg_ids = set(existing_records.values_list('messagecenter_id', flat=True))
+        missing_msg_ids = set(visible_msg_ids) - existing_msg_ids
+        
+        # 为缺失的消息创建已读记录
+        if missing_msg_ids:
+            new_records = [
+                MessageCenterTargetUser(
+                    users_id=user_id,
+                    messagecenter_id=msg_id,
+                    is_read=True
+                )
+                for msg_id in missing_msg_ids
+            ]
+            MessageCenterTargetUser.objects.bulk_create(new_records)
+        
+        # 消息类型名称映射
+        type_names = {
+            0: '系统通知',
+            1: '评论',
+            2: '回复',
+            3: '点赞',
+            4: '审核'
+        }
+        type_name = type_names.get(message_type, '未知类型')
+        
+        # 推送 WebSocket 通知
+        websocket_push(user_id, message={
+            "sender": "system",
+            "contentType": "TEXT",
+            "content": f"所有{type_name}消息已标记为已读",
+            "unread": 0
+        })
+        
+        return DetailResponse(
+            data={"count": len(visible_msg_ids), "message_type": message_type},
+            msg=f"{type_name}消息已全部标记为已读"
+        )
 
     @staticmethod
     def _get_user_visible_queryset(user_id):

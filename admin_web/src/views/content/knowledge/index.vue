@@ -153,6 +153,7 @@
                   v-if="currentDetail?.id"
                   :target-id="currentDetail.id"
                   target-type="knowledge"
+                  :show-header="false"
                 />
               </div>
             </el-tab-pane>
