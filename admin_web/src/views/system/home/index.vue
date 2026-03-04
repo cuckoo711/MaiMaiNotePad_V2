@@ -140,6 +140,9 @@ interface NewsItem {
 
 export default defineComponent({
 	name: 'home',
+	components: {
+		MessageDetailDialog,
+	},
 	setup() {
     const userInfo = useUserInfo();
 		const homeLineRef = ref();

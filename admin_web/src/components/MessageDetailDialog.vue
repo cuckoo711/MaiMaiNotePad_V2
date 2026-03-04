@@ -175,8 +175,33 @@ const handleReply = async () => {
   }
   
   const extraData = props.message?.extra_data;
-  if (!extraData?.comment_id || !extraData?.target_id || !extraData?.target_type) {
+  if (!extraData?.target_id || !extraData?.target_type) {
     ElMessage.error('无法获取评论信息');
+    return;
+  }
+  
+  // 确定 parent 和 reply_to：
+  // - parent: 用于维护两层树形结构，始终指向根评论
+  // - reply_to: 用于记录真正回复的是哪条评论（显示"回复 @xxx"）
+  let parentId = null;
+  let replyToId = null;
+  
+  if (props.message?.message_type === 2 && extraData.reply_id) {
+    // 回复通知：有人回复了你的评论
+    // parent: 使用 root_comment_id（如果有）或 comment_id（你的评论）
+    // reply_to: 使用 reply_id（回复你的那条评论）
+    parentId = extraData.root_comment_id || extraData.comment_id;
+    replyToId = extraData.reply_id;
+  } else if (props.message?.message_type === 1 && extraData.comment_id) {
+    // 评论通知：有人评论了你的内容
+    // parent: 使用 comment_id（那条一级评论）
+    // reply_to: 也使用 comment_id（回复那条评论）
+    parentId = extraData.comment_id;
+    replyToId = extraData.comment_id;
+  }
+  
+  if (!parentId) {
+    ElMessage.error('无法确定回复目标');
     return;
   }
   
@@ -189,20 +214,54 @@ const handleReply = async () => {
         target_id: extraData.target_id,
         target_type: extraData.target_type,
         content: replyContent.value.trim(),
-        parent: extraData.comment_id
+        parent: parentId,
+        reply_to: replyToId
       }
     });
     
     if (response && response.code === 2000) {
+      // 检查是否审核失败
+      if (response.data?.moderation_failed || response.data?.success === false) {
+        // 审核失败，显示具体的错误消息
+        const errorMsg = response.data?.error_message || '评论未通过审核';
+        
+        // 使用 nextTick 确保在下一个事件循环中显示消息，避免与对话框状态冲突
+        await new Promise(resolve => setTimeout(resolve, 0));
+        ElMessage.error(errorMsg);
+        return; // 不关闭弹窗，让用户可以修改内容重新提交
+      }
+      
+      // 真正的成功
       ElMessage.success('回复成功');
       replyContent.value = '';
       // 关闭弹窗
       visible.value = false;
     } else {
-      ElMessage.error(response?.msg || '回复失败');
+      // 处理非成功响应
+      const errorMsg = response?.msg || response?.message || '回复失败';
+      ElMessage.error(errorMsg);
     }
   } catch (error: any) {
-    ElMessage.error(error?.msg || error?.message || '回复失败');
+    // 处理异常情况
+    
+    // 优先使用后端返回的错误消息
+    let errorMsg = '回复失败';
+    
+    if (error?.msg) {
+      // 后端返回的标准错误格式
+      errorMsg = error.msg;
+    } else if (error?.response?.data?.msg) {
+      // axios 错误响应中的消息
+      errorMsg = error.response.data.msg;
+    } else if (error?.response?.data?.message) {
+      // 另一种可能的错误格式
+      errorMsg = error.response.data.message;
+    } else if (error?.message) {
+      // JavaScript 错误对象
+      errorMsg = error.message;
+    }
+    
+    ElMessage.error(errorMsg);
   } finally {
     replying.value = false;
   }
