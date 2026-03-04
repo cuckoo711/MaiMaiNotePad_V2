@@ -56,7 +56,7 @@ export const commonCrudConfig = (options: CrudOptions = {}) => {
 	// ② 用 merged 中的值生成真正的 CRUD 配置
 	return {
 		dept_belong_id: {
-			title: '所属部门',
+			title: '所属用户组',
 			type: 'dict-tree',
 			search: {
 				show: merged.dept_belong_id.search,
@@ -91,7 +91,7 @@ export const commonCrudConfig = (options: CrudOptions = {}) => {
 						},
 					},
 				},
-				helper: '默认不填则为当前创建用户的部门ID',
+				helper: '默认不填则为当前创建用户的用户组ID',
 			},
 		},
 		description: {

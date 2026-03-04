@@ -82,7 +82,7 @@ const handleTreeClick = (record: MenuTreeItemType) => {
 };
 
 /**
- * 部门的 新增 or 编辑 事件
+ * 用户组的 新增 or 编辑 事件
  */
 const handleUpdateMenu = (type: string, record?: MenuTreeItemType) => {
 	if (type === 'update' && record) {
@@ -101,7 +101,7 @@ const handleDrawerClose = (type?: string) => {
 };
 
 /**
- * 部门的删除事件
+ * 用户组的删除事件
  */
 const handleDeleteMenu = (id: string, callback: Function) => {
 	ElMessageBox.confirm('您确认删除该菜单项吗?', '温馨提示', {

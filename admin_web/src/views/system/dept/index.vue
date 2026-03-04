@@ -20,7 +20,7 @@
 			</el-col>
 		</el-row>
 
-		<el-drawer v-model="drawerVisible" title="部门配置" direction="rtl" size="500px" :close-on-click-modal="false" :before-close="handleDrawerClose">
+		<el-drawer v-model="drawerVisible" title="用户组配置" direction="rtl" size="500px" :close-on-click-modal="false" :before-close="handleDrawerClose">
 			<DeptFormCom
 				v-if="drawerVisible"
 				:initFormData="drawerFormData"
@@ -65,17 +65,17 @@ const getData = async () => {
 };
 
 /**
- * 部门的点击事件
+ * 用户组的点击事件
  */
 const handleTreeClick = (record: TreeItemType) => {
 	deptUserRef.value?.handleDoRefreshUser(record.id as string);
 };
 
 /**
- * 部门的删除事件
+ * 用户组的删除事件
  */
 const handleDeleteMenu = (id: string, callback: Function) => {
-	ElMessageBox.confirm('您确认删除该部门吗?', '温馨提示', {
+	ElMessageBox.confirm('您确认删除该用户组吗?', '温馨提示', {
 		confirmButtonText: '确认',
 		cancelButtonText: '取消',
 		type: 'warning',
@@ -91,7 +91,7 @@ const handleDeleteMenu = (id: string, callback: Function) => {
 };
 
 /**
- * 部门的 新增 or 编辑 事件
+ * 用户组的 新增 or 编辑 事件
  */
 const handleUpdateMenu = (type: string, record?: TreeItemType) => {
 	if (type === 'update' && record) {

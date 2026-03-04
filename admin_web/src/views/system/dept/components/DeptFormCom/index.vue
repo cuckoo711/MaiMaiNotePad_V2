@@ -1,6 +1,6 @@
 <template>
 	<el-form ref="formRef" :rules="rules" :model="deptFormData" label-width="100px" label-position="right" class="dept-form-com">
-		<el-form-item label="父级部门" prop="parent">
+		<el-form-item label="父级用户组" prop="parent">
 			<el-tree-select
 				v-model="deptFormData.parent"
 				:props="defaultTreeProps"
@@ -12,10 +12,10 @@
 				style="width: 100%"
 			/>
 		</el-form-item>
-		<el-form-item required label="部门名称" prop="name">
+		<el-form-item required label="用户组名称" prop="name">
 			<el-input v-model="deptFormData.name" />
 		</el-form-item>
-		<el-form-item required label="部门标识" prop="key">
+		<el-form-item required label="用户组标识" prop="key">
 			<el-input v-model="deptFormData.key" />
 		</el-form-item>
 		<el-form-item label="负责人">
@@ -62,8 +62,8 @@ const defaultTreeProps: any = {
 
 const formRef = ref<InstanceType<typeof ElForm>>();
 const rules = reactive<FormRules>({
-	name: [{ required: true, message: '部门名称必填', trigger: 'blur' }],
-	key: [{ required: true, message: '部门标识必填', trigger: 'blur' }],
+	name: [{ required: true, message: '用户组名称必填', trigger: 'blur' }],
+	key: [{ required: true, message: '用户组标识必填', trigger: 'blur' }],
 });
 
 const props = withDefaults(defineProps<IProps>(), {

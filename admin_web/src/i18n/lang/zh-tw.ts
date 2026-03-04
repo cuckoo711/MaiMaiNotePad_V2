@@ -56,7 +56,7 @@ export default {
     searchPlaceholder: '菜單搜索：支持中文、路由路徑',
     newTitle: '通知',
     newBtn: '全部已讀',
-    newGo: '前往通知中心',
+    newGo: '查看全部消息',
     newDesc: '暫無通知',
     logOutTitle: '提示',
     logOutMessage: '此操作將退出登錄, 是否繼續?',

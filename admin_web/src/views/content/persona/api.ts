@@ -53,6 +53,27 @@ export function downloadPersonaFile(id: string, fileId: string) {
 }
 
 /**
+ * 预览人设卡文件（获取文本内容）
+ */
+export function previewPersonaFile(id: string, fileId: string) {
+	return request({
+		url: `/api/content/persona/${id}/files/${fileId}/`,
+		method: 'get',
+		responseType: 'blob',
+	});
+}
+
+/**
+ * 解析人设卡 TOML 文件（获取结构化数据）
+ */
+export function parsePersonaToml(id: string, fileId: string) {
+	return request({
+		url: `/api/content/persona/${id}/files/${fileId}/parse/`,
+		method: 'get',
+	});
+}
+
+/**
  * 获取热门标签
  */
 export function getPopularTags(limit: number = 20, tagType: string = 'persona') {

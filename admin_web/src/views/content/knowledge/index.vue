@@ -14,92 +14,183 @@
       @toggle-star="toggleStar"
     />
 
-    <!-- 详情弹窗 -->
-    <el-dialog
+    <!-- 详情抽屉 -->
+    <el-drawer
       v-model="detailVisible"
-      :title="currentDetail?.name"
-      width="800px"
-      class="detail-dialog"
+      direction="rtl"
+      size="50%"
+      :with-header="false"
+      destroy-on-close
+      class="knowledge-detail-drawer"
     >
-    <div v-if="currentDetail" class="detail-content">
-      <el-tabs v-model="activeTab">
-        <!-- 基本信息 -->
-        <el-tab-pane label="基本信息" name="info">
-          <div class="info-section">
-            <div class="info-row">
-              <span class="info-label">知识库名称:</span>
-              <span class="info-value">{{ currentDetail.name }}</span>
+      <div v-if="currentDetail" class="drawer-container">
+        <!-- 自定义头部 -->
+        <div class="drawer-header">
+          <div class="header-content">
+            <div class="title-section">
+              <h2 class="drawer-title">{{ currentDetail?.name || '知识库详情' }}</h2>
             </div>
-            <div class="info-row">
-              <span class="info-label">上传者:</span>
-              <span class="info-value">{{ currentDetail.uploader_name || '匿名' }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">版权所有者:</span>
-              <span class="info-value">{{ currentDetail.copyright_owner || '未知' }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">下载次数:</span>
-              <span class="info-value">{{ currentDetail.downloads || 0 }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">收藏数:</span>
-              <span class="info-value">{{ currentDetail.star_count || 0 }}</span>
-            </div>
-            <div class="info-row full-width">
-              <span class="info-label">描述:</span>
-              <div class="info-value">{{ currentDetail.description || '暂无描述' }}</div>
-            </div>
-            <div class="info-row full-width" v-if="currentDetail.content">
-              <span class="info-label">内容:</span>
-              <div class="info-value content-text">{{ currentDetail.content }}</div>
+            <div class="header-meta">
+              <span class="meta-item">
+                <i class="fa fa-user"></i>
+                {{ currentDetail.uploader_name || '匿名' }}
+              </span>
+              <span class="meta-item">
+                <i class="fa fa-download"></i>
+                {{ currentDetail.downloads || 0 }} 次下载
+              </span>
+              <span class="meta-item">
+                <i class="fa fa-star"></i>
+                {{ currentDetail.star_count || 0 }} 次收藏
+              </span>
             </div>
           </div>
-        </el-tab-pane>
+        </div>
 
-        <!-- 文件列表 -->
-        <el-tab-pane label="文件列表" name="files">
-          <div class="files-list">
-            <div 
-              v-for="file in currentDetail.files" 
-              :key="file.id" 
-              class="file-item"
-            >
-              <div class="file-info">
-                <i class="fa fa-file-o"></i>
-                <span class="file-name">{{ file.original_name }}</span>
-                <span class="file-size">{{ formatFileSize(file.file_size) }}</span>
+        <!-- 内容区域 -->
+        <div class="drawer-body">
+          <el-tabs v-model="activeTab" class="detail-tabs">
+            <!-- 基本信息 -->
+            <el-tab-pane name="info">
+              <template #label>
+                <span class="tab-label">
+                  <i class="fa fa-info-circle"></i>
+                  基本信息
+                </span>
+              </template>
+              <div class="info-content">
+                <!-- 描述卡片 -->
+                <div class="info-card description-card">
+                  <h3 class="card-title">
+                    <i class="fa fa-align-left"></i>
+                    描述
+                  </h3>
+                  <p class="description-text">
+                    {{ currentDetail.description || '暂无描述' }}
+                  </p>
+                </div>
+
+                <!-- 详细信息卡片 -->
+                <div class="info-card details-card">
+                  <h3 class="card-title">
+                    <i class="fa fa-list-ul"></i>
+                    详细信息
+                  </h3>
+                  <div class="details-grid">
+                    <div class="detail-item">
+                      <span class="detail-label">版权所有者</span>
+                      <span class="detail-value">{{ currentDetail.copyright_owner || '未知' }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 内容卡片 -->
+                <div v-if="currentDetail.content" class="info-card content-card">
+                  <h3 class="card-title">
+                    <i class="fa fa-file-text-o"></i>
+                    内容
+                  </h3>
+                  <div class="content-text">{{ currentDetail.content }}</div>
+                </div>
               </div>
-              <el-button size="small" type="primary" @click="downloadFile(file)">
-                <i class="fa fa-download"></i> 下载
-              </el-button>
-            </div>
-            <div v-if="!currentDetail.files || currentDetail.files.length === 0" class="empty-files">
-              <i class="fa fa-folder-open-o"></i>
-              <p>暂无文件</p>
-            </div>
-          </div>
-        </el-tab-pane>
-      </el-tabs>
-    </div>
+            </el-tab-pane>
 
-    <template #footer>
-      <div class="dialog-footer">
-        <el-button @click="detailVisible = false">关闭</el-button>
-        <el-button type="primary" @click="handleStar">
-          <i class="fa" :class="currentDetail?.is_starred ? 'fa-star' : 'fa-star-o'"></i>
-          {{ currentDetail?.is_starred ? '取消收藏' : '收藏' }}
-        </el-button>
+            <!-- 文件列表 -->
+            <el-tab-pane name="files">
+              <template #label>
+                <span class="tab-label">
+                  <i class="fa fa-folder-open"></i>
+                  文件列表<span v-if="currentDetail.files && currentDetail.files.length" class="file-count">（{{ currentDetail.files.length }}）</span>
+                </span>
+              </template>
+              <div class="files-content">
+                <div v-if="currentDetail.files && currentDetail.files.length" class="files-grid">
+                  <div 
+                    v-for="file in currentDetail.files" 
+                    :key="file.id" 
+                    class="file-card"
+                    @click="previewFile(file)"
+                  >
+                    <div class="file-icon">
+                      <i class="fa fa-file-o"></i>
+                    </div>
+                    <div class="file-info">
+                      <div class="file-name" :title="file.original_name">
+                        {{ file.original_name }}
+                      </div>
+                      <div class="file-meta">
+                        <span class="file-size">{{ formatFileSize(file.file_size) }}</span>
+                      </div>
+                    </div>
+                    <el-tooltip content="下载" placement="top">
+                      <el-icon 
+                        class="download-btn"
+                        :size="20"
+                        @click.stop="downloadFile(file)"
+                      >
+                        <Download />
+                      </el-icon>
+                    </el-tooltip>
+                  </div>
+                </div>
+                <div v-else class="empty-state">
+                  <i class="fa fa-folder-open-o"></i>
+                  <p>暂无文件</p>
+                </div>
+              </div>
+            </el-tab-pane>
+
+            <!-- 评论区 -->
+            <el-tab-pane name="comments">
+              <template #label>
+                <span class="tab-label">
+                  <i class="fa fa-comments"></i>
+                  评论<span v-if="currentDetail?.comment_count" class="comment-badge">（{{ formatCommentCount(currentDetail.comment_count) }}）</span>
+                </span>
+              </template>
+              <div class="comments-content">
+                <CommentSection
+                  v-if="currentDetail?.id"
+                  :target-id="currentDetail.id"
+                  target-type="knowledge"
+                />
+              </div>
+            </el-tab-pane>
+          </el-tabs>
+        </div>
+
+        <!-- 底部操作栏 -->
+        <div class="drawer-footer">
+          <el-button 
+            type="primary" 
+            size="large"
+            @click="handleStar"
+          >
+            <i class="fa" :class="currentDetail?.is_starred ? 'fa-star' : 'fa-star-o'"></i>
+            {{ currentDetail?.is_starred ? '取消收藏' : '收藏' }}
+          </el-button>
+        </div>
       </div>
-    </template>
-    </el-dialog>
+    </el-drawer>
+
+    <!-- 文件预览对话框 -->
+    <KnowledgeFileViewer
+      v-model:visible="fileViewerVisible"
+      :file-name="currentFile?.original_name"
+      :knowledge-id="currentDetail?.id"
+      :file-id="currentFile?.id"
+      @download="handleFileDownload"
+    />
   </div>
 </template>
 
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
+import { Download } from '@element-plus/icons-vue';
 import { PlazaView } from '/@/components/plaza';
+import KnowledgeFileViewer from '/@/components/KnowledgeFileViewer.vue';
+import CommentSection from '/@/components/CommentSection.vue';
 import * as api from './api';
 
 // 状态管理
@@ -111,6 +202,10 @@ const total = ref(0);
 const detailVisible = ref(false);
 const currentDetail = ref<any>(null);
 const activeTab = ref('info');
+
+// 文件预览
+const fileViewerVisible = ref(false);
+const currentFile = ref<any>(null);
 
 // 热门标签
 const popularTags = ref<string[]>([]);
@@ -299,6 +394,19 @@ const downloadFile = async (file: any) => {
   }
 };
 
+// 预览文件
+const previewFile = (file: any) => {
+  currentFile.value = file;
+  fileViewerVisible.value = true;
+};
+
+// 处理文件下载（从预览组件触发）
+const handleFileDownload = () => {
+  if (currentFile.value) {
+    downloadFile(currentFile.value);
+  }
+};
+
 // 格式化文件大小
 const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 B';
@@ -306,6 +414,13 @@ const formatFileSize = (bytes: number): string => {
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+};
+
+// 格式化评论数量
+const formatCommentCount = (count: number): string => {
+  if (!count) return '0';
+  if (count > 999) return '999+';
+  return count.toString();
 };
 
 // 加载右侧卡片数据
@@ -371,94 +486,404 @@ export default {
   height: 100%;
 }
 
-// 详情弹窗样式
-.detail-dialog {
-  .detail-content {
-    .info-section {
-      .info-row {
-        display: flex;
-        padding: 12px 0;
-        border-bottom: 1px solid #f0f0f0;
+// 抽屉整体样式
+.knowledge-detail-drawer {
+  :deep(.el-drawer) {
+    border-radius: 0;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
+  }
 
-        &.full-width {
-          flex-direction: column;
+  :deep(.el-drawer__body) {
+    padding: 0;
+    overflow: hidden;
+  }
+}
 
-          .info-value {
-            margin-top: 8px;
-          }
-        }
+// 抽屉容器
+.drawer-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(to bottom, #fafafa 0%, #ffffff 100px);
+}
 
-        .info-label {
-          width: 120px;
-          color: #666;
-          flex-shrink: 0;
-        }
+// 自定义头部 - 使用橙棕色渐变
+.drawer-header {
+  position: relative;
+  padding: 32px 32px 24px;
+  background: linear-gradient(135deg, #d4a574 0%, #a0522d 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(212, 165, 116, 0.15);
 
-        .info-value {
-          flex: 1;
-          color: #333;
+  .header-content {
+    width: 100%;
+  }
 
-          &.content-text {
-            white-space: pre-wrap;
-            line-height: 1.6;
-          }
-        }
+  .title-section {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+
+    .drawer-title {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 600;
+      color: white;
+      line-height: 1.3;
+    }
+  }
+
+  .header-meta {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.95);
+      font-weight: 500;
+
+      i {
+        font-size: 16px;
+        opacity: 0.9;
+      }
+    }
+  }
+}
+
+// 内容区域
+.drawer-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  .detail-tabs {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+
+    :deep(.el-tabs__header) {
+      margin: 0;
+      padding: 0 32px;
+      background: white;
+      border-bottom: 2px solid #f0f0f0;
+    }
+
+    :deep(.el-tabs__nav-wrap::after) {
+      display: none;
+    }
+
+    :deep(.el-tabs__item) {
+      padding: 0 24px;
+      height: 56px;
+      line-height: 56px;
+      font-size: 15px;
+      font-weight: 500;
+      color: #666;
+      transition: all 0.3s;
+
+      &:hover {
+        color: #a0522d;
+      }
+
+      &.is-active {
+        color: #a0522d;
       }
     }
 
-    .files-list {
-      .file-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px;
-        border: 1px solid #e0e0e0;
-        border-radius: 4px;
-        margin-bottom: 10px;
+    :deep(.el-tabs__active-bar) {
+      height: 3px;
+      background: linear-gradient(90deg, #d4a574 0%, #a0522d 100%);
+      border-radius: 3px 3px 0 0;
+    }
 
-        .file-info {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          flex: 1;
+    :deep(.el-tabs__content) {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0;
+    }
 
-          i {
-            font-size: 20px;
-            color: #666;
-          }
+    .tab-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
 
-          .file-name {
-            flex: 1;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-          }
-
-          .file-size {
-            color: #999;
-            font-size: 12px;
-          }
-        }
+      i {
+        font-size: 16px;
       }
 
-      .empty-files {
-        text-align: center;
-        padding: 40px;
-        color: #999;
+      .file-count {
+        margin-left: 2px;
+        font-size: 14px;
+        opacity: 0.9;
+      }
 
-        i {
-          font-size: 48px;
-          margin-bottom: 10px;
-          display: block;
-        }
+      .comment-badge {
+        margin-left: 2px;
+        font-size: 14px;
+        opacity: 0.9;
+      }
+    }
+  }
+}
+
+// 基本信息内容
+.info-content {
+  padding: 24px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.info-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid #f0f0f0;
+  transition: all 0.3s;
+
+  &:hover {
+    box-shadow: 0 4px 16px rgba(212, 165, 116, 0.1);
+    border-color: #f5e6d3;
+  }
+
+  .card-title {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    i {
+      color: #a0522d;
+      font-size: 18px;
+    }
+  }
+}
+
+.description-card {
+  .description-text {
+    margin: 0;
+    line-height: 1.8;
+    color: #555;
+    font-size: 14px;
+  }
+}
+
+.details-card {
+  .details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      .detail-label {
+        font-size: 12px;
+        color: #999;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .detail-value {
+        font-size: 15px;
+        color: #333;
+        font-weight: 600;
+      }
+    }
+  }
+}
+
+.content-card {
+  .content-text {
+    white-space: pre-wrap;
+    line-height: 1.8;
+    color: #555;
+    font-size: 14px;
+    background: #f8f9fa;
+    padding: 16px;
+    border-radius: 8px;
+    border-left: 3px solid #a0522d;
+  }
+}
+
+// 文件列表内容
+.files-content {
+  padding: 24px 32px 32px;
+}
+
+.files-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.file-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 2px solid #f0f0f0;
+  transition: all 0.3s;
+  cursor: pointer;
+
+  &:hover {
+    border-color: #a0522d;
+    box-shadow: 0 4px 16px rgba(212, 165, 116, 0.15);
+    transform: translateY(-2px);
+
+    .file-icon {
+      background: linear-gradient(135deg, #d4a574 0%, #a0522d 100%);
+
+      i {
+        color: white;
+      }
+    }
+
+    .download-btn {
+      opacity: 1;
+    }
+  }
+
+  .file-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    background: #f5f7fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.3s;
+
+    i {
+      font-size: 24px;
+      color: #a0522d;
+      transition: all 0.3s;
+    }
+  }
+
+  .file-info {
+    flex: 1;
+    min-width: 0;
+
+    .file-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 6px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-meta {
+      display: flex;
+      gap: 12px;
+      font-size: 12px;
+
+      .file-size {
+        color: #999;
       }
     }
   }
 
-  .dialog-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
+  .download-btn {
+    flex-shrink: 0;
+    color: #999;
+    cursor: pointer;
+    transition: all 0.3s;
+    opacity: 0.6;
+
+    &:hover {
+      color: #a0522d;
+      transform: scale(1.2);
+      opacity: 1;
+    }
+  }
+}
+
+// 空状态
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  color: #999;
+
+  i {
+    font-size: 64px;
+    margin-bottom: 16px;
+    display: block;
+    opacity: 0.3;
+    color: #a0522d;
+  }
+
+  p {
+    margin: 0;
+    font-size: 15px;
+    color: #999;
+  }
+}
+
+// 底部操作栏
+.drawer-footer {
+  padding: 20px 32px;
+  background: white;
+  border-top: 2px solid #f0f0f0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.04);
+
+  .el-button {
+    min-width: 100px;
+    font-weight: 500;
+    border-radius: 8px;
+    transition: all 0.3s;
+
+    &.el-button--primary {
+      background: linear-gradient(135deg, #d4a574 0%, #a0522d 100%);
+      border: none;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(212, 165, 116, 0.4);
+      }
+    }
+
+    &:not(.el-button--primary) {
+      &:hover {
+        border-color: #a0522d;
+        color: #a0522d;
+      }
+    }
+  }
+}
+
+// 评论区内容
+.comments-content {
+  padding: 0;
+  
+  :deep(.comment-section) {
+    margin-top: 0;
+    padding: 24px 32px 32px;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
   }
 }
 </style>

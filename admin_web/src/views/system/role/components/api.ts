@@ -75,7 +75,7 @@ export function setRoleMenuBtnDataRange(data: object) {
 }
 
 /**
- * 获取当前用户角色下所能授权的部门
+ * 获取当前用户角色下所能授权的用户组
  * @param query
  * @returns
  */

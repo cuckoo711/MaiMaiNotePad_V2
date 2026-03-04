@@ -47,6 +47,20 @@ export const dynamicRoutes: Array<RouteRecordRaw> = [
 					permission: 'statistics:View',
 				},
 			},
+			{
+				path: '/user/messages',
+				name: 'userMessages',
+				component: () => import('/@/views/user/messages/index.vue'),
+				meta: {
+					title: '我的消息',
+					isLink: '',
+					isHide: true,
+					isKeepAlive: true,
+					isAffix: false,
+					isIframe: false,
+					icon: 'ele-Message',
+				},
+			},
 		],
 	},
 	{

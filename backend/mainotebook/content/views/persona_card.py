@@ -52,7 +52,8 @@ class PersonaCardViewSet(CustomModelViewSet):
     search_fields = ['name', 'description', 'tags']
     ordering_fields = ['create_datetime', 'update_datetime', 'name', 'star_count', 'downloads']
     ordering = ['-create_datetime']
-    # 前台内容接口不使用后台数据级权限过滤，避免无部门用户查不到数据
+    # 数据权限过滤：普通用户只能看到自己的内容，管理员和审核员可以看到所有内容
+    # extra_filter_class 留空，在 get_queryset 中根据用户角色动态过滤
     extra_filter_class = []
     
     def get_permissions(self):
@@ -72,29 +73,50 @@ class PersonaCardViewSet(CustomModelViewSet):
             return []
 
     def get_queryset(self):
-        """获取查询集
+        """根据操作类型和用户角色返回不同的查询集
         
-        - list: 只返回公开且已审核的人设卡，支持收藏筛选
-        - retrieve/file_detail: 管理员/审核员可查看所有，普通用户只能看公开内容和自己的
-        - 其他操作: 返回所有人设卡
+        权限规则：
+        - 超级管理员/管理员/审核员：可查看所有内容
+        - 普通用户：
+          - list（广场）: 只能看公开且已审核的内容
+          - my（内容管理）: 只能看自己创建的内容
+          - retrieve/file_detail: 可查看公开内容和自己的内容
         
         Returns:
             QuerySet: 人设卡查询集
         """
-        queryset = super().get_queryset()
+        user = self.request.user
+        
+        # 判断用户角色
+        is_admin_or_reviewer = False
+        if user and user.is_authenticated:
+            # 超级管理员或职员
+            if user.is_superuser or user.is_staff:
+                is_admin_or_reviewer = True
+            else:
+                # 检查是否为审核员角色
+                user_roles = user.role.all()
+                role_keys = [role.key for role in user_roles]
+                if 'admin' in role_keys or 'reviewer' in role_keys:
+                    is_admin_or_reviewer = True
+        
+        # list 操作（广场）：只返回公开且已审核的人设卡
         if self.action == 'list':
-            queryset = queryset.filter(is_public=True, is_pending=False)
+            queryset = PersonaCard.objects.filter(
+                is_public=True,
+                is_pending=False
+            )
             
             # 处理收藏筛选
             starred_param = self.request.query_params.get('starred', '').lower()
-            if starred_param == 'true' and self.request.user.is_authenticated:
+            if starred_param == 'true' and user.is_authenticated:
                 # 只返回当前用户收藏的人设卡
                 from mainotebook.content.models import StarRecord
                 import uuid as uuid_module
                 
                 # 获取收藏的 target_id（字符串格式）
                 starred_id_strs = StarRecord.objects.filter(
-                    user=self.request.user,
+                    user=user,
                     target_type='persona'
                 ).values_list('target_id', flat=True)
                 
@@ -108,20 +130,32 @@ class PersonaCardViewSet(CustomModelViewSet):
                 
                 queryset = queryset.filter(id__in=starred_ids)
                 
-        elif self.action in ('retrieve', 'file_detail'):
-            user = self.request.user
+            return queryset
+        
+        # retrieve/file_detail 操作：查看详情
+        if self.action in ('retrieve', 'file_detail'):
             if user and user.is_authenticated:
-                # 超级管理员、管理员、审核员可查看所有内容
-                if user.is_superuser or user.is_staff or getattr(user, 'is_moderator', False):
-                    pass  # 不过滤
-                else:
-                    # 普通用户只能看公开内容和自己创建的
-                    queryset = queryset.filter(
-                        models.Q(is_public=True, is_pending=False) | models.Q(uploader=user)
-                    )
-            else:
-                queryset = queryset.filter(is_public=True, is_pending=False)
-        return queryset
+                # 管理员/审核员可查看所有
+                if is_admin_or_reviewer:
+                    return PersonaCard.objects.all()
+                # 普通用户只能看公开内容和自己的
+                return PersonaCard.objects.filter(
+                    models.Q(is_public=True, is_pending=False) | models.Q(uploader=user)
+                )
+            # 未登录用户只能看公开内容
+            return PersonaCard.objects.filter(is_public=True, is_pending=False)
+        
+        # 其他操作（create/update/delete/files 等）
+        # 管理员/审核员可操作所有
+        if is_admin_or_reviewer:
+            return PersonaCard.objects.all()
+        
+        # 普通用户只能操作自己的
+        if user and user.is_authenticated:
+            return PersonaCard.objects.filter(uploader=user)
+        
+        # 未登录用户返回空查询集
+        return PersonaCard.objects.none()
     
     def perform_create(self, serializer):
         """创建人设卡后处理上传的文件，解析版本号，用户选择公开时自动提交审核
@@ -392,6 +426,162 @@ class PersonaCardViewSet(CustomModelViewSet):
             persona_card_file.file_path,
             persona_card_file.original_name
         )
+    
+    @action(
+        methods=['GET'],
+        detail=True,
+        url_path='files/(?P<file_id>[^/.]+)/parse'
+    )
+    def parse_toml(self, request, pk=None, file_id=None):
+        """解析 TOML 文件并返回结构化数据
+        
+        将 TOML 文件解析为结构化的 JSON 数据，包含：
+        - 原始文本内容
+        - 解析后的块（sections）和键值对
+        - 每个键值对的类型信息
+        
+        Args:
+            request: HTTP 请求对象
+            pk: 人设卡 ID
+            file_id: 文件 ID
+            
+        Returns:
+            Response: 包含解析结果的响应
+        """
+        persona_card = self.get_object()
+        
+        try:
+            persona_card_file = PersonaCardFile.objects.get(
+                id=file_id,
+                persona_card=persona_card
+            )
+        except PersonaCardFile.DoesNotExist:
+            return ErrorResponse(msg='文件不存在', code=404)
+        
+        # 检查文件类型
+        if not persona_card_file.original_name.lower().endswith('.toml'):
+            return ErrorResponse(msg='只支持解析 TOML 文件')
+        
+        try:
+            from django.conf import settings
+            full_path = os.path.join(settings.MEDIA_ROOT, persona_card_file.file_path)
+            
+            # 读取原始文本
+            with open(full_path, 'r', encoding='utf-8') as f:
+                raw_content = f.read()
+            
+            # 解析 TOML
+            with open(full_path, 'r', encoding='utf-8') as f:
+                toml_data = toml.load(f)
+            
+            # 构建结构化数据
+            parsed_data = {
+                'raw_content': raw_content,
+                'blocks': self._parse_toml_structure(toml_data)
+            }
+            
+            logger.info(
+                f"用户 {request.user.id if request.user.is_authenticated else '匿名'} "
+                f"解析人设卡 {persona_card.id} 的 TOML 文件: {persona_card_file.original_name}"
+            )
+            
+            return DetailResponse(data=parsed_data, msg='解析成功')
+            
+        except toml.TomlDecodeError as e:
+            logger.warning(f"TOML 解析失败: {persona_card_file.file_path}, 错误: {e}")
+            return ErrorResponse(msg=f'TOML 格式错误: {str(e)}')
+        except Exception as e:
+            logger.error(f"解析 TOML 文件失败: {persona_card_file.file_path}, 错误: {e}")
+            return ErrorResponse(msg=f'解析失败: {str(e)}')
+    
+    @staticmethod
+    def _parse_toml_structure(data: dict, parent_key: str = '') -> list:
+        """将 TOML 数据解析为结构化的块列表
+        
+        Args:
+            data: TOML 解析后的字典数据
+            parent_key: 父级键名（用于嵌套表）
+            
+        Returns:
+            list: 块列表，每个块包含标题和键值对
+        """
+        blocks = []
+        root_block = None
+        
+        for key, value in data.items():
+            full_key = f"{parent_key}.{key}" if parent_key else key
+            
+            if isinstance(value, dict):
+                # 嵌套表，创建一个新块
+                block = {
+                    'title': full_key,
+                    'key_values': []
+                }
+                
+                # 递归处理嵌套字典
+                for sub_key, sub_value in value.items():
+                    if isinstance(sub_value, dict):
+                        # 继续递归
+                        nested_blocks = PersonaCardViewSet._parse_toml_structure(
+                            {sub_key: sub_value}, full_key
+                        )
+                        blocks.extend(nested_blocks)
+                    else:
+                        # 添加键值对
+                        block['key_values'].append({
+                            'key': sub_key,
+                            'value': sub_value,
+                            'type': PersonaCardViewSet._get_value_type(sub_value)
+                        })
+                
+                if block['key_values']:
+                    blocks.append(block)
+            else:
+                # 顶层键值对，放入根块
+                if root_block is None:
+                    root_block = {
+                        'title': parent_key if parent_key else '根配置',
+                        'key_values': []
+                    }
+                
+                root_block['key_values'].append({
+                    'key': key,
+                    'value': value,
+                    'type': PersonaCardViewSet._get_value_type(value)
+                })
+        
+        # 将根块放在最前面
+        if root_block and root_block['key_values']:
+            blocks.insert(0, root_block)
+        
+        return blocks
+    
+    @staticmethod
+    def _get_value_type(value: Any) -> str:
+        """获取值的类型
+        
+        Args:
+            value: 值
+            
+        Returns:
+            str: 类型名称
+        """
+        if isinstance(value, bool):
+            return 'boolean'
+        elif isinstance(value, int):
+            return 'integer'
+        elif isinstance(value, float):
+            return 'float'
+        elif isinstance(value, str):
+            if '\n' in value:
+                return 'multiline_string'
+            return 'string'
+        elif isinstance(value, list):
+            return 'array'
+        elif isinstance(value, dict):
+            return 'table'
+        else:
+            return 'unknown'
     
     @action(methods=['POST'], detail=True, url_path='submit')
     def submit(self, request, pk=None):

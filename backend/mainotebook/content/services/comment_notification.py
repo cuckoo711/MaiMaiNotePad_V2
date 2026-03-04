@@ -101,7 +101,7 @@ class CommentNotificationService:
                 f"「{comment_content_preview}」：\n"
                 f"{reply_content_preview}"
             )
-            extra_data = {}
+            extra_data = {'sender_name': replier_name}
             if comment_id:
                 extra_data['comment_id'] = str(comment_id)
             if reply_id:
@@ -143,8 +143,10 @@ class CommentNotificationService:
                 f"{liker_name} 赞了您的评论"
                 f"「{comment_content_preview}」"
             )
+            extra_data = {'sender_name': liker_name}
             CommentNotificationService._send_notification(
                 comment_author_id, title, content, message_type=3,
+                extra_data=extra_data,
             )
         except Exception:
             logger.exception(
@@ -183,7 +185,7 @@ class CommentNotificationService:
                 f"「{content_name}」：\n"
                 f"{comment_content_preview}"
             )
-            extra_data = {}
+            extra_data = {'sender_name': commenter_name}
             if comment_id:
                 extra_data['comment_id'] = str(comment_id)
             if target_id:

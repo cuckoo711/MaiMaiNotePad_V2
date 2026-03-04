@@ -4,7 +4,7 @@
       <el-col xs="24" :sm="8" :md="6" :lg="4" :xl="4" class="p-1">
         <el-card :body-style="{ height: '100%' }">
           <p class="font-mono font-black text-center text-xl pb-5">
-            部门列表
+            用户组列表
             <el-tooltip effect="dark" :content="content" placement="right">
               <el-icon>
                 <QuestionFilled/>
@@ -78,7 +78,7 @@ interface APIResponseData {
 }
 
 // 引入组件
-const placeholder = ref('请输入部门名称');
+const placeholder = ref('请输入用户组名称');
 const filterText = ref('');
 const treeRef = ref<InstanceType<typeof ElTree>>();
 
@@ -100,7 +100,7 @@ const filterNode = (value: string, data: Tree) => {
 let data = ref([]);
 
 const content = `
-1.部门信息;
+1.用户组信息;
 `;
 
 const getData = () => {

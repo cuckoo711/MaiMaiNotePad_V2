@@ -133,7 +133,7 @@ export function getBackEndControlRoutes() {
 	BtnPermissionStore().getBtnPermissionStore();
 	// 获取系统配置
 	SystemConfigStore().getSystemConfigs()
-	// 获取所有部门信息
+	// 获取所有用户组信息
 	useDeptInfoStore().requestDeptInfo()
 	// 获取字典信息
 	DictionaryStore().getSystemDictionarys()

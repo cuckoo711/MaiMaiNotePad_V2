@@ -47,8 +47,50 @@ class CommentViewSet(CustomModelViewSet):
     serializer_class = CommentSerializer
     create_serializer_class = CommentCreateSerializer
     ordering_fields = ['create_datetime', 'like_count']
-    # 前台内容接口不使用后台数据级权限过滤，避免无部门用户查不到数据
+    # 数据权限过滤：普通用户只能看到自己的评论，管理员和审核员可以看到所有评论
+    # extra_filter_class 留空，在 get_queryset 中根据用户角色动态过滤
     extra_filter_class = []
+    
+    def get_queryset(self):
+        """根据操作类型和用户角色返回不同的查询集
+        
+        权限规则：
+        - 超级管理员/管理员/审核员：可查看所有评论
+        - 普通用户：
+          - list（公开查看）: 可查看所有公开内容的评论
+          - admin_list（内容管理）: 只能看自己的评论
+        
+        Returns:
+            QuerySet: 评论查询集
+        """
+        user = self.request.user
+        
+        # 判断用户角色
+        is_admin_or_reviewer = False
+        if user and user.is_authenticated:
+            # 超级管理员或职员
+            if user.is_superuser or user.is_staff:
+                is_admin_or_reviewer = True
+            else:
+                # 检查是否为审核员角色
+                user_roles = user.role.all()
+                role_keys = [role.key for role in user_roles]
+                if 'admin' in role_keys or 'reviewer' in role_keys:
+                    is_admin_or_reviewer = True
+        
+        # admin_list 操作（内容管理）
+        if self.action == 'admin_list':
+            # 管理员/审核员可查看所有评论（包括已删除）
+            if is_admin_or_reviewer:
+                return Comment.objects.all()
+            # 普通用户只能看自己的评论
+            if user and user.is_authenticated:
+                return Comment.objects.filter(user=user)
+            # 未登录用户返回空查询集
+            return Comment.objects.none()
+        
+        # 其他操作使用默认查询集（已过滤已删除和被拒绝的评论）
+        return super().get_queryset()
     
     def get_permissions(self):
         """根据操作类型返回不同的权限要求
@@ -141,7 +183,7 @@ class CommentViewSet(CustomModelViewSet):
             parent (uuid, optional): 父评论 ID（回复时提供）
             
         Returns:
-            Response: 创建的评论对象
+            Response: 创建的评论对象或审核失败信息
         """
         # 使用创建序列化器验证数据
         serializer = self.get_serializer(data=request.data)
@@ -180,13 +222,33 @@ class CommentViewSet(CustomModelViewSet):
                     msg = str(detail)
             else:
                 msg = str(e.message) if hasattr(e, 'message') else str(e)
-            return Response(
-                {
-                    'code': 4000,
-                    'msg': msg
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            
+            # 判断是否为审核失败
+            is_moderation_failed = '未通过内容审核' in msg
+            
+            if is_moderation_failed:
+                # 审核失败：返回 code 2000，但在 data 中标识失败状态
+                return Response(
+                    {
+                        'code': 2000,
+                        'msg': '操作完成',
+                        'data': {
+                            'success': False,
+                            'moderation_failed': True,
+                            'error_message': msg
+                        }
+                    },
+                    status=status.HTTP_200_OK
+                )
+            else:
+                # 其他验证错误：返回错误码
+                return Response(
+                    {
+                        'code': 4000,
+                        'msg': msg
+                    },
+                    status=status.HTTP_200_OK
+                )
         except Exception as e:
             return Response(
                 {

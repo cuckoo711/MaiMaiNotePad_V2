@@ -147,7 +147,7 @@
             </div>
             <div class="card-comments">
               <span class="stat-item">
-                <i class="fa fa-comment"></i> {{ item.comment_count || 0 }}
+                <i class="fa fa-comment"></i> {{ formatCount(item.comment_count) }}
               </span>
             </div>
           </div>
@@ -400,6 +400,12 @@ const formatDate = (dateString: string): string => {
   if (days < 30) return `${Math.floor(days / 7)}周前`;
   if (days < 365) return `${Math.floor(days / 30)}个月前`;
   return `${Math.floor(days / 365)}年前`;
+};
+
+const formatCount = (count: number | undefined): string => {
+  if (!count) return '0';
+  if (count > 999) return '999+';
+  return count.toString();
 };
 </script>
 

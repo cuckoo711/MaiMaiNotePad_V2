@@ -14,7 +14,7 @@ export default {
         systemMenu: '菜单管理',
         systemRole: '角色管理',
         systemUser: '用户管理',
-        systemDept: '部门管理',
+        systemDept: '用户组管理',
         systemNotice: '通知中心',
         systemNotice1: '通知中心',
         /* 日志管理 */
@@ -56,7 +56,7 @@ export default {
         searchPlaceholder: '菜单搜索：支持中文、路由路径',
         newTitle: '通知',
         newBtn: '全部已读',
-        newGo: '前往通知中心',
+        newGo: '查看全部消息',
         newDesc: '暂无通知',
         logOutTitle: '提示',
         logOutMessage: '此操作将退出登录, 是否继续?',

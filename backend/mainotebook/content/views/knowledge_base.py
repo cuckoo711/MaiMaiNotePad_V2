@@ -6,6 +6,9 @@
 提供知识库的 CRUD 操作和文件管理功能。
 """
 
+import os
+import json
+import logging
 from django.db import models
 from rest_framework import status
 from rest_framework.decorators import action
@@ -29,6 +32,7 @@ from mainotebook.content.services.file_service import FileService
 from mainotebook.content.services.star_service import StarService
 from mainotebook.content.services.tag_service import TagService
 
+logger = logging.getLogger(__name__)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -64,7 +68,8 @@ class KnowledgeBaseViewSet(CustomModelViewSet):
     search_fields = ['name', 'description', 'tags']
     ordering_fields = ['create_datetime', 'update_datetime', 'name', 'star_count', 'downloads']
     ordering = ['-create_datetime']
-    # 前台内容接口不使用后台数据级权限过滤，避免无部门用户查不到数据
+    # 数据权限过滤：普通用户只能看到自己的内容，管理员和审核员可以看到所有内容
+    # extra_filter_class 留空，在 get_queryset 中根据用户角色动态过滤
     extra_filter_class = []
     
     def get_permissions(self):
@@ -84,15 +89,34 @@ class KnowledgeBaseViewSet(CustomModelViewSet):
             return []
     
     def get_queryset(self):
-        """根据操作类型返回不同的查询集
+        """根据操作类型和用户角色返回不同的查询集
         
-        - list: 只返回公开且已审核的知识库，支持收藏筛选
-        - retrieve/file_detail: 管理员/审核员可查看所有，普通用户只能看公开内容和自己的
-        - 其他操作: 返回所有知识库
+        权限规则：
+        - 超级管理员/管理员/审核员：可查看所有内容
+        - 普通用户：
+          - list（广场）: 只能看公开且已审核的内容
+          - my（内容管理）: 只能看自己创建的内容
+          - retrieve/file_detail: 可查看公开内容和自己的内容
         
         Returns:
             QuerySet: 知识库查询集
         """
+        user = self.request.user
+        
+        # 判断用户角色
+        is_admin_or_reviewer = False
+        if user and user.is_authenticated:
+            # 超级管理员或职员
+            if user.is_superuser or user.is_staff:
+                is_admin_or_reviewer = True
+            else:
+                # 检查是否为审核员角色
+                user_roles = user.role.all()
+                role_keys = [role.key for role in user_roles]
+                if 'admin' in role_keys or 'reviewer' in role_keys:
+                    is_admin_or_reviewer = True
+        
+        # list 操作（广场）：只返回公开且已审核的知识库
         if self.action == 'list':
             queryset = KnowledgeBase.objects.filter(
                 is_public=True,
@@ -101,14 +125,14 @@ class KnowledgeBaseViewSet(CustomModelViewSet):
             
             # 处理收藏筛选
             starred_param = self.request.query_params.get('starred', '').lower()
-            if starred_param == 'true' and self.request.user.is_authenticated:
+            if starred_param == 'true' and user.is_authenticated:
                 # 只返回当前用户收藏的知识库
                 from mainotebook.content.models import StarRecord
                 import uuid as uuid_module
                 
                 # 获取收藏的 target_id（字符串格式）
                 starred_id_strs = StarRecord.objects.filter(
-                    user=self.request.user,
+                    user=user,
                     target_type='knowledge'
                 ).values_list('target_id', flat=True)
                 
@@ -123,17 +147,33 @@ class KnowledgeBaseViewSet(CustomModelViewSet):
                 queryset = queryset.filter(id__in=starred_ids)
             
             return queryset
-            
+        
+        # my 操作（内容管理 - 我的知识库）：已在 my 方法中处理，这里不会被调用
+        
+        # retrieve/file_detail 操作：查看详情
         if self.action in ('retrieve', 'file_detail'):
-            user = self.request.user
             if user and user.is_authenticated:
-                if user.is_superuser or user.is_staff or getattr(user, 'is_moderator', False):
+                # 管理员/审核员可查看所有
+                if is_admin_or_reviewer:
                     return KnowledgeBase.objects.all()
+                # 普通用户只能看公开内容和自己的
                 return KnowledgeBase.objects.filter(
                     models.Q(is_public=True, is_pending=False) | models.Q(uploader=user)
                 )
+            # 未登录用户只能看公开内容
             return KnowledgeBase.objects.filter(is_public=True, is_pending=False)
-        return KnowledgeBase.objects.all()
+        
+        # 其他操作（create/update/delete/files 等）
+        # 管理员/审核员可操作所有
+        if is_admin_or_reviewer:
+            return KnowledgeBase.objects.all()
+        
+        # 普通用户只能操作自己的
+        if user and user.is_authenticated:
+            return KnowledgeBase.objects.filter(uploader=user)
+        
+        # 未登录用户返回空查询集
+        return KnowledgeBase.objects.none()
     
     def list(self, request, *args, **kwargs):
         """获取知识库列表
@@ -334,7 +374,7 @@ class KnowledgeBaseViewSet(CustomModelViewSet):
     @action(
         methods=['GET', 'DELETE'],
         detail=True,
-        url_path='files/(?P<file_id>[^/.]+)',
+        url_path='files/(?P<file_id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})',
         permission_classes=[IsAuthenticated]
     )
     def file_detail(self, request, pk=None, file_id=None):
@@ -393,6 +433,262 @@ class KnowledgeBaseViewSet(CustomModelViewSet):
             return ErrorResponse(msg="文件不存在", status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return ErrorResponse(msg=f"文件下载失败: {str(e)}", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(methods=['POST'], detail=True, url_path='parse_file')
+    def parse_file(self, request, pk=None):
+        """解析知识库文件并返回结构化数据
+        
+        支持的文件类型：
+        - JSON: 解析并分页返回文档列表
+        - TXT: 返回文本内容
+        - 压缩包: 返回提示信息，建议下载
+        
+        Args:
+            request: HTTP 请求对象
+            pk: 知识库 ID
+            
+        Request Body:
+            file_id: 文件 ID（必需）
+            page: 页码（仅 JSON，默认 1）
+            page_size: 每页数量（仅 JSON，默认 20）
+            search: 搜索关键词（可选）
+            
+        Returns:
+            Response: 包含解析结果的响应
+        """
+        # 从请求体获取参数
+        file_id = request.data.get('file_id')
+        if not file_id:
+            return ErrorResponse(msg='缺少 file_id 参数', code=400)
+        
+        knowledge_base = self.get_object()
+        
+        try:
+            kb_file = KnowledgeBaseFile.objects.get(
+                id=file_id,
+                knowledge_base=knowledge_base
+            )
+        except KnowledgeBaseFile.DoesNotExist:
+            return ErrorResponse(msg='文件不存在', code=404)
+        
+        from django.conf import settings
+        full_path = os.path.join(settings.MEDIA_ROOT, kb_file.file_path)
+        file_name = kb_file.original_name.lower()
+        
+        try:
+            # JSON 文件
+            if file_name.endswith('.json'):
+                return self._parse_json_file(full_path, request, kb_file)
+            
+            # TXT 文件
+            elif file_name.endswith('.txt'):
+                return self._parse_txt_file(full_path, request, kb_file)
+            
+            # 压缩包
+            elif file_name.endswith(('.zip', '.rar', '.7z', '.tar', '.gz', '.tar.gz')):
+                return DetailResponse(
+                    data={
+                        'file_type': 'archive',
+                        'file_name': kb_file.original_name,
+                        'file_size': kb_file.file_size,
+                        'message': '压缩包文件暂不支持在线预览，请下载后查看'
+                    },
+                    msg='压缩包文件'
+                )
+            
+            else:
+                return ErrorResponse(msg='不支持的文件类型')
+                
+        except Exception as e:
+            logger.error(f"解析文件失败: {kb_file.file_path}, 错误: {e}")
+            return ErrorResponse(msg=f'解析失败: {str(e)}')
+    
+    def _parse_json_file(self, file_path: str, request, kb_file):
+        """解析 JSON 文件（支持搜索和分页）
+        
+        Args:
+            file_path: 文件路径
+            request: HTTP 请求对象
+            kb_file: 文件记录对象
+            
+        Returns:
+            Response: 包含分页数据的响应
+        """
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # 从请求体获取参数
+            search_keyword = request.data.get('search', '').strip()
+            page = int(request.data.get('page', 1))
+            page_size = int(request.data.get('page_size', 20))
+            
+            # 提取文档列表
+            docs = data.get('docs', [])
+            
+            # 计算统计信息（基于全部文档）
+            total_docs = len(docs)
+            if total_docs > 0:
+                total_passage_len = sum(len(doc.get('passage', '')) for doc in docs)
+                total_entities = sum(len(doc.get('extracted_entities', [])) for doc in docs)
+                total_triples = sum(len(doc.get('extracted_triples', [])) for doc in docs)
+                
+                avg_passage_len = total_passage_len / total_docs
+                avg_entities = total_entities / total_docs
+                avg_triples = total_triples / total_docs
+            else:
+                total_passage_len = 0
+                avg_passage_len = 0
+                avg_entities = 0
+                avg_triples = 0
+                total_entities = 0
+                total_triples = 0
+            
+            # 如果有搜索关键词，进行过滤
+            if search_keyword:
+                keyword_lower = search_keyword.lower()
+                filtered_docs = []
+                
+                for doc in docs:
+                    # 搜索段落内容
+                    if doc.get('passage', '').lower().find(keyword_lower) != -1:
+                        filtered_docs.append(doc)
+                        continue
+                    
+                    # 搜索实体
+                    entities = doc.get('extracted_entities', [])
+                    if any(keyword_lower in str(e).lower() for e in entities):
+                        filtered_docs.append(doc)
+                        continue
+                    
+                    # 搜索三元组
+                    triples = doc.get('extracted_triples', [])
+                    if any(
+                        any(keyword_lower in str(item).lower() for item in triple)
+                        for triple in triples
+                    ):
+                        filtered_docs.append(doc)
+                        continue
+                
+                docs = filtered_docs
+            
+            total = len(docs)
+            
+            # 计算分页
+            start = (page - 1) * page_size
+            end = start + page_size
+            page_docs = docs[start:end]
+            
+            # 构建响应数据
+            result = {
+                'file_type': 'json',
+                'file_name': kb_file.original_name,
+                'total_docs': total,
+                'page': page,
+                'page_size': page_size,
+                'total_pages': (total + page_size - 1) // page_size if total > 0 else 0,
+                'docs': page_docs,
+                'metadata': {
+                    'total_chars': total_passage_len,
+                    'avg_passage_len': round(avg_passage_len, 1),
+                    'avg_entities': round(avg_entities, 1),
+                    'avg_triples': round(avg_triples, 1),
+                    'total_entities': total_entities,
+                    'total_triples': total_triples
+                },
+                'search_keyword': search_keyword if search_keyword else None
+            }
+            
+            logger.info(
+                f"用户 {request.user.id if request.user.is_authenticated else '匿名'} "
+                f"解析知识库 {kb_file.knowledge_base.id} 的 JSON 文件: {kb_file.original_name}, "
+                f"第 {page} 页{f', 搜索: {search_keyword}' if search_keyword else ''}"
+            )
+            
+            return DetailResponse(data=result, msg='解析成功')
+            
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON 解析失败: {file_path}, 错误: {e}")
+            return ErrorResponse(msg=f'JSON 格式错误: {str(e)}')
+    
+    def _parse_txt_file(self, file_path: str, request, kb_file):
+        """解析 TXT 文件（按段落分割，支持搜索）
+        
+        TXT 文件格式：每个段落之间用空行分隔，每个段落是一条知识条目
+        
+        Args:
+            file_path: 文件路径
+            request: HTTP 请求对象
+            kb_file: 文件记录对象
+            
+        Returns:
+            Response: 包含段落列表的响应
+        """
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # 按空行分割段落
+            paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
+            
+            # 从请求体获取搜索关键词
+            search_keyword = request.data.get('search', '').strip()
+            
+            # 如果有搜索关键词，进行过滤
+            if search_keyword:
+                keyword_lower = search_keyword.lower()
+                paragraphs = [
+                    p for p in paragraphs 
+                    if keyword_lower in p.lower()
+                ]
+            
+            result = {
+                'file_type': 'txt',
+                'file_name': kb_file.original_name,
+                'total_paragraphs': len(paragraphs),
+                'paragraphs': paragraphs,
+                'search_keyword': search_keyword if search_keyword else None
+            }
+            
+            logger.info(
+                f"解析知识库 {kb_file.knowledge_base.id} 的 TXT 文件: {kb_file.original_name}, "
+                f"共 {len(paragraphs)} 个段落{f', 搜索: {search_keyword}' if search_keyword else ''}"
+            )
+            
+            return DetailResponse(data=result, msg='解析成功')
+            
+        except UnicodeDecodeError:
+            # 尝试其他编码
+            try:
+                with open(file_path, 'r', encoding='gbk') as f:
+                    content = f.read()
+                
+                # 按空行分割段落
+                paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
+                
+                # 从请求体获取搜索关键词
+                search_keyword = request.data.get('search', '').strip()
+                
+                # 如果有搜索关键词，进行过滤
+                if search_keyword:
+                    keyword_lower = search_keyword.lower()
+                    paragraphs = [
+                        p for p in paragraphs 
+                        if keyword_lower in p.lower()
+                    ]
+                
+                result = {
+                    'file_type': 'txt',
+                    'file_name': kb_file.original_name,
+                    'total_paragraphs': len(paragraphs),
+                    'paragraphs': paragraphs,
+                    'encoding': 'gbk',
+                    'search_keyword': search_keyword if search_keyword else None
+                }
+                
+                return DetailResponse(data=result, msg='解析成功')
+            except Exception as e:
+                return ErrorResponse(msg=f'文件编码错误: {str(e)}')
     
     @swagger_auto_schema(
         operation_summary='提交知识库审核',

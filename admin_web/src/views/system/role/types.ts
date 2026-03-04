@@ -64,7 +64,7 @@ export interface RoleMenuBtnType {
 	name: string;
 	/** 数据权限范围 */
 	data_range: number | null;
-	/** 自定义部门 */
+	/** 自定义用户组 */
 	dept: number[];
 }
 

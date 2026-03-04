@@ -128,9 +128,15 @@ class Initialize(CoreInitialize):
 if __name__ == "__main__":
     # 默认只初始化基础数据
     # 传入 --test 参数可同时创建测试用户
+    # 传入 --reset 参数可强制重置所有数据
     include_test = "--test" in sys.argv
-    initializer = Initialize(app='mainotebook.system')
+    reset = "--reset" in sys.argv
+    
+    initializer = Initialize(app='mainotebook.system', reset=reset)
 
+    if reset:
+        print("⚠️  重置模式：将删除并重新创建所有初始化数据")
+    
     if include_test:
         print("🧪 包含测试用户初始化...")
         initializer.run_with_test_data()

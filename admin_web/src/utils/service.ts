@@ -110,7 +110,8 @@ function createService() {
 			const status = get(error, 'response.status');
 			switch (status) {
 				case 400:
-					error.message = '请求错误';
+					// 优先使用后端返回的错误消息
+					error.message = error.response?.data?.msg || '请求错误';
 					break;
 				case 401:
 					// Local.clear();
@@ -174,7 +175,7 @@ function createRequestFunction(service: any) {
 			headers: {
 				'Content-Type': 'application/json',
 			},
-			timeout: 5000,
+			timeout: 15000,
 			baseURL: getBaseURL(),
 			data: {},
 		};

@@ -80,7 +80,7 @@ export function getDeptUserList(query: PageQuery) {
 }
 
 /**
- * 获取所有部门列表
+ * 获取所有用户组列表
  */
 export function getAllDeptList() {
 	return request({

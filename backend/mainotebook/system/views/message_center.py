@@ -321,6 +321,56 @@ class MessageCenterViewSet(CustomModelViewSet):
             data = serializer.data
         return DetailResponse(data=data, msg="获取成功")
 
+    @action(methods=['POST'], detail=False, permission_classes=[IsAuthenticated])
+    def mark_all_read(self, request):
+        """标记当前用户的所有消息为已读
+        
+        采用懒创建策略：
+        1. 获取用户可见的所有消息
+        2. 对于已有中间表记录的，更新 is_read=True
+        3. 对于没有中间表记录的，创建记录并标记为已读
+        """
+        user_id = self.request.user.id
+        
+        # 获取用户可见的所有消息
+        visible_messages = self._get_user_visible_queryset(user_id)
+        visible_msg_ids = list(visible_messages.values_list('id', flat=True))
+        
+        # 获取已有的中间表记录
+        existing_records = MessageCenterTargetUser.objects.filter(
+            users_id=user_id,
+            messagecenter_id__in=visible_msg_ids
+        )
+        
+        # 更新已有记录为已读
+        existing_records.update(is_read=True)
+        
+        # 找出没有中间表记录的消息
+        existing_msg_ids = set(existing_records.values_list('messagecenter_id', flat=True))
+        missing_msg_ids = set(visible_msg_ids) - existing_msg_ids
+        
+        # 为缺失的消息创建已读记录
+        if missing_msg_ids:
+            new_records = [
+                MessageCenterTargetUser(
+                    users_id=user_id,
+                    messagecenter_id=msg_id,
+                    is_read=True
+                )
+                for msg_id in missing_msg_ids
+            ]
+            MessageCenterTargetUser.objects.bulk_create(new_records)
+        
+        # 推送 WebSocket 通知
+        websocket_push(user_id, message={
+            "sender": "system",
+            "contentType": "TEXT",
+            "content": "所有消息已标记为已读",
+            "unread": 0
+        })
+        
+        return DetailResponse(data={"count": len(visible_msg_ids)}, msg="全部已读成功")
+
     @staticmethod
     def _get_user_visible_queryset(user_id):
         """获取用户可见的所有消息查询集

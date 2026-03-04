@@ -55,7 +55,7 @@
               :props="{ label: 'name', children: 'children' }"
               node-key="id"
               check-strictly
-              placeholder="请选择部门"
+              placeholder="请选择用户组"
               clearable
               filterable
           />
@@ -492,7 +492,7 @@ watch(
     (nv) => {
       if (nv && nv.id) {
         getInit();
-        // 若为 registration 分组，预加载部门与角色选项
+        // 若为 registration 分组，预加载用户组与角色选项
         if (props.editableTabsItem?.key === 'registration') {
           fetchDeptOptions();
           fetchRoleOptions();

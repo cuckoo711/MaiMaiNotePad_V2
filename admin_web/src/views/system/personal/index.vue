@@ -28,7 +28,7 @@
 										</el-col>
 										<el-col class="personal-item mb6">
                       <div style="display: flex;">
-                        <div style="flex: 1;">部门：</div>
+                        <div style="flex: 1;">用户组：</div>
                         <div style="flex: 1;"><el-tag>{{ state.personalForm.dept_info.dept_name }}</el-tag></div>
                       </div>
 										</el-col>
@@ -144,12 +144,12 @@
               </span>
                 </button>
               </div>
-						<div v-for="(item, index) in state.newsInfoList" :key="index" class="personal-info-li flex-margin flex w100" >
+						<div v-for="(item, index) in state.newsInfoList" :key="index" class="personal-info-li flex-margin flex w100" @click="handleMessageClick(item)" style="cursor: pointer;">
               <div class="home-card-item-icon flex" style="margin: 5px;" :style="{ background: `#f8f8f8` }">
                 <i class="flex-margin font24" :class="`fa fa-commenting-o`" :style="{ color: `#5d8b22` }"></i>
 						</div>
               <div class="flex-auto" style="margin-top: 10px">
-							  <span class="font14">[{{ item.creator_name }}]</span>
+							  <span class="font14">[{{ getMessageSender(item) }}]</span>
 							  <span style=" color: grey; float: right; font-style:italic;">&nbsp;{{ item.create_datetime }}&nbsp;&nbsp;</span>
 							  <div class="text-container" style="font-size: 12px; margin-top: 5px"> {{ item.title }}</div>
 						  </div>
@@ -188,6 +188,13 @@
 				</span>
 			</template>
 		</el-dialog>
+		
+		<!-- 消息详情弹窗 -->
+		<MessageDetailDialog
+			v-model="dialogVisible"
+			:message="currentMessage"
+			@read="handleMessageRead"
+		/>
 	</div>
 </template>
 
@@ -198,6 +205,7 @@ import * as api from './api';
 import { ElMessage } from 'element-plus';
 import { getBaseURL } from '/@/utils/baseUrl';
 import { Session } from '/@/utils/storage';
+import MessageDetailDialog from '/@/components/MessageDetailDialog.vue';
 import { useRouter } from 'vue-router';
 import { useUserInfo } from '/@/stores/userInfo';
 import { useThemeConfig } from '/@/stores/themeConfig';
@@ -271,6 +279,10 @@ const rules = reactive({
 
 let selectImgVisible = ref(false);
 
+// 消息详情弹窗相关状态
+const dialogVisible = ref(false);
+const currentMessage = ref<any>(null);
+
 const state = reactive<PersonalState>({
 	newsInfoList: [],
 	personalForm: {
@@ -300,7 +312,42 @@ const state = reactive<PersonalState>({
  */
 const route = useRouter();
 const msgMore = () => {
-	route.push({ path: '/messageCenter' });
+	route.push({ path: '/user/messages' });
+};
+
+/**
+ * 点击消息项，打开详情弹窗
+ */
+const handleMessageClick = (message: any) => {
+	currentMessage.value = message;
+	dialogVisible.value = true;
+};
+
+/**
+ * 获取消息发送者名称
+ */
+const getMessageSender = (message: any) => {
+	// 优先使用 extra_data 中的发送者信息
+	if (message.extra_data?.sender_name) {
+		return message.extra_data.sender_name;
+	}
+	// 如果是系统消息
+	if (message.message_type === 0 || message.message_type === 4) {
+		return '系统';
+	}
+	// 默认返回系统
+	return '系统';
+};
+
+/**
+ * 消息已读回调
+ */
+const handleMessageRead = (message: any) => {
+	// 更新本地消息列表中的已读状态
+	const index = state.newsInfoList.findIndex((m: any) => m.id === message.id);
+	if (index !== -1) {
+		(state.newsInfoList[index] as any).is_read = true;
+	}
 };
 
 const genderList = ref();
@@ -382,11 +429,8 @@ const getMsg = async () => {
 		const { data } = res || {};
 		
 		if (data && Array.isArray(data) && data.length > 0) {
-			state.newsInfoList = data.map((item: any) => ({
-				creator_name: String(item.creator_name || '未知用户'),
-				create_datetime: String(item.create_datetime || ''),
-				title: String(item.title || ''),
-			}));
+			// 保留完整的消息对象，以便弹窗使用
+			state.newsInfoList = data;
 		} else {
 			state.newsInfoList = [];
 		}

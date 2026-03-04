@@ -25,11 +25,8 @@ class CommentSerializer(CustomModelSerializer):
         read_only=True,
         help_text="评论用户姓名"
     )
-    user_avatar = serializers.CharField(
-        source='user.avatar',
-        read_only=True,
-        allow_null=True,
-        help_text="评论用户头像"
+    user_avatar = serializers.SerializerMethodField(
+        help_text="评论用户头像（含默认头像）"
     )
     replies = serializers.SerializerMethodField(
         help_text="回复列表（嵌套结构）"
@@ -80,6 +77,26 @@ class CommentSerializer(CustomModelSerializer):
             many=True, 
             context=self.context
         ).data
+    
+    def get_user_avatar(self, obj):
+        """获取用户头像 URL（如果为空则返回默认头像 URL）
+        
+        Args:
+            obj: Comment 实例
+            
+        Returns:
+            str: 用户头像完整 URL
+        """
+        if obj.user:
+            # 获取请求对象以构建完整 URL
+            request = self.context.get('request')
+            if request:
+                # 返回完整的头像 URL（注意是 users 复数）
+                return request.build_absolute_uri(f"/api/content/users/{obj.user.id}/avatar/")
+            else:
+                # 如果没有 request 上下文，返回相对路径
+                return f"/api/content/users/{obj.user.id}/avatar/"
+        return None
     
     def get_reply_to_name(self, obj):
         """获取被回复人的用户名

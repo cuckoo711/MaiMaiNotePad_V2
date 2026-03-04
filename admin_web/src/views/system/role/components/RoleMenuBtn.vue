@@ -18,7 +18,7 @@
 					:props="defaultTreeProps"
 					:data="deptData"
 					@change="customhandlePermissionRangeChange(default_selectBtn.dept)" 
-					placeholder="请选择自定义部门"
+					placeholder="请选择自定义用户组"
 					multiple
 					check-strictly
 					:render-after-expand="false"
@@ -115,13 +115,13 @@ const selectBtn = ref<RoleMenuBtnType>({
  */
 const dataPermissionRange = ref([
 	{ label: '仅本人数据权限', value: 0 },
-	{ label: '本部门及以下数据权限', value: 1 },
-	{ label: '本部门数据权限', value: 2 },
+	{ label: '本用户组及以下数据权限', value: 1 },
+	{ label: '本用户组数据权限', value: 2 },
 	{ label: '全部数据权限', value: 3 },
 	{ label: '自定数据权限', value: 4 },
 ]);
 /**
- * 自定义数据权限的部门树配置
+ * 自定义数据权限的用户组树配置
  */
 const defaultTreeProps = {
 	children: 'children',
@@ -144,7 +144,7 @@ const defaulthandlePermissionRangeChange = async (val: number) => {
 };
 
 /**
- * 默认部门下拉选择事件
+ * 默认用户组下拉选择事件
  * 保留数据到cache
  */
  const customhandlePermissionRangeChange = async (dept: Array<number>) => {
@@ -172,13 +172,13 @@ const formatDataRange = computed(() => {
 		});
 		// 数据权限与默认数据权限一致
 		if (datarange === default_selectBtn.value.data_range) {
-			// 判断选择的部门是否一致
+			// 判断选择的用户组是否一致
 			if (datarange !== 4 || JSON.stringify(dept) === JSON.stringify(default_selectBtn.value.dept)) {
 				
 				return "默认接口权限"
 			}
 		}
-		// datarange === 4 选择的部门不一致返回datarangeitem.label
+		// datarange === 4 选择的用户组不一致返回datarangeitem.label
 		return datarangeitem.label;
 	};
 });
@@ -225,7 +225,7 @@ const handleSettingClick = async (btn: RoleMenuBtnType) => {
 };
 
 /**
- * 部门数据
+ * 用户组数据
  *
  */
 const deptData = ref<number[]>([]);

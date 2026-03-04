@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import urllib
+import logging
 
 from asgiref.sync import sync_to_async, async_to_sync
 from channels.db import database_sync_to_async
@@ -14,6 +15,9 @@ from application import settings
 from mainotebook.system.models import MessageCenter, Users, MessageCenterTargetUser
 from mainotebook.system.views.message_center import MessageCenterTargetUserSerializer
 from mainotebook.utils.serializers import CustomModelSerializer
+
+# 获取日志记录器
+logger = logging.getLogger(__name__)
 
 send_dict = {}
 
@@ -58,8 +62,23 @@ class MainotebookWebSocket(AsyncJsonWebsocketConsumer):
     async def connect(self):
         try:
             import jwt
+            from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
+            
             self.service_uid = self.scope["url_route"]["kwargs"]["service_uid"]
-            decoded_result = jwt.decode(self.service_uid, settings.SECRET_KEY, algorithms=["HS256"])
+            
+            try:
+                decoded_result = jwt.decode(self.service_uid, settings.SECRET_KEY, algorithms=["HS256"])
+            except ExpiredSignatureError:
+                # Token 已过期，拒绝连接（不记录堆栈跟踪）
+                logger.warning(f"WebSocket 连接被拒绝：JWT token 已过期")
+                await self.close(code=4001)  # 自定义关闭码：token 过期
+                return
+            except InvalidTokenError as e:
+                # Token 无效，拒绝连接
+                logger.warning(f"WebSocket 连接被拒绝：JWT token 无效 - {e}")
+                await self.close(code=4002)  # 自定义关闭码：token 无效
+                return
+            
             if decoded_result:
                 self.user_id = decoded_result.get('user_id')
                 self.chat_group_name = "user_" + str(self.user_id)

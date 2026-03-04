@@ -25,6 +25,7 @@
     {"role__key": "superadmin", "menu__web_path": "/square", "menu__component_name": ""},
     {"role__key": "superadmin", "menu__web_path": "/square/knowledge", "menu__component_name": "squareKnowledge"},
     {"role__key": "superadmin", "menu__web_path": "/square/persona", "menu__component_name": "squarePersona"},
+    {"role__key": "superadmin", "menu__web_path": "/user/messages", "menu__component_name": "userMessages"},
 
     {"role__key": "admin", "menu__web_path": "/system", "menu__component_name": ""},
     {"role__key": "admin", "menu__web_path": "/user", "menu__component_name": "user"},
@@ -52,6 +53,7 @@
     {"role__key": "admin", "menu__web_path": "/square", "menu__component_name": ""},
     {"role__key": "admin", "menu__web_path": "/square/knowledge", "menu__component_name": "squareKnowledge"},
     {"role__key": "admin", "menu__web_path": "/square/persona", "menu__component_name": "squarePersona"},
+    {"role__key": "admin", "menu__web_path": "/user/messages", "menu__component_name": "userMessages"},
 
     {"role__key": "reviewer", "menu__web_path": "/content", "menu__component_name": ""},
     {"role__key": "reviewer", "menu__web_path": "/content/knowledge-base", "menu__component_name": "contentKnowledgeBase"},
@@ -62,13 +64,10 @@
     {"role__key": "reviewer", "menu__web_path": "/square", "menu__component_name": ""},
     {"role__key": "reviewer", "menu__web_path": "/square/knowledge", "menu__component_name": "squareKnowledge"},
     {"role__key": "reviewer", "menu__web_path": "/square/persona", "menu__component_name": "squarePersona"},
+    {"role__key": "reviewer", "menu__web_path": "/user/messages", "menu__component_name": "userMessages"},
 
-    {"role__key": "user", "menu__web_path": "/messageCenter", "menu__component_name": "messageCenter"},
     {"role__key": "user", "menu__web_path": "/square", "menu__component_name": ""},
     {"role__key": "user", "menu__web_path": "/square/knowledge", "menu__component_name": "squareKnowledge"},
     {"role__key": "user", "menu__web_path": "/square/persona", "menu__component_name": "squarePersona"},
-    {"role__key": "user", "menu__web_path": "/content", "menu__component_name": ""},
-    {"role__key": "user", "menu__web_path": "/content/knowledge-base", "menu__component_name": "contentKnowledgeBase"},
-    {"role__key": "user", "menu__web_path": "/content/persona-card", "menu__component_name": "contentPersonaCard"},
-    {"role__key": "user", "menu__web_path": "/content/comment", "menu__component_name": "contentComment"}
+    {"role__key": "user", "menu__web_path": "/user/messages", "menu__component_name": "userMessages"}
 ]

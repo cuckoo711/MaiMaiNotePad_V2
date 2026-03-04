@@ -49,6 +49,9 @@ class KnowledgeBaseSerializer(CustomModelSerializer):
     is_starred = serializers.SerializerMethodField(
         help_text="当前用户是否已收藏"
     )
+    comment_count = serializers.SerializerMethodField(
+        help_text="评论数量"
+    )
     
     class Meta:
         model = KnowledgeBase
@@ -57,7 +60,7 @@ class KnowledgeBaseSerializer(CustomModelSerializer):
             'uploader_avatar', 'copyright_owner', 'content', 'tags',
             'star_count', 'downloads', 'is_public', 'is_pending',
             'rejection_reason', 'create_datetime',
-            'update_datetime', 'files', 'is_starred'
+            'update_datetime', 'files', 'is_starred', 'comment_count'
         ]
         read_only_fields = [
             'id', 'star_count', 'downloads', 'create_datetime', 
@@ -95,6 +98,22 @@ class KnowledgeBaseSerializer(CustomModelSerializer):
                 target_type='knowledge'
             ).exists()
         return False
+    
+    def get_comment_count(self, obj):
+        """获取评论数量
+        
+        Args:
+            obj: KnowledgeBase 实例
+            
+        Returns:
+            int: 评论数量（包括所有层级的评论和回复）
+        """
+        from mainotebook.content.models import Comment
+        return Comment.objects.filter(
+            target_id=str(obj.id),
+            target_type='knowledge',
+            is_deleted=False
+        ).count()
 
     def to_representation(self, instance):
         """序列化输出，隐藏非创建者的 content（补充说明）字段

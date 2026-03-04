@@ -754,12 +754,14 @@ class UserExtensionViewSet(viewsets.ViewSet):
     def avatar(self, request, pk=None):
         """获取用户头像（公开访问）
         
+        如果用户没有上传头像，返回默认头像。
+        
         Args:
             request: HTTP 请求对象
             pk: 用户ID
             
         Returns:
-            Response: 重定向到头像文件或返回404
+            Response: 重定向到头像文件或默认头像
         """
         try:
             user = Users.objects.get(pk=pk)
@@ -771,11 +773,17 @@ class UserExtensionViewSet(viewsets.ViewSet):
                 if user.avatar.startswith('/media/'):
                     return redirect(user.avatar)
                 # 如果是相对路径，拼接MEDIA_URL
-                avatar_url = f"{settings.MEDIA_URL}{user.avatar}".replace('//', '/')
+                # 注意：如果 avatar 已经包含 'media/' 前缀，需要去掉
+                avatar_path = user.avatar
+                if avatar_path.startswith('media/'):
+                    avatar_path = avatar_path[6:]  # 去掉 'media/' 前缀
+                avatar_url = f"{settings.MEDIA_URL}{avatar_path}".replace('//', '/')
                 return redirect(avatar_url)
             else:
-                # 用户没有头像
-                raise Http404("User has no avatar")
+                # 用户没有头像，返回默认头像
+                # 使用前端静态资源中的默认头像
+                default_avatar_url = '/img/headerImage.png'
+                return redirect(default_avatar_url)
         except Users.DoesNotExist:
             raise Http404("User not found")
         except Exception as e:

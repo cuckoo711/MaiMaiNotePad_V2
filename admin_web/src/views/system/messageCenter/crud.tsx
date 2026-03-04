@@ -7,10 +7,22 @@ import { auth } from '/@/utils/authFunction';
 const { compute } = useCompute();
 
 export default function ({ crudExpose, context }: CreateCrudOptionsProps): CreateCrudOptionsRet {
-	const { tabActivted } = context; //从context中获取tabActivted
+	const { tabActivted, receiveTabActivted } = context; //从context中获取tabActivted和receiveTabActivted
 
 	const pageRequest = async (query: PageQuery) => {
 		if (tabActivted.value === 'receive') {
+			// 根据二级标签添加消息类型筛选
+			if (receiveTabActivted.value === 'notification') {
+				// 通知：系统通知(0) 和 审核(4)
+				query.message_type__in = '0,4';
+			} else if (receiveTabActivted.value === 'comment') {
+				// 评论：评论(1)
+				query.message_type = 1;
+			} else if (receiveTabActivted.value === 'reply') {
+				// 回复：回复(2) 和 点赞(3)
+				query.message_type__in = '2,3';
+			}
+			// all 不添加筛选条件
 			return await api.GetSelfReceive(query);
 		}
 		return await api.GetList(query);

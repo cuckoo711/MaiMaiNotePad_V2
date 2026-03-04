@@ -1845,6 +1845,21 @@
                         "method": 0
                     }
                 ]
+            },
+            {
+                "name": "我的消息",
+                "icon": "ele-Message",
+                "sort": 3,
+                "is_link": false,
+                "is_catalog": false,
+                "web_path": "/user/messages",
+                "component": "user/messages/index",
+                "component_name": "userMessages",
+                "status": true,
+                "cache": true,
+                "visible": false,
+                "children": [],
+                "menu_button": []
             }
         ],
         "menu_button": [],

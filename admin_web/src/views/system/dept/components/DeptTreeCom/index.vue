@@ -1,11 +1,11 @@
 <template>
-	<el-input v-model="filterVal" :prefix-icon="Search" placeholder="请输入部门名称" />
+	<el-input v-model="filterVal" :prefix-icon="Search" placeholder="请输入用户组名称" />
 	<div class="dept-tree-com">
 		<div class="tc-head">
 			<el-icon size="16" color="#606266" class="tc-head-icon">
 				<HomeFilled />
 			</el-icon>
-			<span class="tc-head-txt">部门架构</span>
+			<span class="tc-head-txt">用户组架构</span>
 			<el-icon size="16" color="#606266" @click="() => (showTotalNum = !showTotalNum)" class="tc-head-icon">
 				<View v-show="!showTotalNum" />
 				<Hide v-show="showTotalNum" />
@@ -113,7 +113,7 @@ watch(filterVal, (val) => {
 });
 
 /**
- * 部门树的搜索事件
+ * 用户组树的搜索事件
  */
 const handleFilterTreeNode = (value: string, data: TreeItemType) => {
 	if (!value) return true;
@@ -121,7 +121,7 @@ const handleFilterTreeNode = (value: string, data: TreeItemType) => {
 };
 
 /**
- * 部门树的懒加载
+ * 用户组树的懒加载
  */
 const handleLoadNode = (node: Node, resolve: Function) => {
 	if (node.level !== 0) {
@@ -132,7 +132,7 @@ const handleLoadNode = (node: Node, resolve: Function) => {
 };
 
 /**
- * 部门的点击事件
+ * 用户组的点击事件
  */
 const handleNodeClick = (record: TreeItemType, node: Node) => {
 	treeSelectDept.value = record;
@@ -156,7 +156,7 @@ const handleUpdateMenu = (type: string) => {
 };
 
 /**
- * 删除部门
+ * 删除用户组
  */
 const handleDeleteDept = () => {
 	if (!treeSelectDept.value.id) {
@@ -169,7 +169,7 @@ const handleDeleteDept = () => {
 };
 
 /**
- * 部门上下移动操作
+ * 用户组上下移动操作
  */
 const handleSort = async (type: string) => {
 	if (!treeSelectDept.value.id) {

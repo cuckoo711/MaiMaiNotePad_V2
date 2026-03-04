@@ -212,25 +212,22 @@ class ModerationService:
 
 输出格式（必须是合法的 JSON，不含任何额外文字）：
 {{
-  "decision": "true/false/unknown",
+  "decision": "approved/rejected/unknown",
   "confidence": 0.0-1.0,
   "violation_types": ["porn", "politics", "abuse", "violence", "spam", "illegal"],
   "flagged_content": "引用原文中被判定为违规的具体片段，多个片段用 | 分隔；若无违规则为空字符串"
 }}
 
 字段说明：
-- decision: "true"（通过）、"false"（拒绝）或 "unknown"（不确定）
-- confidence: 0~1 的浮点数，表示内容违规的置信度，越接近 1 越确信违规
-- violation_types: 违规类型数组，若 decision 为 "true" 则为空数组
+- decision: "approved"（审核通过，内容正常）、"rejected"（审核拒绝，内容违规）或 "unknown"（不确定）
+- confidence: 0~1 的浮点数，表示你对当前判断的置信度
+  - 当 decision 为 "approved" 时，confidence 越高表示越确信内容正常
+  - 当 decision 为 "rejected" 时，confidence 越高表示越确信内容违规
+  - 当 decision 为 "unknown" 时，confidence 表示内容违规的可能性（越高越可能违规）
+- violation_types: 违规类型数组，若 decision 为 "approved" 则为空数组
 - flagged_content: 从原文中摘录的违规片段（原文引用，不要改写），多个片段用 | 分隔。若无违规则为空字符串
 
 请严格按照上述格式输出，不要添加任何解释或额外文字。
-
-置信度（Confidence）代表的是 你认为你的判断是正确的概率，数值越高，表示你越确信你的判断是正确的。
-因此：
-- 置信度越高，判断结果越可信。
-- 置信度越低，判断结果越不可信。
-- 如果你不确定，但是你认为ta是违规的，置信度则代表你认为ta是违规的概率，数值越高，表示你越确信ta是违规的。
 """
 
     # 不同文本类型的特定审核规则
@@ -418,7 +415,7 @@ class ModerationService:
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": "今天天气真好"},
-                        {"role": "assistant", "content": '{"decision": "true", "confidence": 0.9, "violation_types": [], "flagged_content": ""}'},
+                        {"role": "assistant", "content": '{"decision": "approved", "confidence": 0.9, "violation_types": [], "flagged_content": ""}'},
                         {"role": "user", "content": user_message},
                     ],
                     "temperature": temperature,
@@ -449,6 +446,12 @@ class ModerationService:
                 if not self._validate_result(result):
                     logger.error("模型 %s 输出格式不符合要求: %s", model_name, result)
                     result = self._get_default_unknown_result()
+                
+                # 兼容旧格式：将 true/false 转换为 approved/rejected
+                if result.get('decision') == 'true':
+                    result['decision'] = 'approved'
+                elif result.get('decision') == 'false':
+                    result['decision'] = 'rejected'
 
                 result['_meta'] = {
                     'model_name': model_name,
@@ -699,8 +702,9 @@ class ModerationService:
         if "decision" not in result or "confidence" not in result or "violation_types" not in result:
             return False
 
-        # 检查字段类型和取值
-        if result["decision"] not in ["true", "false", "unknown"]:
+        # 检查字段类型和取值（兼容旧格式 true/false）
+        valid_decisions = ["approved", "rejected", "unknown", "true", "false"]
+        if result["decision"] not in valid_decisions:
             return False
 
         if not isinstance(result["confidence"], (int, float)) or not (0 <= result["confidence"] <= 1):

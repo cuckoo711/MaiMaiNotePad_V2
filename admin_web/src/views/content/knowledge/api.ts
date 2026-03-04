@@ -53,6 +53,20 @@ export function downloadKnowledgeFile(id: string, fileId: string) {
 }
 
 /**
+ * 解析知识库文件（JSON/TXT）
+ */
+export function parseKnowledgeFile(id: string, fileId: string, params?: any) {
+	return request({
+		url: `/api/content/knowledge/${id}/parse_file/`,
+		method: 'post',
+		data: {
+			file_id: fileId,
+			...params
+		}
+	});
+}
+
+/**
  * 获取热门标签
  */
 export function getPopularTags(limit: number = 20, tagType: string = 'knowledge') {

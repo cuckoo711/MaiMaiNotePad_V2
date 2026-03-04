@@ -136,6 +136,7 @@ class CommentService:
         """调用 AI 审核评论内容
 
         使用 ModerationService 对评论内容进行审核，并记录审核日志。
+        评论审核优先使用 Qwen/Qwen3-8B 模型，如果该模型失败则自动切换到模型池的其他模型。
         AI 异常时默认放行（返回 uncertain），不阻塞用户发言。
 
         Args:
@@ -149,31 +150,183 @@ class CommentService:
                 - moderation_detail: AI 返回的原始审核结果字典
         """
         import logging
+        import time
+        from openai import OpenAI
+        
         logger = logging.getLogger(__name__)
 
         try:
-            from mainotebook.content.services.moderation_service import get_moderation_service
+            from mainotebook.content.services.moderation_service import get_moderation_service, _get_api_key
+            from mainotebook.content.models import ModerationLog
+            
             service = get_moderation_service()
-            result = service.moderate(
-                content, text_type="comment",
-                source="comment", user=user, content_id=content_id,
-            )
-
-            decision = result.get("decision", "unknown")
-
-            # 映射 AI 决策到评论审核状态
-            if decision == "false":
-                moderation_status = "rejected"
-            elif decision == "true":
-                moderation_status = "approved"
-            else:
-                moderation_status = "uncertain"
-
-            logger.info(
-                "评论 AI 审核完成 - 状态: %s, 置信度: %s, 违规类型: %s",
-                moderation_status, result.get("confidence"), result.get("violation_types"),
-            )
-            return moderation_status, result
+            preferred_model = 'Qwen/Qwen3-8B'
+            
+            # 第一步：尝试使用 Qwen/Qwen3-8B
+            try:
+                logger.info("评论审核优先使用模型: %s", preferred_model)
+                
+                # 获取系统提示词
+                system_prompt = service._get_system_prompt("comment")
+                user_message = f"文本类型：comment\n待审核内容：{content}"
+                
+                # 创建待审核日志
+                moderation_log = ModerationLog.objects.create(
+                    source="comment",
+                    content_id=content_id,
+                    user=user,
+                    model_name=preferred_model,
+                    api_provider='siliconflow',
+                    temperature=0.1,
+                    text_type="comment",
+                    input_text=content,
+                    input_text_length=len(content),
+                    decision='pending',
+                    confidence=0.0,
+                    violation_types=[],
+                    is_success=False,
+                )
+                
+                start_time = time.monotonic()
+                
+                # 直接调用 API
+                api_key = _get_api_key()
+                client = OpenAI(api_key=api_key, base_url="https://api.siliconflow.cn/v1")
+                
+                response = client.chat.completions.create(
+                    model=preferred_model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": "今天天气真好"},
+                        {"role": "assistant", "content": '{"decision": "approved", "confidence": 0.9, "violation_types": [], "flagged_content": ""}'},
+                        {"role": "user", "content": user_message},
+                    ],
+                    temperature=0.1,
+                    max_tokens=2048,
+                    stream=False,
+                    timeout=60,
+                    extra_body={"enable_thinking": False},
+                )
+                
+                latency_ms = int((time.monotonic() - start_time) * 1000)
+                
+                # 提取 token 用量
+                usage = getattr(response, 'usage', None)
+                prompt_tokens = getattr(usage, 'prompt_tokens', 0) or 0
+                completion_tokens = getattr(usage, 'completion_tokens', 0) or 0
+                total_tokens = getattr(usage, 'total_tokens', 0) or 0
+                
+                output = response.choices[0].message.content.strip()
+                
+                # 解析 JSON 结果
+                from mainotebook.utils.json_helper import extract_json
+                result = extract_json(output)
+                
+                if not service._validate_result(result):
+                    raise ValueError(f"模型输出格式不符合要求: {result}")
+                
+                # 兼容旧格式：将 true/false 转换为 approved/rejected
+                if result.get('decision') == 'true':
+                    result['decision'] = 'approved'
+                elif result.get('decision') == 'false':
+                    result['decision'] = 'rejected'
+                
+                result['_meta'] = {
+                    'model_name': preferred_model,
+                    'api_provider': 'siliconflow',
+                    'temperature': 0.1,
+                    'prompt_tokens': prompt_tokens,
+                    'completion_tokens': completion_tokens,
+                    'total_tokens': total_tokens,
+                    'latency_ms': latency_ms,
+                    'raw_output': output,
+                    'is_success': True,
+                    'error_message': None,
+                }
+                
+                # 更新日志为成功
+                moderation_log.decision = result['decision']
+                moderation_log.confidence = result['confidence']
+                moderation_log.violation_types = result['violation_types']
+                moderation_log.prompt_tokens = prompt_tokens
+                moderation_log.completion_tokens = completion_tokens
+                moderation_log.total_tokens = total_tokens
+                moderation_log.raw_output = output
+                moderation_log.latency_ms = latency_ms
+                moderation_log.is_success = True
+                moderation_log.save()
+                
+                logger.info(
+                    "审核完成 [%s] - 决策: %s, 置信度: %s, 违规: %s, Token: %d, 耗时: %dms",
+                    preferred_model, result['decision'], result['confidence'],
+                    result['violation_types'], total_tokens, latency_ms,
+                )
+                
+                # 映射 AI 决策到评论审核状态
+                decision = result.get("decision", "unknown")
+                if decision == "rejected":
+                    moderation_status = "rejected"
+                elif decision == "approved":
+                    moderation_status = "approved"
+                else:
+                    moderation_status = "uncertain"
+                
+                return moderation_status, result
+                
+            except Exception as e:
+                error_str = str(e)
+                is_rate_limited = '429' in error_str or 'rate' in error_str.lower()
+                
+                if is_rate_limited:
+                    logger.warning("%s 触发 429 限速，切换到模型池其他模型", preferred_model)
+                    # 标记该模型进入冷却期
+                    service.model_pool.mark_rate_limited(preferred_model)
+                else:
+                    logger.warning("%s 审核失败: %s，切换到模型池其他模型", preferred_model, e)
+                
+                # 更新日志为错误
+                if 'moderation_log' in locals():
+                    latency_ms = int((time.monotonic() - start_time) * 1000) if 'start_time' in locals() else 0
+                    moderation_log.decision = 'error'
+                    moderation_log.latency_ms = latency_ms
+                    moderation_log.is_success = is_rate_limited  # 限速不计入失败
+                    moderation_log.error_message = error_str
+                    moderation_log.save()
+            
+            # 第二步：使用模型池的其他模型（跳过 Qwen/Qwen3-8B）
+            logger.info("使用模型池进行审核（跳过 %s）", preferred_model)
+            
+            # 临时从模型池中移除 Qwen/Qwen3-8B
+            with service.model_pool._lock:
+                original_models = service.model_pool._models[:]
+                filtered_models = [m for m in original_models if m[0] != preferred_model]
+                service.model_pool._models = filtered_models
+            
+            try:
+                result = service.moderate(
+                    content, text_type="comment",
+                    source="comment", user=user, content_id=content_id,
+                )
+                
+                decision = result.get("decision", "unknown")
+                
+                # 映射 AI 决策到评论审核状态
+                if decision == "rejected":
+                    moderation_status = "rejected"
+                elif decision == "approved":
+                    moderation_status = "approved"
+                else:
+                    moderation_status = "uncertain"
+                
+                logger.info(
+                    "评论 AI 审核完成 - 状态: %s, 置信度: %s, 违规类型: %s",
+                    moderation_status, result.get("confidence"), result.get("violation_types"),
+                )
+                return moderation_status, result
+            finally:
+                # 恢复原始模型列表
+                with service.model_pool._lock:
+                    service.model_pool._models = original_models
 
         except Exception as e:
             # AI 服务异常时默认放行，不阻塞用户

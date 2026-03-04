@@ -56,7 +56,7 @@ export default {
     searchPlaceholder: 'Menu Search: Supports Chinese, route paths',
     newTitle: 'Notifications',
     newBtn: 'Mark All as Read',
-    newGo: 'Go to Notification Center',
+    newGo: 'View All Messages',
     newDesc: 'No notifications',
     logOutTitle: 'Prompt',
     logOutMessage: 'This operation will log you out, continue?',
