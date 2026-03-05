@@ -1259,3 +1259,159 @@ class TagStatistics(CoreModel):
     def __str__(self) -> str:
         return f"{self.tag} (热度: {self.hot_score:.2f})"
 
+
+
+class PersonaCardConfig(CoreModel):
+    """人设卡配置项模型
+    
+    存储 TOML 文件中的每个配置项，支持版本管理和修改历史追踪。
+    每个配置项对应 TOML 文件中的一个键值对，包含所属配置块、键名、值、数据类型等信息。
+    """
+    
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        verbose_name="配置项ID",
+        help_text="配置项唯一标识"
+    )
+    
+    persona_card = models.ForeignKey(
+        to=PersonaCard,
+        on_delete=models.CASCADE,
+        db_constraint=False,
+        related_name="configs",
+        verbose_name="关联人设卡",
+        help_text="关联人设卡"
+    )
+    
+    section_name = models.CharField(
+        max_length=200,
+        verbose_name="配置块名",
+        help_text="TOML 文件中的 section 名称，如 'inner.meta.card'"
+    )
+    
+    key_name = models.CharField(
+        max_length=200,
+        verbose_name="配置键名",
+        help_text="配置项的键名"
+    )
+    
+    value = models.TextField(
+        verbose_name="配置值",
+        help_text="配置项的值，复杂类型存储为 JSON 字符串"
+    )
+    
+    data_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('string', '字符串'),
+            ('integer', '整数'),
+            ('float', '浮点数'),
+            ('boolean', '布尔值'),
+            ('array', '数组'),
+            ('object', '对象'),
+        ],
+        verbose_name="数据类型",
+        help_text="配置值的数据类型"
+    )
+    
+    is_deleted = models.BooleanField(
+        default=False,
+        verbose_name="是否删除",
+        help_text="标记配置块是否被用户删除"
+    )
+    
+    description = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name="注释",
+        help_text="配置项的注释说明"
+    )
+    
+    class Meta:
+        db_table = table_prefix + "content_persona_card_config"
+        verbose_name = "人设卡配置项"
+        verbose_name_plural = verbose_name
+        ordering = ("section_name", "key_name")
+        unique_together = [("persona_card", "section_name", "key_name")]
+        indexes = [
+            models.Index(fields=['persona_card']),
+            models.Index(fields=['section_name']),
+            models.Index(fields=['is_deleted']),
+            models.Index(fields=['create_datetime']),
+            models.Index(fields=['update_datetime']),
+        ]
+    
+    def __str__(self) -> str:
+        return f"{self.section_name}.{self.key_name}"
+
+
+class SensitiveInfoConfirmation(CoreModel):
+    """敏感信息确认记录模型
+    
+    存储用户对配置中敏感信息的确认记录，用于审计和追溯。
+    当用户上传的人设卡配置中包含敏感信息（5-11 位连续数字）时，
+    需要用户确认这些信息不涉及个人隐私，系统会记录确认声明、时间戳和 IP 地址。
+    """
+    
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        verbose_name="确认记录ID",
+        help_text="确认记录唯一标识"
+    )
+    
+    persona_card = models.ForeignKey(
+        to=PersonaCard,
+        on_delete=models.CASCADE,
+        db_constraint=False,
+        related_name="sensitive_confirmations",
+        verbose_name="关联人设卡",
+        help_text="关联人设卡"
+    )
+    
+    user = models.ForeignKey(
+        to=Users,
+        on_delete=models.PROTECT,
+        db_constraint=False,
+        related_name="sensitive_confirmations",
+        verbose_name="确认用户",
+        help_text="确认用户"
+    )
+    
+    confirmation_text = models.TextField(
+        verbose_name="确认声明",
+        help_text="用户输入的确认声明文本"
+    )
+    
+    sensitive_locations = models.JSONField(
+        verbose_name="敏感信息位置",
+        help_text="敏感信息所在位置的 JSON 数组"
+    )
+    
+    ip_address = models.GenericIPAddressField(
+        verbose_name="IP 地址",
+        help_text="用户确认时的 IP 地址"
+    )
+    
+    confirmed_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="确认时间",
+        help_text="确认时间"
+    )
+    
+    class Meta:
+        db_table = table_prefix + "content_sensitive_info_confirmation"
+        verbose_name = "敏感信息确认记录"
+        verbose_name_plural = verbose_name
+        ordering = ("-confirmed_at",)
+        indexes = [
+            models.Index(fields=['persona_card']),
+            models.Index(fields=['user']),
+            models.Index(fields=['confirmed_at']),
+        ]
+    
+    def __str__(self) -> str:
+        return f"{self.user.username} - {self.persona_card.name}"

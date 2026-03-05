@@ -28,6 +28,8 @@ if ADMIN_ENABLED:
         KnowledgeBaseFile,
         PersonaCard, 
         PersonaCardFile,
+        PersonaCardConfig,
+        SensitiveInfoConfirmation,
         Comment,
         CommentReaction,
         StarRecord,
@@ -345,6 +347,74 @@ if ADMIN_ENABLED:
         fieldsets = (
             ('下载信息', {
                 'fields': ('target_id', 'target_type')
+            }),
+            ('时间信息', {
+                'fields': ('create_datetime', 'update_datetime'),
+                'classes': ('collapse',)
+            }),
+        )
+
+
+    @admin.register(PersonaCardConfig)
+    class PersonaCardConfigAdmin(admin.ModelAdmin):
+        """人设卡配置项 Admin 配置"""
+        
+        list_display = [
+            'persona_card',
+            'section_name',
+            'key_name',
+            'data_type',
+            'is_deleted',
+            'create_datetime'
+        ]
+        list_filter = ['data_type', 'is_deleted', 'create_datetime']
+        search_fields = ['section_name', 'key_name', 'value', 'description']
+        raw_id_fields = ['persona_card']
+        date_hierarchy = 'create_datetime'
+        readonly_fields = ['create_datetime', 'update_datetime']
+        
+        fieldsets = (
+            ('配置信息', {
+                'fields': ('persona_card', 'section_name', 'key_name')
+            }),
+            ('配置值', {
+                'fields': ('value', 'data_type', 'description')
+            }),
+            ('状态信息', {
+                'fields': ('is_deleted',)
+            }),
+            ('时间信息', {
+                'fields': ('create_datetime', 'update_datetime'),
+                'classes': ('collapse',)
+            }),
+        )
+
+
+    @admin.register(SensitiveInfoConfirmation)
+    class SensitiveInfoConfirmationAdmin(admin.ModelAdmin):
+        """敏感信息确认记录 Admin 配置"""
+        
+        list_display = [
+            'persona_card',
+            'user',
+            'ip_address',
+            'confirmed_at'
+        ]
+        list_filter = ['confirmed_at']
+        search_fields = ['persona_card__name', 'user__username', 'confirmation_text', 'ip_address']
+        raw_id_fields = ['persona_card', 'user']
+        date_hierarchy = 'confirmed_at'
+        readonly_fields = ['confirmed_at', 'create_datetime', 'update_datetime']
+        
+        fieldsets = (
+            ('确认信息', {
+                'fields': ('persona_card', 'user', 'confirmation_text')
+            }),
+            ('敏感信息位置', {
+                'fields': ('sensitive_locations',)
+            }),
+            ('确认详情', {
+                'fields': ('ip_address', 'confirmed_at')
             }),
             ('时间信息', {
                 'fields': ('create_datetime', 'update_datetime'),
