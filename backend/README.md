@@ -163,7 +163,7 @@ python scripts/full_reset.py --test
 
 ## 核心功能模块
 
-详细文档见 `docs/` 目录。
+详细文档见 [文档索引](docs/README.md)。
 
 ### 系统管理（mainotebook.system）
 
