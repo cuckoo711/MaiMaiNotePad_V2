@@ -393,3 +393,119 @@ class FileSerializer(CustomModelSerializer):
             'file_type', 'file_size', 'create_datetime'
         ]
         read_only_fields = ['id', 'create_datetime']
+
+
+class TagField(serializers.Field):
+    """标签字段序列化器
+    
+    支持：
+    1. 接收数组格式：["标签1", "标签2"]
+    2. 接收字符串格式（向后兼容）："标签1,标签2"
+    3. 自动去重、去空格
+    4. 验证长度限制
+    
+    验证需求：3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8
+    """
+    
+    MAX_TAG_LENGTH = 50
+    MAX_TAGS_COUNT = 20
+    
+    def __init__(self, **kwargs):
+        """初始化字段，设置默认值"""
+        # 设置默认值为空列表，确保字段始终有值
+        kwargs.setdefault('default', list)
+        # 允许 None 值，但会在 to_internal_value 中转换为空列表
+        kwargs.setdefault('allow_null', True)
+        super().__init__(**kwargs)
+    
+    def to_internal_value(self, data):
+        """将输入数据转换为标签数组
+        
+        Args:
+            data: 标签数据，可以是数组、字符串或 None
+            
+        Returns:
+            List[str]: 标准化的标签数组
+            
+        Raises:
+            serializers.ValidationError: 验证失败时
+        """
+        # 处理 None 和空值
+        if data is None or data == '':
+            return []
+        
+        # 处理字符串格式（向后兼容）
+        if isinstance(data, str):
+            tags = [tag.strip() for tag in data.split(',') if tag.strip()]
+        # 处理数组格式
+        elif isinstance(data, list):
+            tags = []
+            for tag in data:
+                if not isinstance(tag, str):
+                    raise serializers.ValidationError(
+                        f"标签必须是字符串类型，收到: {type(tag).__name__}"
+                    )
+                tag = tag.strip()
+                if tag:
+                    tags.append(tag)
+        else:
+            raise serializers.ValidationError(
+                f"标签格式错误，必须是数组或字符串，收到: {type(data).__name__}"
+            )
+        
+        # 去重（保持顺序）
+        seen = set()
+        unique_tags = []
+        for tag in tags:
+            if tag not in seen:
+                seen.add(tag)
+                unique_tags.append(tag)
+        
+        # 验证单个标签长度
+        for tag in unique_tags:
+            if len(tag) > self.MAX_TAG_LENGTH:
+                raise serializers.ValidationError(
+                    f"标签 '{tag}' 超过最大长度 {self.MAX_TAG_LENGTH} 个字符"
+                )
+        
+        # 验证标签数量
+        if len(unique_tags) > self.MAX_TAGS_COUNT:
+            raise serializers.ValidationError(
+                f"标签数量超过最大限制 {self.MAX_TAGS_COUNT} 个"
+            )
+        
+        return unique_tags
+    
+    def to_representation(self, value):
+        """将数据库值转换为 API 响应格式
+        
+        同时进行标准化处理，确保输出始终是标准化的数组。
+        
+        Args:
+            value: 数据库中的标签值
+            
+        Returns:
+            List[str]: 标准化的标签数组
+        """
+        if value is None:
+            return []
+        
+        # 如果数据库中还是字符串格式（迁移期间）
+        if isinstance(value, str):
+            tags = [tag.strip() for tag in value.split(',') if tag.strip()]
+        # 已经是数组格式
+        elif isinstance(value, list):
+            tags = [tag.strip() for tag in value if tag and isinstance(tag, str)]
+        else:
+            return []
+        
+        # 去重（保持顺序）
+        seen = set()
+        unique_tags = []
+        for tag in tags:
+            tag = tag.strip()
+            if tag and tag not in seen:
+                seen.add(tag)
+                unique_tags.append(tag)
+        
+        return unique_tags

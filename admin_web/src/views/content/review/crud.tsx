@@ -195,7 +195,14 @@ export const createCrudOptions = function ({ crudExpose, context }: CreateCrudOp
 					column: {
 						minWidth: 150,
 						showOverflowTooltip: true,
-						formatter: ({ value }: any) => value || '-',
+						formatter: ({ value }: any) => {
+							// 支持数组和字符串格式
+							if (!value) return '-';
+							if (Array.isArray(value)) {
+								return value.length > 0 ? value.join(', ') : '-';
+							}
+							return value;
+						},
 					},
 					form: { show: false },
 				},

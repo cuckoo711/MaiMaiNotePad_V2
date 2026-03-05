@@ -249,7 +249,12 @@ export const createCrudOptions = function ({ crudExpose }: CreateCrudOptionsProp
 					column: {
 						minWidth: 150,
 						formatter: ({ value }) => {
-							return value ? value : '-';
+							// 支持数组和字符串格式
+							if (!value) return '-';
+							if (Array.isArray(value)) {
+								return value.length > 0 ? value.join(', ') : '-';
+							}
+							return value;
 						},
 					},
 					form: {

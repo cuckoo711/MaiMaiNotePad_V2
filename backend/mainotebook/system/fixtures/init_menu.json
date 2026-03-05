@@ -1576,6 +1576,98 @@
                         "method": 0
                     }
                 ]
+            },
+            {
+                "name": "上传人设卡",
+                "icon": "ele-Upload",
+                "sort": 3,
+                "is_link": false,
+                "is_catalog": false,
+                "web_path": "/content/persona/upload",
+                "component": "content/persona/upload/PersonaCardUploadWizard",
+                "component_name": "personaCardUpload",
+                "status": true,
+                "cache": false,
+                "visible": false,
+                "children": [],
+                "menu_button": [
+                    {
+                        "name": "解析TOML",
+                        "value": "persona_upload:ParseToml",
+                        "api": "/api/content/persona/parse_toml/",
+                        "method": 1
+                    },
+                    {
+                        "name": "创建人设卡",
+                        "value": "persona_upload:CreateWithConfig",
+                        "api": "/api/content/persona/create_with_config/",
+                        "method": 1
+                    },
+                    {
+                        "name": "确认敏感信息",
+                        "value": "persona_upload:ConfirmSensitive",
+                        "api": "/api/content/persona/{id}/confirm_sensitive/",
+                        "method": 1
+                    }
+                ]
+            },
+            {
+                "name": "我的人设卡",
+                "icon": "ele-FolderOpened",
+                "sort": 4,
+                "is_link": false,
+                "is_catalog": false,
+                "web_path": "/content/persona/manage",
+                "component": "content/persona/manage/PersonaCardList",
+                "component_name": "personaCardManage",
+                "status": true,
+                "cache": true,
+                "visible": true,
+                "children": [],
+                "menu_button": [
+                    {
+                        "name": "查询我的人设卡",
+                        "value": "persona_manage:MyList",
+                        "api": "/api/content/persona/my/",
+                        "method": 0
+                    },
+                    {
+                        "name": "获取配置",
+                        "value": "persona_manage:GetConfig",
+                        "api": "/api/content/persona/{id}/config/",
+                        "method": 0
+                    },
+                    {
+                        "name": "更新配置",
+                        "value": "persona_manage:UpdateConfig",
+                        "api": "/api/content/persona/{id}/config/",
+                        "method": 2
+                    },
+                    {
+                        "name": "导出TOML",
+                        "value": "persona_manage:ExportToml",
+                        "api": "/api/content/persona/{id}/export_toml/",
+                        "method": 1
+                    },
+                    {
+                        "name": "下载人设卡",
+                        "value": "persona_manage:Download",
+                        "api": "/api/content/persona/{id}/download/",
+                        "method": 0
+                    },
+                    {
+                        "name": "切换公开状态",
+                        "value": "persona_manage:TogglePublic",
+                        "api": "/api/content/persona/{id}/toggle_public/",
+                        "method": 1
+                    },
+                    {
+                        "name": "删除",
+                        "value": "persona_manage:Delete",
+                        "api": "/api/content/persona/{id}/",
+                        "method": 3
+                    }
+                ]
             }
         ],
         "menu_button": [],

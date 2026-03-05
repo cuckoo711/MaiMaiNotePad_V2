@@ -54,11 +54,11 @@ class KnowledgeBase(CoreModel):
         verbose_name="内容",
         help_text="知识库文本内容"
     )
-    tags = models.TextField(
-        null=True,
+    tags = models.JSONField(
+        default=list,
         blank=True,
         verbose_name="标签",
-        help_text="标签，多个标签用逗号分隔"
+        help_text="标签数组，JSON 格式"
     )
     star_count = models.IntegerField(
         default=0,
@@ -242,11 +242,11 @@ class PersonaCard(CoreModel):
         verbose_name="内容",
         help_text="人设卡文本内容"
     )
-    tags = models.TextField(
-        null=True,
+    tags = models.JSONField(
+        default=list,
         blank=True,
         verbose_name="标签",
-        help_text="标签，多个标签用逗号分隔"
+        help_text="标签数组，JSON 格式"
     )
     star_count = models.IntegerField(
         default=0,
@@ -285,6 +285,11 @@ class PersonaCard(CoreModel):
         verbose_name="版本号",
         help_text="版本号"
     )
+    is_deleted = models.BooleanField(
+        default=False,
+        verbose_name="是否删除",
+        help_text="软删除标记，已删除的人设卡对其他用户不可见"
+    )
     
     def to_dict(self) -> dict:
         """转换为字典格式
@@ -305,6 +310,7 @@ class PersonaCard(CoreModel):
             'base_path': self.base_path,
             'is_public': self.is_public,
             'is_pending': self.is_pending,
+            'is_deleted': self.is_deleted,
             'rejection_reason': self.rejection_reason,
             'version': self.version,
             'created_at': self.create_datetime.isoformat() if self.create_datetime else None,
@@ -320,6 +326,7 @@ class PersonaCard(CoreModel):
             models.Index(fields=['uploader']),
             models.Index(fields=['is_public']),
             models.Index(fields=['is_pending']),
+            models.Index(fields=['is_deleted']),
             models.Index(fields=['star_count']),
             models.Index(fields=['create_datetime']),
             models.Index(fields=['update_datetime']),

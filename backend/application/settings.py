@@ -108,6 +108,10 @@ DATABASES = {
         "PASSWORD": DATABASE_PASSWORD,
         "HOST": DATABASE_HOST,
         "PORT": DATABASE_PORT,
+        "TEST": {
+            "NAME": "test_" + DATABASE_NAME,
+            "MIRROR": None,
+        }
     }
 }
 AUTH_USER_MODEL = "system.Users"

@@ -128,7 +128,7 @@ def get_browser(request, ):
     :param kwargs:
     :return:
     """
-    ua_string = request.META['HTTP_USER_AGENT']
+    ua_string = request.META.get('HTTP_USER_AGENT', 'Unknown')
     user_agent = parse(ua_string)
     return user_agent.get_browser()
 

@@ -28,7 +28,8 @@ class ReviewNotificationService:
         content_name: str,
         content_type: str,
         action: str,
-        reason: Optional[str] = None
+        reason: Optional[str] = None,
+        report_summary: Optional[str] = None
     ) -> None:
         """发送审核结果通知
 
@@ -41,6 +42,7 @@ class ReviewNotificationService:
             content_type: 内容类型（knowledge/persona）
             action: 审核操作（approved/rejected）
             reason: 拒绝原因（仅拒绝时使用）
+            report_summary: 审核报告摘要（可选）
         """
         try:
             # 根据 action 生成消息标题和内容
@@ -49,11 +51,15 @@ class ReviewNotificationService:
             if action == "approved":
                 title = "审核通过通知"
                 message_content = f"您的{content_type_label}「{content_name}」已通过审核。"
+                if report_summary:
+                    message_content += f"\n\n审核摘要：{report_summary}"
             else:
                 title = "审核拒绝通知"
                 message_content = f"您的{content_type_label}「{content_name}」未通过审核。"
                 if reason:
-                    message_content += f"拒绝原因：{reason}"
+                    message_content += f"\n\n拒绝原因：{reason}"
+                if report_summary:
+                    message_content += f"\n\n审核摘要：{report_summary}"
 
             # 创建 MessageCenter 记录（target_type=0 表示指定用户）
             message = MessageCenter.objects.create(

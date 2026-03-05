@@ -12,7 +12,7 @@ export interface KnowledgeBase {
 	uploader_name?: string; // 上传者名称（关联查询）
 	copyright_owner?: string; // 版权所有者
 	content?: string; // 内容
-	tags?: string; // 标签（逗号分隔）
+	tags?: string[]; // 标签（数组格式）
 	star_count: number; // 收藏数
 	downloads: number; // 下载次数
 	base_path: string; // 基础路径（JSON 数组）

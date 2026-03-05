@@ -94,6 +94,25 @@
                         <el-tag size="small" type="info">v{{ currentDetail.version || '1.0' }}</el-tag>
                       </span>
                     </div>
+                    <div class="detail-item" v-if="parseDetailTags(currentDetail.tags).length > 0">
+                      <span class="detail-label">标签</span>
+                      <span class="detail-value">
+                        <el-tag
+                          v-for="tag in parseDetailTags(currentDetail.tags)"
+                          :key="tag"
+                          size="small"
+                          type="info"
+                          effect="plain"
+                          style="margin-right: 6px; margin-bottom: 4px;"
+                        >
+                          {{ tag }}
+                        </el-tag>
+                      </span>
+                    </div>
+                    <div class="detail-item" v-else>
+                      <span class="detail-label">标签</span>
+                      <span class="detail-value" style="color: #999;">暂无标签</span>
+                    </div>
                   </div>
                 </div>
 
@@ -495,6 +514,20 @@ const loadSidebarData = async () => {
   }
 };
 
+/**
+ * 解析详情页标签数据
+ * 支持数组和字符串格式
+ */
+const parseDetailTags = (tagsData: string | string[] | undefined): string[] => {
+  if (!tagsData) return [];
+  // 如果是数组格式
+  if (Array.isArray(tagsData)) {
+    return tagsData.filter((tag: string) => tag && tag.trim());
+  }
+  // 如果是字符串格式（向后兼容）
+  return tagsData.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag);
+};
+
 // 页面加载
 onMounted(() => {
   loadPopularTags();
@@ -744,6 +777,9 @@ export default {
         font-size: 15px;
         color: #333;
         font-weight: 600;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
       }
     }
   }

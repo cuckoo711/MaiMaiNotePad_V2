@@ -1,0 +1,226 @@
+{
+  "10001": {
+    "key": "AUTH_INVALID_JSON",
+    "module": "auth",
+    "messages": {
+      "zh-CN": "请求数据格式不正确,请检查后重试。"
+    }
+  },
+  "10002": {
+    "key": "AUTH_UNSUPPORTED_CONTENT_TYPE",
+    "module": "auth",
+    "messages": {
+      "zh-CN": "当前请求格式不支持,请使用 JSON 或表单提交。"
+    }
+  },
+  "10003": {
+    "key": "AUTH_MISSING_CREDENTIALS",
+    "module": "auth",
+    "messages": {
+      "zh-CN": "请输入用户名和密码后再尝试登录。"
+    }
+  },
+  "10004": {
+    "key": "AUTH_MISSING_REFRESH_TOKEN",
+    "module": "auth",
+    "messages": {
+      "zh-CN": "刷新令牌缺失,请重新登录。"
+    }
+  },
+  "10005": {
+    "key": "AUTH_INVALID_EMAIL_FORMAT",
+    "module": "auth",
+    "messages": {
+      "zh-CN": "邮箱格式不正确,请检查后重新输入。"
+    }
+  },
+  "14001": {
+    "key": "PERSONA_NOT_FOUND",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "人设卡不存在或已被删除。"
+    }
+  },
+  "14002": {
+    "key": "PERSONA_ALREADY_DELETED",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "该人设卡已被删除,无法进行操作。"
+    }
+  },
+  "14100": {
+    "key": "PERSONA_UPLOAD_PERMISSION_DENIED",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "您没有上传人设卡的权限,可能是账号被封禁或禁言。"
+    }
+  },
+  "14101": {
+    "key": "PERSONA_UPLOAD_QUOTA_EXCEEDED",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "您今日的上传次数已达上限(10次),请明天再试。"
+    }
+  },
+  "14102": {
+    "key": "PERSONA_EDIT_PERMISSION_DENIED",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "该人设卡正在审核中或已通过审核,暂时无法编辑。"
+    }
+  },
+  "14103": {
+    "key": "PERSONA_DOWNLOAD_PERMISSION_DENIED",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "您没有下载该人设卡的权限,请先登录或确认人设卡已公开。"
+    }
+  },
+  "14200": {
+    "key": "PERSONA_NAME_INVALID",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "人设卡名称长度必须在1-200个字符之间。"
+    }
+  },
+  "14201": {
+    "key": "PERSONA_DESCRIPTION_TOO_SHORT",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "人设卡描述至少需要10个字符。"
+    }
+  },
+  "14202": {
+    "key": "FILE_NAME_INVALID",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "文件名必须为 bot_config.toml。"
+    }
+  },
+  "14203": {
+    "key": "FILE_SIZE_INVALID",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "文件大小必须在1KB到2MB之间。"
+    }
+  },
+  "14204": {
+    "key": "FILE_MIME_TYPE_INVALID",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "文件类型必须为 text/plain 或 application/toml。"
+    }
+  },
+  "14205": {
+    "key": "FILE_ENCODING_INVALID",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "文件编码必须为 UTF-8。"
+    }
+  },
+  "14206": {
+    "key": "TOML_SYNTAX_ERROR",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "TOML 文件语法错误,请检查文件格式。"
+    }
+  },
+  "14207": {
+    "key": "TOML_MISSING_VERSION",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "TOML 文件缺少 version 字段,请在顶层或 inner.meta.card 中添加。"
+    }
+  },
+  "14300": {
+    "key": "SENSITIVE_INFO_NOT_CONFIRMED",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "检测到配置中包含敏感信息(5-11位数字),请确认后再提交。"
+    }
+  },
+  "14301": {
+    "key": "CONFIRMATION_TEXT_INVALID",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "确认声明格式不正确,请按照提示输入完整的确认文本。"
+    }
+  },
+  "14302": {
+    "key": "CAPTCHA_INVALID",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "验证码错误,请重新输入。"
+    }
+  },
+  "14303": {
+    "key": "CAPTCHA_ATTEMPTS_EXCEEDED",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "验证码错误次数过多(已达10次),请等待1分钟后再试。"
+    }
+  },
+  "14304": {
+    "key": "CAPTCHA_COOLDOWN_ACTIVE",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "验证码冷却期内,请稍后再试。"
+    }
+  },
+  "14400": {
+    "key": "CONFIG_SECTION_NOT_FOUND",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "指定的配置块不存在。"
+    }
+  },
+  "14401": {
+    "key": "CONFIG_ITEM_NOT_FOUND",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "指定的配置项不存在。"
+    }
+  },
+  "14402": {
+    "key": "REVIEW_IN_PROGRESS",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "该人设卡正在审核中,暂时无法进行此操作。"
+    }
+  },
+  "14500": {
+    "key": "FILE_UPLOAD_FAILED",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "文件上传失败,请稍后重试。"
+    }
+  },
+  "14501": {
+    "key": "FILE_PARSE_FAILED",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "文件解析失败,请检查文件格式是否正确。"
+    }
+  },
+  "14502": {
+    "key": "DATABASE_ERROR",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "数据库操作失败,请稍后重试。"
+    }
+  },
+  "14503": {
+    "key": "CACHE_ERROR",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "缓存操作失败,请稍后重试。"
+    }
+  },
+  "14504": {
+    "key": "TASK_CREATION_FAILED",
+    "module": "persona",
+    "messages": {
+      "zh-CN": "异步任务创建失败,请稍后重试。"
+    }
+  }
+}

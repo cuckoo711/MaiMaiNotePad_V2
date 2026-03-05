@@ -9,6 +9,7 @@
 from rest_framework import serializers
 from mainotebook.utils.serializers import CustomModelSerializer
 from mainotebook.content.models import KnowledgeBase, KnowledgeBaseFile, StarRecord
+from mainotebook.content.serializers.common import TagField
 
 
 class KnowledgeBaseFileSerializer(CustomModelSerializer):
@@ -32,6 +33,7 @@ class KnowledgeBaseSerializer(CustomModelSerializer):
     用于列表和详情展示，包含关联数据和计算字段。
     """
     
+    tags = TagField(required=False)
     uploader_name = serializers.CharField(
         source='uploader.name', 
         read_only=True,

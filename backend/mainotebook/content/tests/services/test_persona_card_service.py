@@ -595,3 +595,188 @@ class PersonaCardServiceTest(TestCase):
         pc_ids = [pc.id for pc in queryset]
         self.assertIn(pc1.id, pc_ids)
         self.assertIn(pc2.id, pc_ids)
+    
+    # ========== 权限验证测试 ==========
+    
+    def test_check_upload_permission_active_user(self):
+        """测试已注册且未被封禁的用户可以上传（需求 1.1）"""
+        # 创建正常用户
+        user = Users.objects.create(
+            username="active_user",
+            name="正常用户",
+            email="active@example.com",
+            is_active=True
+        )
+        
+        # 验证上传权限
+        can_upload = PersonaCardService.check_upload_permission(user)
+        self.assertTrue(can_upload)
+    
+    def test_check_upload_permission_inactive_user(self):
+        """测试未激活用户不能上传（需求 1.1）"""
+        # 创建未激活用户
+        user = Users.objects.create(
+            username="inactive_user",
+            name="未激活用户",
+            email="inactive@example.com",
+            is_active=False
+        )
+        
+        # 验证上传权限
+        can_upload = PersonaCardService.check_upload_permission(user)
+        self.assertFalse(can_upload)
+    
+    def test_check_upload_permission_banned_user(self):
+        """测试被封禁用户不能上传（需求 1.2）"""
+        # 创建被封禁用户
+        user = Users.objects.create(
+            username="banned_user",
+            name="被封禁用户",
+            email="banned@example.com",
+            is_active=True
+        )
+        # 添加 is_banned 属性（动态添加，因为模型中可能还没有这个字段）
+        user.is_banned = True
+        
+        # 验证上传权限
+        can_upload = PersonaCardService.check_upload_permission(user)
+        self.assertFalse(can_upload)
+    
+    def test_check_upload_permission_muted_user(self):
+        """测试禁言用户不能上传（需求 1.2）"""
+        # 创建禁言用户
+        user = Users.objects.create(
+            username="muted_user",
+            name="禁言用户",
+            email="muted@example.com",
+            is_active=True,
+            is_muted=True
+        )
+        
+        # 验证上传权限
+        can_upload = PersonaCardService.check_upload_permission(user)
+        self.assertFalse(can_upload)
+    
+    def test_check_edit_permission_owner_private_card(self):
+        """测试上传者可以编辑私有人设卡（需求 12.3）"""
+        # 创建私有人设卡
+        pc = PersonaCard.objects.create(
+            name='私有人设卡',
+            description='描述',
+            uploader=self.user1,
+            is_public=False,
+            is_pending=False
+        )
+        
+        # 验证编辑权限
+        can_edit = PersonaCardService.check_edit_permission(self.user1, pc)
+        self.assertTrue(can_edit)
+    
+    def test_check_edit_permission_non_owner(self):
+        """测试非上传者不能编辑人设卡（需求 12.3）"""
+        # 用户1创建人设卡
+        pc = PersonaCard.objects.create(
+            name='用户1的人设卡',
+            description='描述',
+            uploader=self.user1,
+            is_public=False,
+            is_pending=False
+        )
+        
+        # 用户2尝试编辑
+        can_edit = PersonaCardService.check_edit_permission(self.user2, pc)
+        self.assertFalse(can_edit)
+    
+    def test_check_edit_permission_pending_card(self):
+        """测试审核中的人设卡不能编辑（需求 12.4）"""
+        # 创建审核中的人设卡
+        pc = PersonaCard.objects.create(
+            name='审核中人设卡',
+            description='描述',
+            uploader=self.user1,
+            is_public=True,
+            is_pending=True
+        )
+        
+        # 验证编辑权限
+        can_edit = PersonaCardService.check_edit_permission(self.user1, pc)
+        self.assertFalse(can_edit)
+    
+    def test_check_edit_permission_approved_public_card(self):
+        """测试已通过审核的公开人设卡不能编辑（需求 12.4）"""
+        # 创建已通过审核的公开人设卡
+        pc = PersonaCard.objects.create(
+            name='已审核公开人设卡',
+            description='描述',
+            uploader=self.user1,
+            is_public=True,
+            is_pending=False
+        )
+        
+        # 验证编辑权限
+        can_edit = PersonaCardService.check_edit_permission(self.user1, pc)
+        self.assertFalse(can_edit)
+    
+    def test_check_download_permission_authenticated_user_public_approved_card(self):
+        """测试已注册用户可以下载公开且已通过审核的人设卡（需求 13.1）"""
+        # 创建公开且已通过审核的人设卡
+        pc = PersonaCard.objects.create(
+            name='公开已审核人设卡',
+            description='描述',
+            uploader=self.user1,
+            is_public=True,
+            is_pending=False
+        )
+        
+        # 验证下载权限
+        can_download = PersonaCardService.check_download_permission(self.user2, pc)
+        self.assertTrue(can_download)
+    
+    def test_check_download_permission_unauthenticated_user(self):
+        """测试未认证用户不能下载（需求 13.1）"""
+        # 创建公开且已通过审核的人设卡
+        pc = PersonaCard.objects.create(
+            name='公开已审核人设卡',
+            description='描述',
+            uploader=self.user1,
+            is_public=True,
+            is_pending=False
+        )
+        
+        # 创建未认证用户（模拟匿名用户）
+        from django.contrib.auth.models import AnonymousUser
+        anonymous_user = AnonymousUser()
+        
+        # 验证下载权限
+        can_download = PersonaCardService.check_download_permission(anonymous_user, pc)
+        self.assertFalse(can_download)
+    
+    def test_check_download_permission_private_card(self):
+        """测试私有人设卡不能下载（需求 13.1）"""
+        # 创建私有人设卡
+        pc = PersonaCard.objects.create(
+            name='私有人设卡',
+            description='描述',
+            uploader=self.user1,
+            is_public=False,
+            is_pending=False
+        )
+        
+        # 验证下载权限（即使是其他已认证用户也不能下载）
+        can_download = PersonaCardService.check_download_permission(self.user2, pc)
+        self.assertFalse(can_download)
+    
+    def test_check_download_permission_pending_card(self):
+        """测试审核中的人设卡不能下载（需求 13.1）"""
+        # 创建审核中的公开人设卡
+        pc = PersonaCard.objects.create(
+            name='审核中人设卡',
+            description='描述',
+            uploader=self.user1,
+            is_public=True,
+            is_pending=True
+        )
+        
+        # 验证下载权限
+        can_download = PersonaCardService.check_download_permission(self.user2, pc)
+        self.assertFalse(can_download)

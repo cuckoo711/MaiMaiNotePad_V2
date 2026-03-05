@@ -4,7 +4,7 @@
 提供标签统计、热门标签查询、缓存管理等功能。
 """
 
-from typing import List, Dict
+from typing import List, Dict, Union
 from django.core.cache import cache
 from django.db.models import F
 from django.utils import timezone
@@ -18,6 +18,29 @@ class TagService:
     POPULAR_TAGS_CACHE_KEY_PREFIX = "content:popular_tags"
     # 缓存过期时间（秒）
     CACHE_TIMEOUT = 3600  # 1小时
+    
+    @classmethod
+    def parse_tags(cls, tags: Union[List[str], str, None]) -> List[str]:
+        """解析标签数据
+        
+        统一处理标签的解析逻辑，支持数组和字符串格式。
+        
+        Args:
+            tags: 标签数据，可以是数组、字符串或 None
+            
+        Returns:
+            List[str]: 标签数组
+        """
+        if tags is None:
+            return []
+        
+        if isinstance(tags, str):
+            return [tag.strip() for tag in tags.split(',') if tag.strip()]
+        
+        if isinstance(tags, list):
+            return [tag.strip() for tag in tags if tag and isinstance(tag, str) and tag.strip()]
+        
+        return []
     
     @classmethod
     def get_popular_tags(cls, limit: int = 20, tag_type: str = 'knowledge') -> List[Dict[str, any]]:
@@ -88,21 +111,23 @@ class TagService:
         cache.delete(cache_key)
     
     @classmethod
-    def update_tag_usage(cls, tags: List[str], tag_type: str = 'knowledge') -> None:
+    def update_tag_usage(cls, tags: Union[List[str], str], tag_type: str = 'knowledge') -> None:
         """更新标签使用次数
         
         当创建或更新知识库/人设卡时调用此方法。
         
         Args:
-            tags: 标签列表
+            tags: 标签数据（数组或字符串）
             tag_type: 标签类型，'knowledge' 或 'persona'，默认 'knowledge'
         """
-        if not tags:
+        tag_list = cls.parse_tags(tags)
+        
+        if not tag_list:
             return
         
         now = timezone.now()
         
-        for tag in tags:
+        for tag in tag_list:
             tag = tag.strip()
             if not tag:
                 continue
@@ -131,10 +156,89 @@ class TagService:
         cache.delete(cache_key)
     
     @classmethod
+    def decrease_tag_usage(cls, tags: Union[List[str], str], tag_type: str = 'knowledge') -> None:
+        """减少标签使用次数
+        
+        当删除或将公开内容设为私有时调用此方法。
+        使用 F 表达式原子减少 usage_count，避免竞态条件。
+        当 usage_count 降为 0 时，自动删除 TagStatistics 记录。
+        
+        Args:
+            tags: 标签数据（数组或字符串）
+            tag_type: 标签类型，'knowledge' 或 'persona'，默认 'knowledge'
+        """
+        tag_list = cls.parse_tags(tags)
+        
+        if not tag_list:
+            return
+        
+        for tag in tag_list:
+            tag = tag.strip()
+            if not tag:
+                continue
+            
+            # 使用 F 表达式原子减少 usage_count
+            TagStatistics.objects.filter(tag=tag, tag_type=tag_type).update(
+                usage_count=F('usage_count') - 1
+            )
+        
+        # 查询并删除 usage_count <= 0 的记录
+        TagStatistics.objects.filter(
+            tag__in=tag_list,
+            tag_type=tag_type,
+            usage_count__lte=0
+        ).delete()
+        
+        # 对剩余记录更新 hot_score
+        remaining_tags = TagStatistics.objects.filter(
+            tag__in=tag_list,
+            tag_type=tag_type
+        )
+        for tag_stat in remaining_tags:
+            tag_stat.update_hot_score()
+        
+        # 清除对应类型的缓存
+        cache_key = f"{cls.POPULAR_TAGS_CACHE_KEY_PREFIX}:{tag_type}"
+        cache.delete(cache_key)
+    @classmethod
+    def sync_tag_usage(cls, old_tags: Union[List[str], str, None], new_tags: Union[List[str], str, None], tag_type: str = 'knowledge') -> None:
+        """同步标签使用次数
+
+        当更新内容的标签列表时调用此方法。
+        计算标签差异，对新增标签增加 usage_count，对删除标签减少 usage_count。
+
+        Args:
+            old_tags: 旧标签数据（数组或字符串）
+            new_tags: 新标签数据（数组或字符串）
+            tag_type: 标签类型，'knowledge' 或 'persona'，默认 'knowledge'
+        """
+        # 解析新旧标签
+        old_tag_list = set(cls.parse_tags(old_tags))
+        new_tag_list = set(cls.parse_tags(new_tags))
+
+        # 计算标签差异
+        added_tags = new_tag_list - old_tag_list
+        removed_tags = old_tag_list - new_tag_list
+
+        # 对新增标签调用 update_tag_usage()
+        if added_tags:
+            cls.update_tag_usage(list(added_tags), tag_type)
+
+        # 对删除标签调用 decrease_tag_usage()
+        if removed_tags:
+            cls.decrease_tag_usage(list(removed_tags), tag_type)
+
+        # 清除对应类型的缓存
+        cache_key = f"{cls.POPULAR_TAGS_CACHE_KEY_PREFIX}:{tag_type}"
+        cache.delete(cache_key)
+
+    
+    @classmethod
     def rebuild_statistics(cls) -> Dict[str, int]:
         """重建标签统计数据
         
         扫描所有知识库和人设卡，重新统计标签使用次数。
+        支持新的数组格式。
         用于定时任务或手动触发。
         
         Returns:
@@ -146,19 +250,17 @@ class TagService:
         knowledge_tag_usage = {}
         persona_tag_usage = {}
         
-        # 统计知识库标签
+        # 统计知识库标签（只统计公开且未删除的内容）
         for kb in KnowledgeBase.objects.filter(is_public=True):
-            if kb.tags:
-                tags = [t.strip() for t in kb.tags.split(',') if t.strip()]
-                for tag in tags:
-                    knowledge_tag_usage[tag] = knowledge_tag_usage.get(tag, 0) + 1
+            tags = cls.parse_tags(kb.tags)
+            for tag in tags:
+                knowledge_tag_usage[tag] = knowledge_tag_usage.get(tag, 0) + 1
         
-        # 统计人设卡标签
-        for pc in PersonaCard.objects.filter(is_public=True):
-            if pc.tags:
-                tags = [t.strip() for t in pc.tags.split(',') if t.strip()]
-                for tag in tags:
-                    persona_tag_usage[tag] = persona_tag_usage.get(tag, 0) + 1
+        # 统计人设卡标签（只统计公开且未删除的内容）
+        for pc in PersonaCard.objects.filter(is_public=True, is_deleted=False):
+            tags = cls.parse_tags(pc.tags)
+            for tag in tags:
+                persona_tag_usage[tag] = persona_tag_usage.get(tag, 0) + 1
         
         # 批量创建统计记录
         tag_stats = []
@@ -191,8 +293,7 @@ class TagService:
         TagStatistics.objects.bulk_create(tag_stats)
         
         # 清除所有缓存
-        cache.delete(f"{cls.POPULAR_TAGS_CACHE_KEY_PREFIX}:knowledge")
-        cache.delete(f"{cls.POPULAR_TAGS_CACHE_KEY_PREFIX}:persona")
+        cls.clear_cache()
         
         return {
             'total_tags': len(tag_stats),

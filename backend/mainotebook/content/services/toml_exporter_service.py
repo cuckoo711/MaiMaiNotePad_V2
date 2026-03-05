@@ -7,8 +7,11 @@
 """
 
 import json
+import logging
 from typing import Any, List
 from django.db.models import QuerySet
+
+logger = logging.getLogger(__name__)
 
 
 class TomlExporterService:
@@ -112,7 +115,16 @@ class TomlExporterService:
         while toml_lines and toml_lines[-1] == '':
             toml_lines.pop()
         
-        return '\n'.join(toml_lines)
+        result = '\n'.join(toml_lines)
+        
+        logger.info(
+            f"TOML 导出成功, "
+            f"配置块数量={len(sections_dict)}, "
+            f"被删除块数量={len(deleted_sections)}, "
+            f"输出行数={len(toml_lines)}"
+        )
+        
+        return result
     
     @staticmethod
     def format_value(value: str, data_type: str) -> str:

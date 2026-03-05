@@ -16,3 +16,5 @@ class ContentConfig(AppConfig):
         """应用就绪时执行的初始化操作"""
         # 注册 AIModel 的 post_save/post_delete signal，自动重算优先级
         import mainotebook.content.views.ai_model  # noqa: F401
+        # 注册标签统计生命周期同步信号
+        import mainotebook.content.signals  # noqa: F401

@@ -117,7 +117,7 @@
 					{{ currentItem?.content_type === 'knowledge' ? '知识库' : '人设卡' }}
 				</el-descriptions-item>
 				<el-descriptions-item label="上传者">{{ currentItem?.uploader_name || '-' }}</el-descriptions-item>
-				<el-descriptions-item label="标签">{{ currentItem?.tags || '-' }}</el-descriptions-item>
+				<el-descriptions-item label="标签">{{ formatTags(currentItem?.tags) }}</el-descriptions-item>
 				<el-descriptions-item label="文件数">{{ currentItem?.file_count ?? 0 }}</el-descriptions-item>
 				<el-descriptions-item label="创建时间">{{ formatDateTime(currentItem?.create_datetime) }}</el-descriptions-item>
 			</el-descriptions>
@@ -367,7 +367,7 @@
 						</el-table-column>
 						<el-table-column label="违规片段" min-width="140">
 							<template #default="{ row }">
-								<span v-if="row.flagged_content" style="color: #f56c6c; font-size: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden">
+								<span v-if="row.flagged_content" style="color: #f56c6c; font-size: 12px; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden">
 									{{ row.flagged_content }}
 								</span>
 								<span v-else style="color: #c0c4cc; font-size: 12px">无</span>
@@ -475,6 +475,20 @@ const currentItem = ref<api.ReviewItem | null>(null);
 const formatDateTime = (dateTime?: string) => {
 	if (!dateTime) return '-';
 	return dayjs(dateTime).format('YYYY-MM-DD HH:mm:ss');
+};
+
+/**
+ * 格式化标签展示
+ * 支持数组和字符串格式
+ */
+const formatTags = (tagsData?: string | string[]) => {
+	if (!tagsData) return '-';
+	// 如果是数组格式
+	if (Array.isArray(tagsData)) {
+		return tagsData.length > 0 ? tagsData.join(', ') : '-';
+	}
+	// 如果是字符串格式（向后兼容）
+	return tagsData;
 };
 
 const handleViewDetail = (row: any) => {

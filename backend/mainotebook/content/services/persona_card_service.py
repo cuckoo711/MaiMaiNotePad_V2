@@ -1,9 +1,12 @@
 """
 人设卡服务
 
-提供人设卡相关的业务逻辑。
+提供人设卡相关的业务逻辑，包括权限验证、TOML 验证、审核流程等。
+
+**验证需求：1.1, 1.2, 12.3, 12.4, 13.1**
 """
 
+import logging
 from typing import Optional, Tuple
 from django.db.models import QuerySet, Q
 from django.core.exceptions import ValidationError, PermissionDenied
@@ -11,12 +14,103 @@ from mainotebook.system.models import Users
 from ..models import PersonaCard, PersonaCardFile, StarRecord, UploadRecord
 from .toml_validator import TOMLValidator
 
+logger = logging.getLogger(__name__)
+
 
 class PersonaCardService:
     """人设卡服务
     
-    提供人设卡相关的业务逻辑。
+    提供人设卡相关的业务逻辑，包括权限验证、CRUD 操作和审核流程。
     """
+    
+    @staticmethod
+    def check_upload_permission(user: Users) -> bool:
+        """检查用户是否有上传权限
+        
+        只有已注册且未被封禁、未被禁言的用户才能上传人设卡。
+        
+        Args:
+            user: 用户对象
+            
+        Returns:
+            bool: 是否有上传权限
+            
+        **验证需求：1.1, 1.2**
+        """
+        # 检查用户是否激活
+        if not user.is_active:
+            return False
+        
+        # 检查用户是否被封禁
+        if hasattr(user, 'is_banned') and user.is_banned:
+            return False
+        
+        # 检查用户是否被禁言
+        if hasattr(user, 'is_muted') and user.is_muted:
+            return False
+        
+        return True
+    
+    @staticmethod
+    def check_edit_permission(user: Users, persona_card: PersonaCard) -> bool:
+        """检查用户是否有编辑权限
+        
+        只有上传者可以编辑人设卡，且只能编辑私有状态的人设卡。
+        正在审核或已通过审核的公开人设卡不能编辑。
+        
+        Args:
+            user: 用户对象
+            persona_card: 人设卡对象
+            
+        Returns:
+            bool: 是否有编辑权限
+            
+        **验证需求：12.3, 12.4**
+        """
+        # 检查是否是上传者
+        if persona_card.uploader != user:
+            return False
+        
+        # 检查人设卡状态
+        # 正在审核的人设卡不能编辑
+        if persona_card.is_pending:
+            return False
+        
+        # 已通过审核的公开人设卡不能编辑
+        if persona_card.is_public and not persona_card.is_pending:
+            return False
+        
+        # 私有状态的人设卡可以编辑
+        return True
+    
+    @staticmethod
+    def check_download_permission(user: Users, persona_card: PersonaCard) -> bool:
+        """检查用户是否有下载权限
+        
+        只有已注册用户才能下载公开且已通过审核的人设卡。
+        
+        Args:
+            user: 用户对象
+            persona_card: 人设卡对象
+            
+        Returns:
+            bool: 是否有下载权限
+            
+        **验证需求：13.1**
+        """
+        # 检查用户是否已注册（已认证）
+        if not user or not user.is_authenticated:
+            return False
+        
+        # 检查人设卡是否公开
+        if not persona_card.is_public:
+            return False
+        
+        # 检查人设卡是否已通过审核
+        if persona_card.is_pending:
+            return False
+        
+        return True
     
     @staticmethod
     def get_public_persona_cards(
@@ -32,10 +126,11 @@ class PersonaCardService:
         Returns:
             QuerySet: 人设卡查询集
         """
-        # 基础查询：公开、已审核
+        # 基础查询：公开、已审核、未删除
         queryset = PersonaCard.objects.filter(
             is_public=True,
-            is_pending=False
+            is_pending=False,
+            is_deleted=False
         )
         
         # 应用过滤条件
@@ -64,10 +159,11 @@ class PersonaCardService:
             user: 用户对象
             
         Returns:
-            QuerySet: 人设卡查询集
+            QuerySet: 人设卡查询集（不包含已删除的人设卡）
         """
         return PersonaCard.objects.filter(
-            uploader=user
+            uploader=user,
+            is_deleted=False  # 过滤掉已删除的人设卡
         ).order_by('-create_datetime')
     
     @staticmethod
@@ -134,6 +230,11 @@ class PersonaCardService:
             status='pending'
         )
         
+        logger.info(
+            f"创建人设卡成功: persona_card_id={persona_card.id}, "
+            f"name={persona_card.name}, user_id={user.id}"
+        )
+        
         return persona_card
     
     @staticmethod
@@ -164,6 +265,12 @@ class PersonaCardService:
             setattr(persona_card, key, value)
         
         persona_card.save()
+        
+        logger.info(
+            f"更新人设卡成功: persona_card_id={persona_card.id}, "
+            f"user_id={user.id}, 更新字段={list(data.keys())}"
+        )
+        
         return persona_card
     
     @staticmethod
@@ -189,6 +296,11 @@ class PersonaCardService:
         
         # 硬删除人设卡
         persona_card.delete()
+        
+        logger.info(
+            f"删除人设卡成功: persona_card_id={persona_card.id}, "
+            f"name={persona_card.name}, user_id={user.id}"
+        )
     
     @staticmethod
     def submit_for_review(persona_card: PersonaCard, user: Users) -> None:
@@ -230,8 +342,12 @@ class PersonaCardService:
         try:
             from mainotebook.content.tasks import auto_review_task
             auto_review_task.delay(str(persona_card.id), 'persona')
-        except Exception:
-            import logging
-            logging.getLogger(__name__).warning(
-                "触发 AI 自动审核任务失败: persona_card_id=%s", persona_card.id
+            logger.info(
+                f"提交人设卡审核成功: persona_card_id={persona_card.id}, "
+                f"user_id={user.id}"
+            )
+        except Exception as e:
+            logger.warning(
+                f"触发 AI 自动审核任务失败: persona_card_id={persona_card.id}, "
+                f"错误: {str(e)}"
             )

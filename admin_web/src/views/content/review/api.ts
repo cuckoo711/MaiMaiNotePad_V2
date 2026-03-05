@@ -158,13 +158,18 @@ export function batchReject(ids: string[], contentType: string, reason: string):
  */
 export interface AIReviewPartResult {
 	part_name: string;
-	part_type: 'text_field' | 'file' | 'segment';
+	part_type: 'text_field' | 'file' | 'segment' | 'aggregated';
 	confidence: number;
 	violation_types: string[];
 	decision?: string;
 	segment_index?: number;
 	text_summary?: string;
 	segments?: AIReviewPartResult[];
+	progress?: {
+		total: number;
+		completed: number;
+		percent: number;
+	};
 }
 
 /**
@@ -176,7 +181,7 @@ export interface AIReviewReport {
 	content_type: string;
 	content_name: string;
 	create_datetime: string;
-	decision: 'auto_approved' | 'auto_rejected' | 'pending_manual';
+	decision: 'auto_approved' | 'auto_rejected' | 'pending_manual' | 'processing' | 'pending_ai';
 	final_confidence: number;
 	violation_types: string[];
 	report_data: {

@@ -216,7 +216,7 @@ class KnowledgeBaseViewSet(CustomModelViewSet):
 
         # 更新标签使用统计
         if knowledge_base.tags:
-            tags = [tag.strip() for tag in knowledge_base.tags.split(',') if tag.strip()]
+            tags = TagService.parse_tags(knowledge_base.tags)
             try:
                 TagService.update_tag_usage(tags, tag_type='knowledge')
             except Exception as e:
@@ -254,31 +254,42 @@ class KnowledgeBaseViewSet(CustomModelViewSet):
                 )
     
     def perform_update(self, serializer):
-        """更新知识库后更新标签使用统计
+        """更新知识库后处理
+        
+        标签统计的同步由 pre_save 信号处理器自动处理。
         
         Args:
             serializer: 知识库更新序列化器
         """
-        # 获取旧的标签
-        old_tags = set()
-        if serializer.instance.tags:
-            old_tags = set(tag.strip() for tag in serializer.instance.tags.split(',') if tag.strip())
-        
-        # 保存更新
-        knowledge_base = serializer.save()
-        
-        # 获取新的标签
-        new_tags = set()
-        if knowledge_base.tags:
-            new_tags = set(tag.strip() for tag in knowledge_base.tags.split(',') if tag.strip())
-        
-        # 计算新增的标签
-        added_tags = new_tags - old_tags
-        if added_tags:
-            try:
-                TagService.update_tag_usage(list(added_tags), tag_type='knowledge')
-            except Exception as e:
-                logger.warning(f"更新标签使用统计失败: {e}")
+        # 保存更新（pre_save 信号会自动处理标签统计同步）
+        serializer.save()
+    def destroy(self, request, *args, **kwargs):
+        """删除知识库（物理删除）
+
+        删除知识库时，标签统计的同步由 post_delete 信号处理器自动处理。
+
+        Args:
+            request: HTTP 请求对象
+
+        Returns:
+            Response: 删除结果响应
+        """
+        # 获取 knowledge_base 对象
+        knowledge_base = self.get_object()
+
+        # 记录删除操作
+        kb_id = knowledge_base.id
+        was_public = knowledge_base.is_public
+
+        # 执行物理删除（post_delete 信号会自动处理标签统计同步）
+        knowledge_base.delete()
+
+        logger.info(
+            f"用户 {request.user.id} 删除{'公开' if was_public else '私有'}知识库 {kb_id}"
+        )
+
+        return DetailResponse(data=[], msg="删除成功", status=status.HTTP_204_NO_CONTENT)
+
     
     @swagger_auto_schema(
         operation_summary='获取当前用户的知识库列表',

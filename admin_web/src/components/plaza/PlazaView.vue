@@ -382,9 +382,14 @@ const emitSearch = () => {
 };
 
 // 工具函数
-const parseTagsString = (tagsString: string): string[] => {
-  if (!tagsString) return [];
-  return tagsString.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag);
+const parseTagsString = (tagsData: string | string[]): string[] => {
+  if (!tagsData) return [];
+  // 如果已经是数组，直接返回
+  if (Array.isArray(tagsData)) {
+    return tagsData.filter((tag: string) => tag && tag.trim());
+  }
+  // 如果是字符串，按逗号分割（向后兼容）
+  return tagsData.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag);
 };
 
 const formatDate = (dateString: string): string => {

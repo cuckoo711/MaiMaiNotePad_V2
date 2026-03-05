@@ -61,6 +61,34 @@ export const dynamicRoutes: Array<RouteRecordRaw> = [
 					icon: 'ele-Message',
 				},
 			},
+			{
+				path: '/content/persona/edit/:id',
+				name: 'personaCardEdit',
+				component: () => import('/@/views/content/persona/manage/PersonaCardEdit.vue'),
+				meta: {
+					title: '编辑人设卡',
+					isLink: '',
+					isHide: true,
+					isKeepAlive: false,
+					isAffix: false,
+					isIframe: false,
+					icon: 'ele-Edit',
+				},
+			},
+			{
+				path: '/content/persona/upload',
+				name: 'personaCardUpload',
+				component: () => import('/@/views/content/persona/upload/PersonaCardUploadWizard.vue'),
+				meta: {
+					title: '上传人设卡',
+					isLink: '',
+					isHide: true,
+					isKeepAlive: false,
+					isAffix: false,
+					isIframe: false,
+					icon: 'ele-Upload',
+				},
+			},
 		],
 	},
 	{
@@ -142,5 +170,23 @@ export const staticRoutes: Array<RouteRecordRaw> = [
 		meta: {
 			title: 'message.router.personal'
 		},
-	}
+	},
+	{
+		path: '/content/persona/edit/:id',
+		name: 'personaCardEdit',
+		component: () => import('/@/views/content/persona/manage/PersonaCardEdit.vue'),
+		meta: {
+			title: '编辑人设卡',
+			isHide: true,
+		},
+	},
+	{
+		path: '/content/persona/upload',
+		name: 'personaCardUpload',
+		component: () => import('/@/views/content/persona/upload/PersonaCardUploadWizard.vue'),
+		meta: {
+			title: '上传人设卡',
+			isHide: true,
+		},
+	},
 ];

@@ -844,6 +844,9 @@ class AutoReviewService:
         if action == "rejected" and report.violation_types:
             reason = ", ".join(report.violation_types)
 
+        # 生成审核报告摘要
+        report_summary = AutoReviewService._generate_report_summary(report)
+
         try:
             ReviewNotificationService.send_review_notification(
                 uploader_id=content.uploader.id,
@@ -851,6 +854,7 @@ class AutoReviewService:
                 content_type=content_type,
                 action=action,
                 reason=reason,
+                report_summary=report_summary,
             )
         except Exception as e:
             logger.error(
@@ -859,4 +863,39 @@ class AutoReviewService:
                 content_type,
                 e,
             )
+
+    @staticmethod
+    def _generate_report_summary(report) -> str:
+        """生成审核报告摘要
+
+        从审核报告中提取关键信息生成简短摘要，用于站内信通知。
+
+        Args:
+            report: ReviewReport 审核报告实例
+
+        Returns:
+            str: 审核报告摘要
+        """
+        summary_parts = []
+
+        # 添加审核决策
+        decision_map = {
+            "auto_approved": "自动通过",
+            "auto_rejected": "自动拒绝",
+            "pending_manual": "待人工审核",
+        }
+        decision_text = decision_map.get(report.decision, report.decision)
+        summary_parts.append(f"审核结果：{decision_text}")
+
+        # 添加置信度
+        if report.final_confidence is not None:
+            confidence_percent = int(report.final_confidence * 100)
+            summary_parts.append(f"置信度：{confidence_percent}%")
+
+        # 添加违规类型（如果有）
+        if report.violation_types:
+            violations = ", ".join(report.violation_types)
+            summary_parts.append(f"违规类型：{violations}")
+
+        return "；".join(summary_parts)
 

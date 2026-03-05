@@ -8,7 +8,10 @@
 
 import re
 import tomllib
+import logging
 from typing import Dict, List, Any, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class TomlParserService:
@@ -50,20 +53,44 @@ class TomlParserService:
             ValueError: 缺少必需字段
         """
         # 读取文件内容
-        with open(file_path, 'rb') as f:
-            file_content = f.read().decode('utf-8')
+        try:
+            with open(file_path, 'rb') as f:
+                file_content = f.read().decode('utf-8')
+        except FileNotFoundError as e:
+            logger.error(f"TOML 文件不存在: {file_path}")
+            raise
+        except UnicodeDecodeError as e:
+            logger.error(f"TOML 文件编码错误: {file_path}, 错误: {str(e)}")
+            raise
         
         # 解析 TOML
-        parsed_data = tomllib.loads(file_content)
+        try:
+            parsed_data = tomllib.loads(file_content)
+        except tomllib.TOMLDecodeError as e:
+            logger.error(
+                f"TOML 解析失败: {file_path}, "
+                f"错误: {str(e)}"
+            )
+            raise
         
         # 提取注释
         comments = TomlParserService.extract_comments(file_content)
         
         # 验证结构
-        TomlParserService.validate_structure(parsed_data)
+        try:
+            TomlParserService.validate_structure(parsed_data)
+        except ValueError as e:
+            logger.warning(f"TOML 结构验证失败: {file_path}, 错误: {str(e)}")
+            raise
         
         # 构建结果
         result = TomlParserService._build_result(parsed_data, comments, file_content)
+        
+        logger.info(
+            f"TOML 文件解析成功: {file_path}, "
+            f"配置块数量={len(result.get('sections', []))}, "
+            f"版本={result.get('version')}"
+        )
         
         return result
     
@@ -82,16 +109,30 @@ class TomlParserService:
             ValueError: 缺少必需字段
         """
         # 解析 TOML
-        parsed_data = tomllib.loads(content)
+        try:
+            parsed_data = tomllib.loads(content)
+        except tomllib.TOMLDecodeError as e:
+            logger.error(f"TOML 内容解析失败, 错误: {str(e)}")
+            raise
         
         # 提取注释
         comments = TomlParserService.extract_comments(content)
         
         # 验证结构
-        TomlParserService.validate_structure(parsed_data)
+        try:
+            TomlParserService.validate_structure(parsed_data)
+        except ValueError as e:
+            logger.warning(f"TOML 结构验证失败, 错误: {str(e)}")
+            raise
         
         # 构建结果
         result = TomlParserService._build_result(parsed_data, comments, content)
+        
+        logger.info(
+            f"TOML 内容解析成功, "
+            f"配置块数量={len(result.get('sections', []))}, "
+            f"版本={result.get('version')}"
+        )
         
         return result
     

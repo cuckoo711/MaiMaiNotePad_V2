@@ -8,7 +8,14 @@
 
 from rest_framework import serializers
 from mainotebook.utils.serializers import CustomModelSerializer
-from mainotebook.content.models import PersonaCard, PersonaCardFile, StarRecord
+from mainotebook.content.models import (
+    PersonaCard, 
+    PersonaCardFile, 
+    PersonaCardConfig,
+    SensitiveInfoConfirmation,
+    StarRecord
+)
+from mainotebook.content.serializers.common import TagField
 
 
 class PersonaCardFileSerializer(CustomModelSerializer):
@@ -32,6 +39,7 @@ class PersonaCardSerializer(CustomModelSerializer):
     用于列表和详情展示，包含关联数据和计算字段。
     """
     
+    tags = TagField(required=False)
     uploader_name = serializers.CharField(
         source='uploader.name', 
         read_only=True,
@@ -151,22 +159,116 @@ class PersonaCardSerializer(CustomModelSerializer):
         return data
 
 
+class PersonaCardConfigSerializer(CustomModelSerializer):
+    """人设卡配置项序列化器
+    
+    用于序列化配置项数据，包含配置块名、键名、值、数据类型等信息。
+    """
+    
+    class Meta:
+        model = PersonaCardConfig
+        fields = [
+            'id', 'section_name', 'key_name', 'value', 
+            'data_type', 'is_deleted', 'description',
+            'create_datetime', 'update_datetime'
+        ]
+        read_only_fields = ['id', 'create_datetime', 'update_datetime']
+    
+    def validate_value(self, value):
+        """验证配置值
+        
+        Args:
+            value: 配置值
+            
+        Returns:
+            str: 验证通过的值
+            
+        Raises:
+            serializers.ValidationError: 当值无效时
+        """
+        if value is None or value == '':
+            raise serializers.ValidationError("配置值不能为空")
+        return value
+
+
+class SensitiveInfoConfirmationSerializer(CustomModelSerializer):
+    """敏感信息确认记录序列化器
+    
+    用于序列化敏感信息确认记录，包含确认声明、敏感信息位置、IP 地址等。
+    """
+    
+    class Meta:
+        model = SensitiveInfoConfirmation
+        fields = [
+            'id', 'confirmation_text', 'sensitive_locations',
+            'ip_address', 'confirmed_at'
+        ]
+        read_only_fields = ['id', 'ip_address', 'confirmed_at']
+    
+    def validate_confirmation_text(self, value):
+        """验证确认声明文本
+        
+        Args:
+            value: 确认声明文本
+            
+        Returns:
+            str: 验证通过的文本
+            
+        Raises:
+            serializers.ValidationError: 当文本格式不正确时
+        """
+        if not value or len(value.strip()) < 10:
+            raise serializers.ValidationError("确认声明至少需要 10 个字符")
+        
+        # 验证是否包含关键词
+        if "确认" not in value or "隐私" not in value:
+            raise serializers.ValidationError("确认声明必须包含'确认'和'隐私'关键词")
+        
+        return value.strip()
+    
+    def validate_sensitive_locations(self, value):
+        """验证敏感信息位置
+        
+        Args:
+            value: 敏感信息位置列表
+            
+        Returns:
+            list: 验证通过的位置列表
+            
+        Raises:
+            serializers.ValidationError: 当位置数据无效时
+        """
+        if not isinstance(value, list) or len(value) == 0:
+            raise serializers.ValidationError("敏感信息位置必须是非空列表")
+        
+        return value
+
+
 class PersonaCardCreateSerializer(CustomModelSerializer):
     """人设卡创建序列化器
     
     用于创建人设卡，自动设置上传者。
     接受 is_public 字段：为 True 时进入审核流程，否则为私有。
+    支持配置项和敏感信息确认记录的创建。
     """
+    
+    tags = TagField(required=False)
+    # 配置项列表（可选）
+    configs = PersonaCardConfigSerializer(many=True, required=False)
+    
+    # 敏感信息确认记录（可选）
+    sensitive_confirmation = SensitiveInfoConfirmationSerializer(required=False)
     
     class Meta:
         model = PersonaCard
         fields = [
             'name', 'description', 'copyright_owner', 
-            'content', 'tags', 'is_public'
+            'content', 'tags', 'is_public',
+            'configs', 'sensitive_confirmation'
         ]
     
     def validate_name(self, value):
-        """验证名称在用户范围内的唯一性
+        """验证名称长度和唯一性
         
         Args:
             value: 人设卡名称
@@ -175,8 +277,20 @@ class PersonaCardCreateSerializer(CustomModelSerializer):
             str: 验证通过的名称
             
         Raises:
-            serializers.ValidationError: 当名称重复时
+            serializers.ValidationError: 当名称不符合要求时
         """
+        # 验证长度（1-200 个字符）
+        if not value or len(value.strip()) < 1:
+            raise serializers.ValidationError("名称不能为空")
+        
+        if len(value) > 200:
+            raise serializers.ValidationError("名称长度不能超过 200 个字符")
+        
+        # HTML 转义处理
+        import html
+        value = html.escape(value.strip())
+        
+        # 验证用户范围内的唯一性
         request = self.context.get('request')
         if not request or not request.user.is_authenticated:
             raise serializers.ValidationError("用户未认证")
@@ -187,6 +301,60 @@ class PersonaCardCreateSerializer(CustomModelSerializer):
             name=value
         ).exists():
             raise serializers.ValidationError("您已经创建了同名的人设卡")
+        
+        return value
+    
+    def validate_description(self, value):
+        """验证描述最小长度
+        
+        Args:
+            value: 人设卡描述
+            
+        Returns:
+            str: 验证通过的描述
+            
+        Raises:
+            serializers.ValidationError: 当描述不符合要求时
+        """
+        # 验证最小长度（至少 10 个字符）
+        if not value or len(value.strip()) < 10:
+            raise serializers.ValidationError("描述至少需要 10 个字符")
+        
+        # HTML 转义处理
+        import html
+        value = html.escape(value.strip())
+        
+        return value
+    
+    def validate_copyright_owner(self, value):
+        """验证版权所有者字段
+        
+        Args:
+            value: 版权所有者
+            
+        Returns:
+            str: 验证通过的版权所有者
+        """
+        if value:
+            # HTML 转义处理
+            import html
+            value = html.escape(value.strip())
+        
+        return value
+    
+    def validate_content(self, value):
+        """验证补充说明字段
+        
+        Args:
+            value: 补充说明
+            
+        Returns:
+            str: 验证通过的补充说明
+        """
+        if value:
+            # HTML 转义处理
+            import html
+            value = html.escape(value.strip())
         
         return value
     
@@ -202,6 +370,10 @@ class PersonaCardCreateSerializer(CustomModelSerializer):
         Returns:
             PersonaCard: 创建的人设卡实例
         """
+        # 提取嵌套数据
+        configs_data = validated_data.pop('configs', [])
+        sensitive_confirmation_data = validated_data.pop('sensitive_confirmation', None)
+        
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             validated_data['uploader'] = request.user
@@ -211,7 +383,32 @@ class PersonaCardCreateSerializer(CustomModelSerializer):
         # 暂存用户选择的公开意图，创建时先设为私有
         validated_data['is_public'] = False
         
-        return super().create(validated_data)
+        # 创建人设卡
+        persona_card = super().create(validated_data)
+        
+        # 创建配置项
+        if configs_data:
+            from mainotebook.content.models import PersonaCardConfig
+            config_instances = [
+                PersonaCardConfig(
+                    persona_card=persona_card,
+                    **config_data
+                )
+                for config_data in configs_data
+            ]
+            PersonaCardConfig.objects.bulk_create(config_instances)
+        
+        # 创建敏感信息确认记录
+        if sensitive_confirmation_data and request:
+            from mainotebook.content.models import SensitiveInfoConfirmation
+            SensitiveInfoConfirmation.objects.create(
+                persona_card=persona_card,
+                user=request.user,
+                ip_address=request.META.get('REMOTE_ADDR', '0.0.0.0'),
+                **sensitive_confirmation_data
+            )
+        
+        return persona_card
 
 
 class PersonaCardUpdateSerializer(CustomModelSerializer):
@@ -219,6 +416,8 @@ class PersonaCardUpdateSerializer(CustomModelSerializer):
     
     用于更新人设卡信息，验证权限。
     """
+    
+    tags = TagField(required=False)
     
     class Meta:
         model = PersonaCard
