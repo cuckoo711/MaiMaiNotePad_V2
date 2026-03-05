@@ -13,8 +13,8 @@
 from django.test import TestCase
 from django.core.exceptions import ValidationError
 from mainotebook.system.models import Users
-from ..models import StarRecord, KnowledgeBase, PersonaCard
-from ..services.star_service import StarService
+from mainotebook.content.models import StarRecord, KnowledgeBase, PersonaCard
+from mainotebook.content.services.star_service import StarService
 
 
 class StarServiceTest(TestCase):

@@ -29,10 +29,9 @@ class KnowledgeBaseFilter(filters.FilterSet):
         label='知识库描述'
     )
     
-    # 标签模糊搜索
+    # 标签筛选（支持多标签查询，支持逗号分隔和数组格式）
     tags = filters.CharFilter(
-        field_name='tags',
-        lookup_expr='icontains',
+        method='filter_tags',
         label='标签'
     )
     
@@ -111,10 +110,52 @@ class KnowledgeBaseFilter(filters.FilterSet):
             'keyword'
         ]
     
+    def filter_tags(self, queryset, name, value):
+        """标签筛选过滤方法
+
+        支持单标签和多标签查询（数组格式）。
+        前端应使用标准的数组参数格式：tags=标签1&tags=标签2
+        tags 字段是 JSONField 数组格式，使用 contains 查询。
+        多个标签之间是 OR 关系（满足任一标签即可）。
+
+        Args:
+            queryset: 查询集
+            name: 字段名
+            value: 标签字符串（CharFilter 只会传递最后一个值）
+
+        Returns:
+            QuerySet: 过滤后的查询集
+        """
+        from django.db.models import Q
+
+        # 从 request 中获取完整的标签列表
+        # CharFilter 的 value 参数只包含最后一个值，需要直接从 request 获取
+        tag_list = self.request.GET.getlist('tags') if hasattr(self, 'request') else []
+
+        # 如果没有从 request 获取到，使用传入的 value
+        if not tag_list and value:
+            tag_list = [value.strip()] if value.strip() else []
+
+        # 清理标签列表
+        tag_list = [tag.strip() for tag in tag_list if tag and tag.strip()]
+
+        if not tag_list:
+            return queryset
+
+        # 使用 Q 对象组合多个标签的查询条件（OR 关系）
+        # 对于 JSONField 数组，使用 contains 查询
+        q_objects = Q()
+        for tag in tag_list:
+            # PostgreSQL JSONField 的 contains 查询
+            q_objects |= Q(tags__contains=[tag])
+
+        return queryset.filter(q_objects)
+    
     def filter_search(self, queryset, name, value):
         """综合搜索过滤方法
         
-        在名称、描述、标签字段中进行模糊搜索。
+        在名称、描述字段中进行模糊搜索。
+        注意：标签字段现在是 JSONField，不再使用 icontains。
         
         Args:
             queryset: 查询集
@@ -130,8 +171,7 @@ class KnowledgeBaseFilter(filters.FilterSet):
         from django.db.models import Q
         return queryset.filter(
             Q(name__icontains=value) |
-            Q(description__icontains=value) |
-            Q(tags__icontains=value)
+            Q(description__icontains=value)
         )
 
 
@@ -156,10 +196,9 @@ class PersonaCardFilter(filters.FilterSet):
         label='人设卡描述'
     )
     
-    # 标签模糊搜索
+    # 标签筛选（支持多标签查询）
     tags = filters.CharFilter(
-        field_name='tags',
-        lookup_expr='icontains',
+        method='filter_tags',
         label='标签'
     )
     
@@ -285,10 +324,52 @@ class PersonaCardFilter(filters.FilterSet):
             # 完整版本号，精确匹配
             return queryset.filter(version=value)
     
+    def filter_tags(self, queryset, name, value):
+        """标签筛选过滤方法
+
+        支持单标签和多标签查询（数组格式）。
+        前端应使用标准的数组参数格式：tags=标签1&tags=标签2
+        tags 字段是 JSONField 数组格式，使用 contains 查询。
+        多个标签之间是 OR 关系（满足任一标签即可）。
+
+        Args:
+            queryset: 查询集
+            name: 字段名
+            value: 标签字符串（CharFilter 只会传递最后一个值）
+
+        Returns:
+            QuerySet: 过滤后的查询集
+        """
+        from django.db.models import Q
+
+        # 从 request 中获取完整的标签列表
+        # CharFilter 的 value 参数只包含最后一个值，需要直接从 request 获取
+        tag_list = self.request.GET.getlist('tags') if hasattr(self, 'request') else []
+
+        # 如果没有从 request 获取到，使用传入的 value
+        if not tag_list and value:
+            tag_list = [value.strip()] if value.strip() else []
+
+        # 清理标签列表
+        tag_list = [tag.strip() for tag in tag_list if tag and tag.strip()]
+
+        if not tag_list:
+            return queryset
+
+        # 使用 Q 对象组合多个标签的查询条件（OR 关系）
+        # 对于 JSONField 数组，使用 contains 查询
+        q_objects = Q()
+        for tag in tag_list:
+            # PostgreSQL JSONField 的 contains 查询
+            q_objects |= Q(tags__contains=[tag])
+
+        return queryset.filter(q_objects)
+    
     def filter_search(self, queryset, name, value):
         """综合搜索过滤方法
         
-        在名称、描述、标签字段中进行模糊搜索。
+        在名称、描述字段中进行模糊搜索。
+        注意：标签字段现在是 JSONField，不再使用 icontains。
         
         Args:
             queryset: 查询集
@@ -304,8 +385,7 @@ class PersonaCardFilter(filters.FilterSet):
         from django.db.models import Q
         return queryset.filter(
             Q(name__icontains=value) |
-            Q(description__icontains=value) |
-            Q(tags__icontains=value)
+            Q(description__icontains=value)
         )
 
 

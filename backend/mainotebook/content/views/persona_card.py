@@ -1442,8 +1442,17 @@ class PersonaCardViewSet(CustomModelViewSet):
                 # 按配置块分组返回数据
                 formatted_data = PersonaCardConfigService.format_configs_as_dict(configs)
                 
+                # 检测敏感信息
+                from mainotebook.content.services.sensitive_info_detector_service import SensitiveInfoDetectorService
+                sections = formatted_data.get('sections', [])
+                sensitive_items = SensitiveInfoDetectorService.detect_from_sections(sections)
+                
+                # 将敏感信息添加到返回数据中
+                formatted_data['sensitive_info'] = sensitive_items
+                
                 logger.info(
-                    f"用户 {request.user.id} 获取人设卡 {persona_card.id} 的配置项成功"
+                    f"用户 {request.user.id} 获取人设卡 {persona_card.id} 的配置项成功, "
+                    f"检测到 {len(sensitive_items)} 处敏感信息"
                 )
                 
                 return DetailResponse(

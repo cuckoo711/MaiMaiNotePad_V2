@@ -9,7 +9,7 @@
 
 from django.test import TestCase
 from django.core.files.uploadedfile import SimpleUploadedFile
-from ..services.file_validation_service import FileValidationService
+from mainotebook.content.services.file_validation_service import FileValidationService
 
 
 class FileValidationServiceTest(TestCase):

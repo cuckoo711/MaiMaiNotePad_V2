@@ -14,8 +14,8 @@
 from django.test import TestCase
 from django.core.exceptions import ValidationError, PermissionDenied
 from mainotebook.system.models import Users
-from ..models import KnowledgeBase, StarRecord, UploadRecord
-from ..services.knowledge_base_service import KnowledgeBaseService
+from mainotebook.content.models import KnowledgeBase, StarRecord, UploadRecord
+from mainotebook.content.services.knowledge_base_service import KnowledgeBaseService
 
 
 class KnowledgeBaseServiceTest(TestCase):
@@ -50,8 +50,7 @@ class KnowledgeBaseServiceTest(TestCase):
         data = {
             'name': '测试知识库',
             'description': '这是一个测试知识库',
-            'tags': 'Python,Django',
-            'version': '1.0'
+            'tags': 'Python,Django'
         }
         
         kb = KnowledgeBaseService.create_knowledge_base(self.user1, data)
@@ -62,7 +61,6 @@ class KnowledgeBaseServiceTest(TestCase):
         self.assertEqual(kb.description, '这是一个测试知识库')
         self.assertEqual(kb.uploader, self.user1)
         self.assertEqual(kb.tags, 'Python,Django')
-        self.assertEqual(kb.version, '1.0')
         self.assertTrue(kb.is_pending)  # 默认待审核
         self.assertFalse(kb.is_public)  # 默认不公开
         

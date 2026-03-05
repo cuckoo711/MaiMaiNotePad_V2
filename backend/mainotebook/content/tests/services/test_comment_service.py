@@ -16,8 +16,8 @@ from django.core.exceptions import ValidationError, PermissionDenied
 from django.utils import timezone
 from datetime import timedelta
 from mainotebook.system.models import Users
-from ..models import Comment, CommentReaction, KnowledgeBase
-from ..services.comment_service import CommentService
+from mainotebook.content.models import Comment, CommentReaction, KnowledgeBase
+from mainotebook.content.services.comment_service import CommentService
 
 
 class CommentServiceTest(TestCase):

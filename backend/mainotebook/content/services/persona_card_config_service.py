@@ -29,7 +29,7 @@ class PersonaCardConfigService:
     ) -> List[PersonaCardConfig]:
         """批量创建配置项
         
-        从解析后的 TOML 数据创建配置项记录。支持复杂类型的 JSON 序列化。
+        从解析后的 TOML 数据创建配置项记录。支持复杂类型的 JSON 序列化和排序信息保存。
         
         Args:
             persona_card: 人设卡实例
@@ -39,12 +39,14 @@ class PersonaCardConfigService:
                         {
                             "name": "section_name",
                             "comment": "块注释",
+                            "section_order": 10,
                             "items": [
                                 {
                                     "key": "key_name",
                                     "value": "value",
                                     "type": "string|integer|float|boolean|array|object",
-                                    "comment": "键注释"
+                                    "comment": "键注释",
+                                    "item_order": 5
                                 }
                             ]
                         }
@@ -66,12 +68,14 @@ class PersonaCardConfigService:
         for section in parsed_data['sections']:
             section_name = section.get('name', '')
             section_comment = section.get('comment', '')
+            section_order = section.get('section_order', 0)
             
             for item in section.get('items', []):
                 key_name = item.get('key', '')
                 value = item.get('value')
                 data_type = item.get('type', 'string')
                 comment = item.get('comment', '')
+                item_order = item.get('item_order', 0)
                 
                 # 复杂类型序列化为 JSON 字符串
                 if data_type in ('array', 'object'):
@@ -89,6 +93,8 @@ class PersonaCardConfigService:
                     value=value_str,
                     data_type=data_type,
                     description=description,
+                    section_order=section_order,
+                    item_order=item_order,
                     creator=user,
                     modifier=user.username
                 )
@@ -200,13 +206,14 @@ class PersonaCardConfigService:
         """获取配置项
         
         获取指定人设卡的所有配置项，可选择是否包含已删除的配置项。
+        按照原始 TOML 文件中的顺序排序（section_order, item_order）。
         
         Args:
             persona_card: 人设卡实例
             include_deleted: 是否包含已删除的配置项，默认为 False
             
         Returns:
-            QuerySet[PersonaCardConfig]: 配置项查询集，按 section_name 和 key_name 排序
+            QuerySet[PersonaCardConfig]: 配置项查询集，按 section_order 和 item_order 排序
         """
         queryset = PersonaCardConfig.objects.filter(
             persona_card=persona_card
@@ -215,7 +222,7 @@ class PersonaCardConfigService:
         if not include_deleted:
             queryset = queryset.filter(is_deleted=False)
         
-        return queryset.order_by('section_name', 'key_name')
+        return queryset.order_by('section_order', 'item_order', 'section_name', 'key_name')
     
     @staticmethod
     def get_configs_by_section(
@@ -231,7 +238,7 @@ class PersonaCardConfigService:
             include_deleted: 是否包含已删除的配置项，默认为 False
             
         Returns:
-            QuerySet[PersonaCardConfig]: 配置项查询集
+            QuerySet[PersonaCardConfig]: 配置项查询集，按 item_order 排序
         """
         queryset = PersonaCardConfig.objects.filter(
             persona_card=persona_card,
@@ -241,7 +248,7 @@ class PersonaCardConfigService:
         if not include_deleted:
             queryset = queryset.filter(is_deleted=False)
         
-        return queryset.order_by('key_name')
+        return queryset.order_by('item_order', 'key_name')
     
     @staticmethod
     def delete_section(

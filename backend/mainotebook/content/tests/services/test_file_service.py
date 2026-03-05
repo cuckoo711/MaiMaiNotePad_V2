@@ -12,9 +12,9 @@ import tempfile
 from io import BytesIO
 from django.test import TestCase, override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
-from ..services import FileService
-from ..exceptions import ValidationException
-from ..constants import MAX_FILE_SIZE
+from mainotebook.content.services import FileService
+from mainotebook.content.exceptions import ValidationException
+from mainotebook.content.constants import MAX_FILE_SIZE
 
 
 class FileServiceTest(TestCase):

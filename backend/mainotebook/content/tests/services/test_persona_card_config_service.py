@@ -13,8 +13,8 @@
 import json
 from django.test import TestCase
 from mainotebook.system.models import Users
-from ..models import PersonaCard, PersonaCardConfig
-from ..services.persona_card_config_service import PersonaCardConfigService
+from mainotebook.content.models import PersonaCard, PersonaCardConfig
+from mainotebook.content.services.persona_card_config_service import PersonaCardConfigService
 
 
 class PersonaCardConfigServiceTest(TestCase):

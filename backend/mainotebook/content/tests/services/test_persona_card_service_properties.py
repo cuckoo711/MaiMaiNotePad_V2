@@ -15,8 +15,8 @@ from django.contrib.auth.models import AnonymousUser
 from hypothesis import given, settings, strategies as st
 from hypothesis.extra.django import TestCase as HypothesisTestCase
 from mainotebook.system.models import Users
-from ..models import PersonaCard
-from ..services.persona_card_service import PersonaCardService
+from mainotebook.content.models import PersonaCard
+from mainotebook.content.services.persona_card_service import PersonaCardService
 
 
 class PersonaCardServicePropertiesTest(HypothesisTestCase):

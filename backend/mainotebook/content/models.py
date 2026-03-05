@@ -1336,11 +1336,23 @@ class PersonaCardConfig(CoreModel):
         help_text="配置项的注释说明"
     )
     
+    section_order = models.IntegerField(
+        default=0,
+        verbose_name="配置块排序",
+        help_text="配置块在整个配置文件中的排序位置，数字越小越靠前"
+    )
+    
+    item_order = models.IntegerField(
+        default=0,
+        verbose_name="配置项排序",
+        help_text="配置项在配置块中的排序位置，数字越小越靠前"
+    )
+    
     class Meta:
         db_table = table_prefix + "content_persona_card_config"
         verbose_name = "人设卡配置项"
         verbose_name_plural = verbose_name
-        ordering = ("section_name", "key_name")
+        ordering = ("section_order", "item_order", "section_name", "key_name")
         unique_together = [("persona_card", "section_name", "key_name")]
         indexes = [
             models.Index(fields=['persona_card']),

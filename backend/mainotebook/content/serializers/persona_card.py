@@ -162,7 +162,7 @@ class PersonaCardSerializer(CustomModelSerializer):
 class PersonaCardConfigSerializer(CustomModelSerializer):
     """人设卡配置项序列化器
     
-    用于序列化配置项数据，包含配置块名、键名、值、数据类型等信息。
+    用于序列化配置项数据，包含配置块名、键名、值、数据类型、排序等信息。
     """
     
     class Meta:
@@ -170,6 +170,7 @@ class PersonaCardConfigSerializer(CustomModelSerializer):
         fields = [
             'id', 'section_name', 'key_name', 'value', 
             'data_type', 'is_deleted', 'description',
+            'section_order', 'item_order',
             'create_datetime', 'update_datetime'
         ]
         read_only_fields = ['id', 'create_datetime', 'update_datetime']

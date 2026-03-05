@@ -259,9 +259,9 @@ const loadKnowledgeList = async (searchParams: any) => {
       params.starred = true;
     }
 
-    // 标签筛选
+    // 标签筛选（使用数组格式，后端会自动处理为 tags=标签1&tags=标签2）
     if (searchParams.tags && searchParams.tags.length > 0) {
-      params.tags = searchParams.tags.join(',');
+      params.tags = searchParams.tags;
     }
 
     const res = await api.getKnowledgeList(params);

@@ -13,8 +13,8 @@ from django.test import TestCase
 from django.core.cache import cache
 from django.utils import timezone
 from mainotebook.system.models import Users
-from ..models import TagStatistics, KnowledgeBase, PersonaCard
-from ..services.tag_service import TagService
+from mainotebook.content.models import TagStatistics, KnowledgeBase, PersonaCard
+from mainotebook.content.services.tag_service import TagService
 
 
 class TagServiceTest(TestCase):

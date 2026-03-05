@@ -87,6 +87,7 @@
 				<div class="config-editor-wrapper">
 					<ConfigEditor
 						v-model:sections="configSections"
+						:sensitive-info="sensitiveInfo"
 						:readonly="!canEdit"
 						@update:sections="handleConfigChange"
 					/>
@@ -147,6 +148,9 @@ const basicInfo = reactive({
 // 配置块数据
 const configSections = ref<ConfigSection[]>([]);
 
+// 敏感信息数据
+const sensitiveInfo = ref<any[]>([]);
+
 /**
  * 是否可以编辑
  * 只有私有状态且未在审核中的人设卡可以编辑
@@ -181,6 +185,14 @@ const loadPersonaCard = async () => {
 		const configResponse = await getPersonaCardConfig(personaCardId.value);
 		if (configResponse.code === 2000) {
 			configSections.value = configResponse.data.sections || [];
+			// 保存敏感信息数据
+			sensitiveInfo.value = configResponse.data.sensitive_info || [];
+			// 调试日志
+			console.log('加载配置数据成功:', {
+				sections: configSections.value.length,
+				sensitiveInfo: sensitiveInfo.value.length,
+				sensitiveInfoDetail: sensitiveInfo.value
+			});
 		} else {
 			ElMessage.error(configResponse.msg || '加载配置数据失败');
 		}

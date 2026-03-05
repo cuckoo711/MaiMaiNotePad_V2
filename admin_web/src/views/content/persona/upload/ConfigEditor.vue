@@ -39,14 +39,20 @@
 							<div class="item-header">
 								<span class="item-key">{{ item.key }}</span>
 								<el-tag :type="getTypeTagType(item.type)" size="small">{{ item.type }}</el-tag>
+								<el-tag v-if="hasSensitiveInfo(section.name, item.key)" type="warning" size="small">
+									<el-icon><Warning /></el-icon>
+									包含敏感信息
+								</el-tag>
 							</div>
 
 							<!-- 配置项值编辑 -->
 							<div class="item-value">
-								<!-- 字符串类型 -->
+								<!-- 字符串类型 - 使用多行文本框 -->
 								<el-input
 									v-if="item.type === 'string'"
 									v-model="item.value"
+									type="textarea"
+									:rows="3"
 									placeholder="请输入值"
 									@input="handleItemChange(section.name, item.key)"
 								/>
@@ -140,7 +146,7 @@
 
 <script lang="ts" setup>
 import { ref, watch } from 'vue';
-import { InfoFilled, Comment, Delete, RefreshLeft } from '@element-plus/icons-vue';
+import { InfoFilled, Comment, Delete, RefreshLeft, Warning } from '@element-plus/icons-vue';
 import { ElMessageBox } from 'element-plus';
 import type { ConfigSection } from '/@/stores/personaUpload';
 
@@ -160,6 +166,7 @@ import type { ConfigSection } from '/@/stores/personaUpload';
 // Props
 interface Props {
 	sections: ConfigSection[];
+	sensitiveInfo?: any[]; // 敏感信息列表
 }
 
 const props = defineProps<Props>();
@@ -176,6 +183,38 @@ const localSections = ref<ConfigSection[]>([...props.sections]);
 
 // 当前展开的配置块
 const activeNames = ref<string[]>([]);
+
+/**
+ * 检查配置项是否包含敏感信息
+ */
+const hasSensitiveInfo = (sectionName: string, itemKey: string) => {
+	if (!props.sensitiveInfo || props.sensitiveInfo.length === 0) {
+		return false;
+	}
+	
+	const path = `${sectionName}.${itemKey}`;
+	const result = props.sensitiveInfo.some((item: any) => item.path === path);
+	
+	// 调试日志
+	if (result) {
+		console.log('检测到敏感信息:', { sectionName, itemKey, path });
+	}
+	
+	return result;
+};
+
+/**
+ * 获取配置项的敏感信息匹配列表
+ */
+const getSensitiveMatches = (sectionName: string, itemKey: string) => {
+	if (!props.sensitiveInfo || props.sensitiveInfo.length === 0) {
+		return [];
+	}
+	
+	const path = `${sectionName}.${itemKey}`;
+	const item = props.sensitiveInfo.find((item: any) => item.path === path);
+	return item ? item.matches : [];
+};
 
 /**
  * 获取类型标签颜色
@@ -269,6 +308,15 @@ watch(
 		localSections.value = [...newValue];
 	},
 	{ deep: true }
+);
+
+// 监听 sensitiveInfo 变化
+watch(
+	() => props.sensitiveInfo,
+	(newValue) => {
+		console.log('ConfigEditor 接收到 sensitiveInfo 更新:', newValue);
+	},
+	{ immediate: true, deep: true }
 );
 </script>
 

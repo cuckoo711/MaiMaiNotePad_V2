@@ -15,8 +15,8 @@
 from django.test import TestCase
 from django.core.exceptions import ValidationError, PermissionDenied
 from mainotebook.system.models import Users
-from ..models import PersonaCard, PersonaCardFile, StarRecord, UploadRecord
-from ..services.persona_card_service import PersonaCardService
+from mainotebook.content.models import PersonaCard, PersonaCardFile, StarRecord, UploadRecord
+from mainotebook.content.services.persona_card_service import PersonaCardService
 import tempfile
 import os
 

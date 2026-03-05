@@ -16,8 +16,8 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import timedelta
 from mainotebook.system.models import Users
-from ..models import KnowledgeBase, PersonaCard, UploadRecord
-from ..services.review_service import ReviewService
+from mainotebook.content.models import KnowledgeBase, PersonaCard, UploadRecord
+from mainotebook.content.services.review_service import ReviewService
 
 
 class ReviewServiceTest(TestCase):
@@ -45,10 +45,10 @@ class ReviewServiceTest(TestCase):
     
     def tearDown(self):
         """测试后清理"""
-        # 清理测试数据
-        UploadRecord.objects.all().delete()
-        KnowledgeBase.objects.all().delete()
+        # 清理测试数据（按依赖顺序）
         PersonaCard.objects.all().delete()
+        KnowledgeBase.objects.all().delete()
+        UploadRecord.objects.all().delete()
         Users.objects.all().delete()
     
     # ========== 获取待审核列表测试 ==========
@@ -89,12 +89,12 @@ class ReviewServiceTest(TestCase):
             is_public=True
         )
         
-        # 获取待审核列表
-        result = ReviewService.get_pending_items()
+        # 获取待审核列表（明确指定 status='pending'）
+        result = ReviewService.get_pending_items(filters={'status': 'pending'})
         items = result['items']
         
         # 验证结果
-        self.assertEqual(len(items), 2)
+        self.assertEqual(len(items), 2, f"期望2个待审核项，实际{len(items)}个")
         
         # 验证包含正确的知识库
         kb_ids = [item['id'] for item in items]
@@ -141,8 +141,8 @@ class ReviewServiceTest(TestCase):
             is_public=True
         )
         
-        # 获取待审核列表
-        result = ReviewService.get_pending_items()
+        # 获取待审核列表（明确指定 status='pending'）
+        result = ReviewService.get_pending_items(filters={'status': 'pending'})
         items = result['items']
         
         # 验证结果

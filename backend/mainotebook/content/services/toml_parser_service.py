@@ -149,21 +149,29 @@ class TomlParserService:
         Raises:
             ValueError: 结构无效时抛出异常
         """
-        # 查找 version 字段：支持顶层和 inner.meta.card 子字段
+        # 查找 version 字段：支持顶层、inner、inner.meta.card 等位置
         version = parsed_data.get('version')
         
         if version is None:
-            # 尝试在嵌套结构中查找 version
+            # 尝试在 inner 中查找 version
             inner = parsed_data.get('inner', {})
             if isinstance(inner, dict):
-                meta = inner.get('meta', {})
-                if isinstance(meta, dict):
-                    card = meta.get('card', {})
-                    if isinstance(card, dict):
-                        version = card.get('version')
+                version = inner.get('version')
+                
+                if version is None:
+                    # 尝试在 inner.meta 中查找
+                    meta = inner.get('meta', {})
+                    if isinstance(meta, dict):
+                        version = meta.get('version')
+                        
+                        if version is None:
+                            # 尝试在 inner.meta.card 中查找
+                            card = meta.get('card', {})
+                            if isinstance(card, dict):
+                                version = card.get('version')
         
         if version is None:
-            raise ValueError("缺少必需字段: version（应在顶层或 inner.meta.card 中）")
+            raise ValueError("缺少必需字段: version（应在顶层、inner 或 inner.meta.card 中）")
         
         return True
     
@@ -267,14 +275,45 @@ class TomlParserService:
         # 提取 version 字段
         version = parsed_data.get('version')
         if version is None:
-            # 尝试在嵌套结构中查找
+            # 尝试在 inner 中查找
             inner = parsed_data.get('inner', {})
             if isinstance(inner, dict):
-                meta = inner.get('meta', {})
-                if isinstance(meta, dict):
-                    card = meta.get('card', {})
-                    if isinstance(card, dict):
-                        version = card.get('version')
+                version = inner.get('version')
+                
+                if version is None:
+                    # 尝试在 inner.meta 中查找
+                    meta = inner.get('meta', {})
+                    if isinstance(meta, dict):
+                        version = meta.get('version')
+                        
+                        if version is None:
+                            # 尝试在 inner.meta.card 中查找
+                            card = meta.get('card', {})
+                            if isinstance(card, dict):
+                                version = card.get('version')
+        
+        # 构建行号到配置项的映射，用于确定排序
+        line_to_section = {}  # {line_num: section_name}
+        line_to_key = {}  # {line_num: (section_name, key_name)}
+        
+        # 解析文件，记录每个 section 和 key 的行号
+        current_section = None
+        for line_num, line in enumerate(lines, start=1):
+            stripped = line.strip()
+            
+            # 检查是否是 section 声明
+            section_match = re.match(r'^\[([^\]]+)\]', stripped)
+            if section_match:
+                section_name = section_match.group(1)
+                current_section = section_name
+                line_to_section[line_num] = section_name
+                continue
+            
+            # 检查是否是键值对
+            key_match = re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)\s*=', stripped)
+            if key_match:
+                key_name = key_match.group(1)
+                line_to_key[line_num] = (current_section, key_name)
         
         # 处理顶层配置项（不在任何 section 中的）
         top_level_items = []
@@ -285,11 +324,19 @@ class TomlParserService:
                     key, lines, comments, section_name=None
                 )
                 
+                # 查找该键的行号
+                item_order = 0
+                for line_num, (sec, k) in line_to_key.items():
+                    if sec is None and k == key:
+                        item_order = line_num
+                        break
+                
                 top_level_items.append({
                     'key': key,
                     'value': value,
                     'type': TomlParserService._identify_data_type(value),
-                    'comment': key_comment
+                    'comment': key_comment,
+                    'item_order': item_order
                 })
         
         if top_level_items:
@@ -298,10 +345,12 @@ class TomlParserService:
                 None, lines, comments
             )
             
+            # 顶层配置块的排序为 0
             sections.append({
                 'name': '',  # 顶层配置项，section 名称为空
                 'comment': top_comment,
-                'items': top_level_items
+                'items': top_level_items,
+                'section_order': 0
             })
         
         # 处理各个 section
@@ -310,17 +359,32 @@ class TomlParserService:
                 # 这是一个 section
                 section_items = []
                 
+                # 查找该 section 的行号
+                section_order = 0
+                for line_num, sec in line_to_section.items():
+                    if sec == section_name:
+                        section_order = line_num
+                        break
+                
                 for key, value in section_data.items():
                     # 查找该键的注释
                     key_comment = TomlParserService._find_comment_for_key(
                         key, lines, comments, section_name=section_name
                     )
                     
+                    # 查找该键的行号
+                    item_order = 0
+                    for line_num, (sec, k) in line_to_key.items():
+                        if sec == section_name and k == key:
+                            item_order = line_num
+                            break
+                    
                     section_items.append({
                         'key': key,
                         'value': value,
                         'type': TomlParserService._identify_data_type(value),
-                        'comment': key_comment
+                        'comment': key_comment,
+                        'item_order': item_order
                     })
                 
                 # 查找 section 的注释
@@ -331,7 +395,8 @@ class TomlParserService:
                 sections.append({
                     'name': section_name,
                     'comment': section_comment,
-                    'items': section_items
+                    'items': section_items,
+                    'section_order': section_order
                 })
         
         return {
