@@ -851,3 +851,64 @@ class UserNotificationPreference(CoreModel):
         }
         status = '免打扰' if self.is_muted else '正常'
         return f"{self.user.name} - {type_names.get(self.message_type, '未知')} - {status}"
+
+
+class Translation(CoreModel):
+    """翻译模型
+    
+    用于存储系统中的翻译数据，支持多语言翻译对。
+    """
+    source_text = models.CharField(
+        max_length=200,
+        verbose_name="原文",
+        help_text="原文文本"
+    )
+    translated_text = models.CharField(
+        max_length=200,
+        verbose_name="译文",
+        help_text="翻译后的文本"
+    )
+    source_language = models.CharField(
+        max_length=10,
+        default="en",
+        blank=False,
+        verbose_name="源语言",
+        help_text="源语言代码（如：en, zh）"
+    )
+    target_language = models.CharField(
+        max_length=10,
+        default="zh",
+        blank=False,
+        verbose_name="目标语言",
+        help_text="目标语言代码（如：en, zh）"
+    )
+    translation_type = models.CharField(
+        max_length=50,
+        verbose_name="翻译类型",
+        help_text="翻译类型标识（如：toml_visualizer_blocks）"
+    )
+    sort = models.IntegerField(
+        default=1,
+        verbose_name="排序",
+        help_text="显示排序"
+    )
+    status = models.BooleanField(
+        default=True,
+        verbose_name="状态",
+        help_text="是否启用"
+    )
+    
+    class Meta:
+        db_table = table_prefix + "system_translation"
+        verbose_name = "翻译表"
+        verbose_name_plural = verbose_name
+        ordering = ("sort",)
+        unique_together = (("translation_type", "source_text"),)
+        indexes = [
+            models.Index(fields=["translation_type"]),
+            models.Index(fields=["source_language"]),
+            models.Index(fields=["target_language"]),
+        ]
+    
+    def __str__(self) -> str:
+        return f"{self.translation_type}: {self.source_text} -> {self.translated_text}"

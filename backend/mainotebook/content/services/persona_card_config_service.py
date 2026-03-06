@@ -10,6 +10,7 @@ from typing import List, Dict, Any, Optional
 from django.db.models import QuerySet
 from django.db import transaction
 from mainotebook.system.models import Users
+from mainotebook.system.services.translation_service import TranslationService
 from ..models import PersonaCard, PersonaCardConfig
 
 logger = logging.getLogger(__name__)
@@ -318,14 +319,19 @@ class PersonaCardConfigService:
     
     @staticmethod
     def format_configs_as_dict(
-        configs: QuerySet[PersonaCardConfig]
+        configs: QuerySet[PersonaCardConfig],
+        translate: bool = True,
+        translation_type: str = 'toml_visualizer_blocks'
     ) -> Dict[str, Any]:
         """将配置项格式化为字典结构
         
         将配置项查询集格式化为按配置块分组的字典结构，便于前端展示。
+        支持翻译配置块名和键名。
         
         Args:
             configs: 配置项查询集
+            translate: 是否翻译配置块名和键名，默认为 True
+            translation_type: 翻译类型，默认为 'toml_visualizer_blocks'
             
         Returns:
             Dict[str, Any]: 格式化后的字典，结构为：
@@ -333,9 +339,11 @@ class PersonaCardConfigService:
                     "sections": [
                         {
                             "name": "section_name",
+                            "translated_name": "翻译后的块名",  # 如果启用翻译
                             "items": [
                                 {
                                     "key": "key_name",
+                                    "translated_key": "翻译后的键名",  # 如果启用翻译
                                     "value": value,
                                     "type": "data_type",
                                     "comment": "description",
@@ -348,22 +356,59 @@ class PersonaCardConfigService:
         """
         sections_dict = {}
         
+        # 收集所有需要翻译的文本
+        if translate:
+            section_names = set()
+            key_names = set()
+            
+            for config in configs:
+                section_names.add(config.section_name)
+                key_names.add(config.key_name)
+            
+            # 批量获取翻译
+            section_translations = TranslationService.get_translations_batch(
+                list(section_names),
+                translation_type=translation_type
+            )
+            
+            key_translations = TranslationService.get_translations_batch(
+                list(key_names),
+                translation_type='toml_visualizer_tokens'  # 键名使用 tokens 类型
+            )
+        
         for config in configs:
             section_name = config.section_name
             
             if section_name not in sections_dict:
-                sections_dict[section_name] = {
+                section_data = {
                     'name': section_name,
                     'items': []
                 }
+                
+                # 添加翻译后的块名（纯翻译文本）
+                if translate and section_name in section_translations:
+                    section_data['translated_name'] = section_translations[section_name]
+                else:
+                    section_data['translated_name'] = section_name
+                
+                sections_dict[section_name] = section_data
             
-            sections_dict[section_name]['items'].append({
+            # 构建配置项数据
+            item_data = {
                 'key': config.key_name,
                 'value': PersonaCardConfigService.get_value(config),
                 'type': config.data_type,
                 'comment': config.description or '',
                 'is_deleted': config.is_deleted
-            })
+            }
+            
+            # 添加翻译后的键名（纯翻译文本）
+            if translate and config.key_name in key_translations:
+                item_data['translated_key'] = key_translations[config.key_name]
+            else:
+                item_data['translated_key'] = config.key_name
+            
+            sections_dict[section_name]['items'].append(item_data)
         
         return {
             'sections': list(sections_dict.values())

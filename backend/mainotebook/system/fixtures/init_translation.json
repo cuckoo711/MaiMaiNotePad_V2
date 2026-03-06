@@ -1,0 +1,1685 @@
+[
+    {
+        "source_text": "inner",
+        "translated_text": "内在",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 1,
+        "status": true
+    },
+    {
+        "source_text": "bot",
+        "translated_text": "机器人",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 2,
+        "status": true
+    },
+    {
+        "source_text": "personality",
+        "translated_text": "人格",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 3,
+        "status": true
+    },
+    {
+        "source_text": "expression",
+        "translated_text": "表达",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 4,
+        "status": true
+    },
+    {
+        "source_text": "chat",
+        "translated_text": "聊天",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 5,
+        "status": true
+    },
+    {
+        "source_text": "memory",
+        "translated_text": "记忆",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 6,
+        "status": true
+    },
+    {
+        "source_text": "dream",
+        "translated_text": "梦境",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 7,
+        "status": true
+    },
+    {
+        "source_text": "tool",
+        "translated_text": "工具",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 8,
+        "status": true
+    },
+    {
+        "source_text": "tools",
+        "translated_text": "工具",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 9,
+        "status": true
+    },
+    {
+        "source_text": "emoji",
+        "translated_text": "表情",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 10,
+        "status": true
+    },
+    {
+        "source_text": "voice",
+        "translated_text": "语音",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 11,
+        "status": true
+    },
+    {
+        "source_text": "system",
+        "translated_text": "系统",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 12,
+        "status": true
+    },
+    {
+        "source_text": "profile",
+        "translated_text": "档案",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 13,
+        "status": true
+    },
+    {
+        "source_text": "preference",
+        "translated_text": "偏好",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 14,
+        "status": true
+    },
+    {
+        "source_text": "message_receive",
+        "translated_text": "消息接收",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 15,
+        "status": true
+    },
+    {
+        "source_text": "lpmm_knowledge",
+        "translated_text": "LPMM 知识",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 16,
+        "status": true
+    },
+    {
+        "source_text": "keyword_reaction",
+        "translated_text": "关键词反应",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 17,
+        "status": true
+    },
+    {
+        "source_text": "response_post_process",
+        "translated_text": "回复后处理",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 18,
+        "status": true
+    },
+    {
+        "source_text": "chinese_typo",
+        "translated_text": "中文错字",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 19,
+        "status": true
+    },
+    {
+        "source_text": "response_splitter",
+        "translated_text": "回复拆分",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 20,
+        "status": true
+    },
+    {
+        "source_text": "log",
+        "translated_text": "日志",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 21,
+        "status": true
+    },
+    {
+        "source_text": "debug",
+        "translated_text": "调试",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 22,
+        "status": true
+    },
+    {
+        "source_text": "maim_message",
+        "translated_text": "麦麦消息",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 23,
+        "status": true
+    },
+    {
+        "source_text": "telemetry",
+        "translated_text": "遥测",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 24,
+        "status": true
+    },
+    {
+        "source_text": "webui",
+        "translated_text": "Web UI",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 25,
+        "status": true
+    },
+    {
+        "source_text": "experimental",
+        "translated_text": "实验特性",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 26,
+        "status": true
+    },
+    {
+        "source_text": "relationship",
+        "translated_text": "关系",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_blocks",
+        "sort": 27,
+        "status": true
+    },
+    {
+        "source_text": "inner",
+        "translated_text": "内在",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 1,
+        "status": true
+    },
+    {
+        "source_text": "bot",
+        "translated_text": "机器人",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 2,
+        "status": true
+    },
+    {
+        "source_text": "personality",
+        "translated_text": "人格",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 3,
+        "status": true
+    },
+    {
+        "source_text": "expression",
+        "translated_text": "表达",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 4,
+        "status": true
+    },
+    {
+        "source_text": "chat",
+        "translated_text": "聊天",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 5,
+        "status": true
+    },
+    {
+        "source_text": "memory",
+        "translated_text": "记忆",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 6,
+        "status": true
+    },
+    {
+        "source_text": "dream",
+        "translated_text": "梦境",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 7,
+        "status": true
+    },
+    {
+        "source_text": "tool",
+        "translated_text": "工具",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 8,
+        "status": true
+    },
+    {
+        "source_text": "tools",
+        "translated_text": "工具",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 9,
+        "status": true
+    },
+    {
+        "source_text": "emoji",
+        "translated_text": "表情",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 10,
+        "status": true
+    },
+    {
+        "source_text": "voice",
+        "translated_text": "语音",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 11,
+        "status": true
+    },
+    {
+        "source_text": "system",
+        "translated_text": "系统",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 12,
+        "status": true
+    },
+    {
+        "source_text": "profile",
+        "translated_text": "档案",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 13,
+        "status": true
+    },
+    {
+        "source_text": "preference",
+        "translated_text": "偏好",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 14,
+        "status": true
+    },
+    {
+        "source_text": "config",
+        "translated_text": "配置",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 15,
+        "status": true
+    },
+    {
+        "source_text": "setting",
+        "translated_text": "设置",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 16,
+        "status": true
+    },
+    {
+        "source_text": "settings",
+        "translated_text": "设置",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 17,
+        "status": true
+    },
+    {
+        "source_text": "user",
+        "translated_text": "用户",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 18,
+        "status": true
+    },
+    {
+        "source_text": "global",
+        "translated_text": "全局",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 19,
+        "status": true
+    },
+    {
+        "source_text": "persona",
+        "translated_text": "人设",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 20,
+        "status": true
+    },
+    {
+        "source_text": "behavior",
+        "translated_text": "行为",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 21,
+        "status": true
+    },
+    {
+        "source_text": "message",
+        "translated_text": "消息",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 22,
+        "status": true
+    },
+    {
+        "source_text": "receive",
+        "translated_text": "接收",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 23,
+        "status": true
+    },
+    {
+        "source_text": "lpmm",
+        "translated_text": "LPMM",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 24,
+        "status": true
+    },
+    {
+        "source_text": "knowledge",
+        "translated_text": "知识",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 25,
+        "status": true
+    },
+    {
+        "source_text": "keyword",
+        "translated_text": "关键词",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 26,
+        "status": true
+    },
+    {
+        "source_text": "reaction",
+        "translated_text": "反应",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 27,
+        "status": true
+    },
+    {
+        "source_text": "response",
+        "translated_text": "回复",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 28,
+        "status": true
+    },
+    {
+        "source_text": "post",
+        "translated_text": "后",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 29,
+        "status": true
+    },
+    {
+        "source_text": "process",
+        "translated_text": "处理",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 30,
+        "status": true
+    },
+    {
+        "source_text": "chinese",
+        "translated_text": "中文",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 31,
+        "status": true
+    },
+    {
+        "source_text": "typo",
+        "translated_text": "错字",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 32,
+        "status": true
+    },
+    {
+        "source_text": "splitter",
+        "translated_text": "拆分",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 33,
+        "status": true
+    },
+    {
+        "source_text": "log",
+        "translated_text": "日志",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 34,
+        "status": true
+    },
+    {
+        "source_text": "debug",
+        "translated_text": "调试",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 35,
+        "status": true
+    },
+    {
+        "source_text": "maim",
+        "translated_text": "麦麦",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 36,
+        "status": true
+    },
+    {
+        "source_text": "telemetry",
+        "translated_text": "遥测",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 37,
+        "status": true
+    },
+    {
+        "source_text": "webui",
+        "translated_text": "Web UI",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 38,
+        "status": true
+    },
+    {
+        "source_text": "experimental",
+        "translated_text": "实验",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 39,
+        "status": true
+    },
+    {
+        "source_text": "relationship",
+        "translated_text": "关系",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 40,
+        "status": true
+    },
+    {
+        "source_text": "version",
+        "translated_text": "版本",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 41,
+        "status": true
+    },
+    {
+        "source_text": "platform",
+        "translated_text": "平台",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 42,
+        "status": true
+    },
+    {
+        "source_text": "qq_account",
+        "translated_text": "QQ账号",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 43,
+        "status": true
+    },
+    {
+        "source_text": "platforms",
+        "translated_text": "平台列表",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 44,
+        "status": true
+    },
+    {
+        "source_text": "nickname",
+        "translated_text": "昵称",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 45,
+        "status": true
+    },
+    {
+        "source_text": "alias_names",
+        "translated_text": "别名",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 46,
+        "status": true
+    },
+    {
+        "source_text": "reply_style",
+        "translated_text": "回复风格",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 47,
+        "status": true
+    },
+    {
+        "source_text": "multiple_reply_style",
+        "translated_text": "多种回复风格",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 48,
+        "status": true
+    },
+    {
+        "source_text": "multiple_probability",
+        "translated_text": "多种概率",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 49,
+        "status": true
+    },
+    {
+        "source_text": "plan_style",
+        "translated_text": "规划风格",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 50,
+        "status": true
+    },
+    {
+        "source_text": "states",
+        "translated_text": "状态",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 51,
+        "status": true
+    },
+    {
+        "source_text": "state_probability",
+        "translated_text": "状态概率",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 52,
+        "status": true
+    },
+    {
+        "source_text": "visual_style",
+        "translated_text": "视觉风格",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 53,
+        "status": true
+    },
+    {
+        "source_text": "learning_list",
+        "translated_text": "学习列表",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 54,
+        "status": true
+    },
+    {
+        "source_text": "expression_groups",
+        "translated_text": "表达组",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 55,
+        "status": true
+    },
+    {
+        "source_text": "expression_checked_only",
+        "translated_text": "仅检查表达",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 56,
+        "status": true
+    },
+    {
+        "source_text": "expression_self_reflect",
+        "translated_text": "表达自我反思",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 57,
+        "status": true
+    },
+    {
+        "source_text": "expression_auto_check_interval",
+        "translated_text": "自动检查间隔",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 58,
+        "status": true
+    },
+    {
+        "source_text": "expression_auto_check_count",
+        "translated_text": "自动检查数量",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 59,
+        "status": true
+    },
+    {
+        "source_text": "expression_auto_check_custom_criteria",
+        "translated_text": "自定义标准",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 60,
+        "status": true
+    },
+    {
+        "source_text": "expression_manual_reflect",
+        "translated_text": "手动反思",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 61,
+        "status": true
+    },
+    {
+        "source_text": "manual_reflect_operator_id",
+        "translated_text": "操作员ID",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 62,
+        "status": true
+    },
+    {
+        "source_text": "allow_reflect",
+        "translated_text": "允许反思",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 63,
+        "status": true
+    },
+    {
+        "source_text": "all_global_jargon",
+        "translated_text": "全局黑话",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 64,
+        "status": true
+    },
+    {
+        "source_text": "enable_jargon_explanation",
+        "translated_text": "启用黑话解释",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 65,
+        "status": true
+    },
+    {
+        "source_text": "jargon_mode",
+        "translated_text": "黑话模式",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 66,
+        "status": true
+    },
+    {
+        "source_text": "talk_value",
+        "translated_text": "发言频率",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 67,
+        "status": true
+    },
+    {
+        "source_text": "mentioned_bot_reply",
+        "translated_text": "提及必回",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 68,
+        "status": true
+    },
+    {
+        "source_text": "max_context_size",
+        "translated_text": "上下文长度",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 69,
+        "status": true
+    },
+    {
+        "source_text": "planner_smooth",
+        "translated_text": "规划器平滑",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 70,
+        "status": true
+    },
+    {
+        "source_text": "think_mode",
+        "translated_text": "思考模式",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 71,
+        "status": true
+    },
+    {
+        "source_text": "plan_reply_log_max_per_chat",
+        "translated_text": "日志最大数",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 72,
+        "status": true
+    },
+    {
+        "source_text": "llm_quote",
+        "translated_text": "LLM引用",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 73,
+        "status": true
+    },
+    {
+        "source_text": "enable_talk_value_rules",
+        "translated_text": "启用发言规则",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 74,
+        "status": true
+    },
+    {
+        "source_text": "talk_value_rules",
+        "translated_text": "发言规则",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 75,
+        "status": true
+    },
+    {
+        "source_text": "max_agent_iterations",
+        "translated_text": "最大迭代",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 76,
+        "status": true
+    },
+    {
+        "source_text": "agent_timeout_seconds",
+        "translated_text": "超时秒数",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 77,
+        "status": true
+    },
+    {
+        "source_text": "global_memory",
+        "translated_text": "全局记忆",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 78,
+        "status": true
+    },
+    {
+        "source_text": "global_memory_blacklist",
+        "translated_text": "全局记忆黑名单",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 79,
+        "status": true
+    },
+    {
+        "source_text": "planner_question",
+        "translated_text": "规划器问题",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 80,
+        "status": true
+    },
+    {
+        "source_text": "interval_minutes",
+        "translated_text": "间隔分钟",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 81,
+        "status": true
+    },
+    {
+        "source_text": "max_iterations",
+        "translated_text": "最大迭代",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 82,
+        "status": true
+    },
+    {
+        "source_text": "first_delay_seconds",
+        "translated_text": "首次延迟",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 83,
+        "status": true
+    },
+    {
+        "source_text": "dream_send",
+        "translated_text": "梦境发送",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 84,
+        "status": true
+    },
+    {
+        "source_text": "dream_visible",
+        "translated_text": "梦境可见",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 85,
+        "status": true
+    },
+    {
+        "source_text": "dream_time_ranges",
+        "translated_text": "梦境时间段",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 86,
+        "status": true
+    },
+    {
+        "source_text": "enable_tool",
+        "translated_text": "启用工具",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 87,
+        "status": true
+    },
+    {
+        "source_text": "emoji_chance",
+        "translated_text": "表情概率",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 88,
+        "status": true
+    },
+    {
+        "source_text": "max_reg_num",
+        "translated_text": "最大注册数",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 89,
+        "status": true
+    },
+    {
+        "source_text": "do_replace",
+        "translated_text": "替换",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 90,
+        "status": true
+    },
+    {
+        "source_text": "check_interval",
+        "translated_text": "检查间隔",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 91,
+        "status": true
+    },
+    {
+        "source_text": "steal_emoji",
+        "translated_text": "偷取表情",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 92,
+        "status": true
+    },
+    {
+        "source_text": "content_filtration",
+        "translated_text": "内容过滤",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 93,
+        "status": true
+    },
+    {
+        "source_text": "filtration_prompt",
+        "translated_text": "过滤提示",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 94,
+        "status": true
+    },
+    {
+        "source_text": "enable_asr",
+        "translated_text": "启用语音识别",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 95,
+        "status": true
+    },
+    {
+        "source_text": "ban_words",
+        "translated_text": "禁用词",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 96,
+        "status": true
+    },
+    {
+        "source_text": "ban_msgs_regex",
+        "translated_text": "禁用消息正则",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 97,
+        "status": true
+    },
+    {
+        "source_text": "enable",
+        "translated_text": "启用",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 98,
+        "status": true
+    },
+    {
+        "source_text": "lpmm_mode",
+        "translated_text": "LPMM模式",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 99,
+        "status": true
+    },
+    {
+        "source_text": "rag_synonym_search_top_k",
+        "translated_text": "同义检索TopK",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 100,
+        "status": true
+    },
+    {
+        "source_text": "rag_synonym_threshold",
+        "translated_text": "同义阈值",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 101,
+        "status": true
+    },
+    {
+        "source_text": "info_extraction_workers",
+        "translated_text": "信息抽取线程",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 102,
+        "status": true
+    },
+    {
+        "source_text": "qa_relation_search_top_k",
+        "translated_text": "关系检索TopK",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 103,
+        "status": true
+    },
+    {
+        "source_text": "qa_relation_threshold",
+        "translated_text": "关系阈值",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 104,
+        "status": true
+    },
+    {
+        "source_text": "qa_paragraph_search_top_k",
+        "translated_text": "段落检索TopK",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 105,
+        "status": true
+    },
+    {
+        "source_text": "qa_paragraph_node_weight",
+        "translated_text": "段落节点权重",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 106,
+        "status": true
+    },
+    {
+        "source_text": "qa_ent_filter_top_k",
+        "translated_text": "实体过滤TopK",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 107,
+        "status": true
+    },
+    {
+        "source_text": "qa_ppr_damping",
+        "translated_text": "PPR阻尼",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 108,
+        "status": true
+    },
+    {
+        "source_text": "qa_res_top_k",
+        "translated_text": "结果TopK",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 109,
+        "status": true
+    },
+    {
+        "source_text": "embedding_dimension",
+        "translated_text": "嵌入维度",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 110,
+        "status": true
+    },
+    {
+        "source_text": "max_embedding_workers",
+        "translated_text": "最大嵌入线程",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 111,
+        "status": true
+    },
+    {
+        "source_text": "embedding_chunk_size",
+        "translated_text": "嵌入块大小",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 112,
+        "status": true
+    },
+    {
+        "source_text": "max_synonym_entities",
+        "translated_text": "最大同义实体",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 113,
+        "status": true
+    },
+    {
+        "source_text": "enable_ppr",
+        "translated_text": "启用PPR",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 114,
+        "status": true
+    },
+    {
+        "source_text": "keyword_rules",
+        "translated_text": "关键词规则",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 115,
+        "status": true
+    },
+    {
+        "source_text": "regex_rules",
+        "translated_text": "正则规则",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 116,
+        "status": true
+    },
+    {
+        "source_text": "keywords",
+        "translated_text": "关键词",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 117,
+        "status": true
+    },
+    {
+        "source_text": "regex",
+        "translated_text": "正则",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 118,
+        "status": true
+    },
+    {
+        "source_text": "enable_response_post_process",
+        "translated_text": "启用后处理",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 119,
+        "status": true
+    },
+    {
+        "source_text": "error_rate",
+        "translated_text": "错误率",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 120,
+        "status": true
+    },
+    {
+        "source_text": "min_freq",
+        "translated_text": "最小频率",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 121,
+        "status": true
+    },
+    {
+        "source_text": "tone_error_rate",
+        "translated_text": "声调错误率",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 122,
+        "status": true
+    },
+    {
+        "source_text": "word_replace_rate",
+        "translated_text": "词替换率",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 123,
+        "status": true
+    },
+    {
+        "source_text": "max_length",
+        "translated_text": "最大长度",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 124,
+        "status": true
+    },
+    {
+        "source_text": "max_sentence_num",
+        "translated_text": "最大句子数",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 125,
+        "status": true
+    },
+    {
+        "source_text": "enable_kaomoji_protection",
+        "translated_text": "颜文字保护",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 126,
+        "status": true
+    },
+    {
+        "source_text": "enable_overflow_return_all",
+        "translated_text": "溢出返回全部",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 127,
+        "status": true
+    },
+    {
+        "source_text": "date_style",
+        "translated_text": "日期样式",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 128,
+        "status": true
+    },
+    {
+        "source_text": "log_level_style",
+        "translated_text": "日志级别样式",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 129,
+        "status": true
+    },
+    {
+        "source_text": "color_text",
+        "translated_text": "彩色文本",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 130,
+        "status": true
+    },
+    {
+        "source_text": "log_level",
+        "translated_text": "日志级别",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 131,
+        "status": true
+    },
+    {
+        "source_text": "console_log_level",
+        "translated_text": "控制台日志级别",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 132,
+        "status": true
+    },
+    {
+        "source_text": "file_log_level",
+        "translated_text": "文件日志级别",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 133,
+        "status": true
+    },
+    {
+        "source_text": "suppress_libraries",
+        "translated_text": "屏蔽库",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 134,
+        "status": true
+    },
+    {
+        "source_text": "library_log_levels",
+        "translated_text": "库日志级别",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 135,
+        "status": true
+    },
+    {
+        "source_text": "show_prompt",
+        "translated_text": "显示提示",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 136,
+        "status": true
+    },
+    {
+        "source_text": "show_replyer_prompt",
+        "translated_text": "显示回复器提示",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 137,
+        "status": true
+    },
+    {
+        "source_text": "show_replyer_reasoning",
+        "translated_text": "显示回复器推理",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 138,
+        "status": true
+    },
+    {
+        "source_text": "show_jargon_prompt",
+        "translated_text": "显示黑话提示",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 139,
+        "status": true
+    },
+    {
+        "source_text": "show_memory_prompt",
+        "translated_text": "显示记忆提示",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 140,
+        "status": true
+    },
+    {
+        "source_text": "show_planner_prompt",
+        "translated_text": "显示规划器提示",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 141,
+        "status": true
+    },
+    {
+        "source_text": "show_lpmm_paragraph",
+        "translated_text": "显示LPMM段落",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 142,
+        "status": true
+    },
+    {
+        "source_text": "auth_token",
+        "translated_text": "认证令牌",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 143,
+        "status": true
+    },
+    {
+        "source_text": "enable_api_server",
+        "translated_text": "启用API服务器",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 144,
+        "status": true
+    },
+    {
+        "source_text": "api_server_host",
+        "translated_text": "API服务器主机",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 145,
+        "status": true
+    },
+    {
+        "source_text": "api_server_port",
+        "translated_text": "API服务器端口",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 146,
+        "status": true
+    },
+    {
+        "source_text": "api_server_use_wss",
+        "translated_text": "使用WSS",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 147,
+        "status": true
+    },
+    {
+        "source_text": "api_server_cert_file",
+        "translated_text": "证书文件",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 148,
+        "status": true
+    },
+    {
+        "source_text": "api_server_key_file",
+        "translated_text": "密钥文件",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 149,
+        "status": true
+    },
+    {
+        "source_text": "api_server_allowed_api_keys",
+        "translated_text": "允许的API密钥",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 150,
+        "status": true
+    },
+    {
+        "source_text": "enabled",
+        "translated_text": "已启用",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 151,
+        "status": true
+    },
+    {
+        "source_text": "mode",
+        "translated_text": "模式",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 152,
+        "status": true
+    },
+    {
+        "source_text": "anti_crawler_mode",
+        "translated_text": "防爬虫模式",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 153,
+        "status": true
+    },
+    {
+        "source_text": "allowed_ips",
+        "translated_text": "允许的IP",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 154,
+        "status": true
+    },
+    {
+        "source_text": "trusted_proxies",
+        "translated_text": "信任的代理",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 155,
+        "status": true
+    },
+    {
+        "source_text": "trust_xff",
+        "translated_text": "信任XFF",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 156,
+        "status": true
+    },
+    {
+        "source_text": "secure_cookie",
+        "translated_text": "安全Cookie",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 157,
+        "status": true
+    },
+    {
+        "source_text": "private_plan_style",
+        "translated_text": "私聊规划风格",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 158,
+        "status": true
+    },
+    {
+        "source_text": "chat_prompts",
+        "translated_text": "聊天提示",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 159,
+        "status": true
+    },
+    {
+        "source_text": "enable_relationship",
+        "translated_text": "启用关系",
+        "source_language": "en",
+        "target_language": "zh",
+        "translation_type": "toml_visualizer_tokens",
+        "sort": 160,
+        "status": true
+    }
+]

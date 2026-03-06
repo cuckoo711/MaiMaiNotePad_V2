@@ -16,7 +16,10 @@
 				>
 					<template #title>
 						<div class="section-title">
-							<span class="section-name">{{ section.name }}</span>
+							<span class="section-name">
+								<span class="original">{{ section.name }}</span>
+								<span v-if="section.translated_name && section.translated_name !== section.name" class="translated">{{ section.translated_name }}</span>
+							</span>
 							<el-tag v-if="section.is_deleted" type="danger" size="small">已删除</el-tag>
 							<el-tag v-else type="success" size="small">{{ section.items.length }} 项</el-tag>
 						</div>
@@ -37,12 +40,23 @@
 							:class="{ 'is-deleted': item.is_deleted }"
 						>
 							<div class="item-header">
-								<span class="item-key">{{ item.key }}</span>
-								<el-tag :type="getTypeTagType(item.type)" size="small">{{ item.type }}</el-tag>
-								<el-tag v-if="hasSensitiveInfo(section.name, item.key)" type="warning" size="small">
-									<el-icon><Warning /></el-icon>
-									包含敏感信息
-								</el-tag>
+								<span class="item-key">
+									<span class="original">{{ item.key }}</span>
+									<span v-if="item.translated_key && item.translated_key !== item.key" class="translated">{{ item.translated_key }}</span>
+								</span>
+								<div class="item-tags">
+									<el-tag :type="getTypeTagType(item.type)" size="small">{{ item.type }}</el-tag>
+									<el-tag 
+										v-if="hasSensitiveInfo(section.name, item.key)" 
+										type="warning" 
+										size="small" 
+										effect="dark"
+										class="sensitive-tag"
+									>
+										<el-icon><Warning /></el-icon>
+										可能包含敏感信息
+									</el-tag>
+								</div>
 							</div>
 
 							<!-- 配置项值编辑 -->
@@ -145,7 +159,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { InfoFilled, Comment, Delete, RefreshLeft, Warning } from '@element-plus/icons-vue';
 import { ElMessageBox } from 'element-plus';
 import type { ConfigSection } from '/@/stores/personaUpload';
@@ -174,6 +188,7 @@ const props = defineProps<Props>();
 // Emits
 const emit = defineEmits<{
 	'update:sections': [value: ConfigSection[]];
+	'update:sensitiveInfo': [value: any[]];
 	prev: [];
 	submit: [];
 }>();
@@ -184,36 +199,99 @@ const localSections = ref<ConfigSection[]>([...props.sections]);
 // 当前展开的配置块
 const activeNames = ref<string[]>([]);
 
+// 实时检测到的敏感信息
+const realtimeSensitiveInfo = ref<Map<string, string[]>>(new Map());
+
 /**
- * 检查配置项是否包含敏感信息
+ * 敏感信息检测正则表达式（5-11 位连续数字）
+ */
+const SENSITIVE_PATTERN = /\b\d{5,11}\b/g;
+
+/**
+ * 检测字符串中的敏感信息
+ */
+const detectSensitiveInfo = (value: any): string[] => {
+	if (typeof value !== 'string') {
+		value = String(value);
+	}
+	
+	const matches = value.match(SENSITIVE_PATTERN);
+	return matches ? Array.from(new Set(matches)) : [];
+};
+
+/**
+ * 更新配置项的敏感信息检测
+ */
+const updateSensitiveDetection = (sectionName: string, itemKey: string, value: any) => {
+	const path = `${sectionName}.${itemKey}`;
+	const matches = detectSensitiveInfo(value);
+	
+	if (matches.length > 0) {
+		realtimeSensitiveInfo.value.set(path, matches);
+	} else {
+		realtimeSensitiveInfo.value.delete(path);
+	}
+	
+	// 通知父组件敏感信息变化
+	emitSensitiveInfo();
+};
+
+/**
+ * 将实时检测到的敏感信息转换为标准格式并发送给父组件
+ */
+const emitSensitiveInfo = () => {
+	const sensitiveItems: any[] = [];
+	
+	realtimeSensitiveInfo.value.forEach((matches, path) => {
+		const [section, key] = path.split('.');
+		const sectionObj = localSections.value.find(s => s.name === section);
+		if (!sectionObj) return;
+		
+		const item = sectionObj.items.find(i => i.key === key);
+		if (!item) return;
+		
+		sensitiveItems.push({
+			section,
+			key,
+			value: item.value,
+			matches,
+			path
+		});
+	});
+	
+	emit('update:sensitiveInfo', sensitiveItems);
+};
+
+/**
+ * 初始化所有配置项的敏感信息检测
+ */
+const initializeSensitiveDetection = () => {
+	realtimeSensitiveInfo.value.clear();
+	
+	localSections.value.forEach(section => {
+		section.items.forEach(item => {
+			updateSensitiveDetection(section.name, item.key, item.value);
+		});
+	});
+	
+	// 初始化后通知父组件
+	emitSensitiveInfo();
+};
+
+/**
+ * 检查配置项是否包含敏感信息（实时检测）
  */
 const hasSensitiveInfo = (sectionName: string, itemKey: string) => {
-	if (!props.sensitiveInfo || props.sensitiveInfo.length === 0) {
-		return false;
-	}
-	
 	const path = `${sectionName}.${itemKey}`;
-	const result = props.sensitiveInfo.some((item: any) => item.path === path);
-	
-	// 调试日志
-	if (result) {
-		console.log('检测到敏感信息:', { sectionName, itemKey, path });
-	}
-	
-	return result;
+	return realtimeSensitiveInfo.value.has(path);
 };
 
 /**
  * 获取配置项的敏感信息匹配列表
  */
 const getSensitiveMatches = (sectionName: string, itemKey: string) => {
-	if (!props.sensitiveInfo || props.sensitiveInfo.length === 0) {
-		return [];
-	}
-	
 	const path = `${sectionName}.${itemKey}`;
-	const item = props.sensitiveInfo.find((item: any) => item.path === path);
-	return item ? item.matches : [];
+	return realtimeSensitiveInfo.value.get(path) || [];
 };
 
 /**
@@ -235,6 +313,16 @@ const getTypeTagType = (type: string) => {
  * 处理配置项变化
  */
 const handleItemChange = (sectionName: string, itemKey: string) => {
+	// 查找配置项
+	const section = localSections.value.find(s => s.name === sectionName);
+	if (!section) return;
+	
+	const item = section.items.find(i => i.key === itemKey);
+	if (!item) return;
+	
+	// 实时检测敏感信息
+	updateSensitiveDetection(sectionName, itemKey, item.value);
+	
 	// 触发更新事件
 	emit('update:sections', localSections.value);
 };
@@ -306,6 +394,8 @@ watch(
 	() => props.sections,
 	(newValue) => {
 		localSections.value = [...newValue];
+		// 重新初始化敏感信息检测
+		initializeSensitiveDetection();
 	},
 	{ deep: true }
 );
@@ -318,6 +408,12 @@ watch(
 	},
 	{ immediate: true, deep: true }
 );
+
+// 组件初始化时进行敏感信息检测
+initializeSensitiveDetection();
+
+// 计算属性：获取所有敏感信息的数量
+const sensitiveCount = computed(() => realtimeSensitiveInfo.value.size);
 </script>
 
 <style scoped lang="scss">
@@ -352,6 +448,21 @@ watch(
 				flex: 1;
 				font-weight: 500;
 				color: var(--el-text-color-primary);
+				display: flex;
+				align-items: center;
+				gap: 8px;
+
+				.original {
+					font-size: 15px;
+					color: var(--el-text-color-primary);
+					font-weight: 500;
+				}
+
+				.translated {
+					font-size: 13px;
+					color: var(--el-text-color-secondary);
+					font-weight: 400;
+				}
 			}
 		}
 
@@ -393,6 +504,38 @@ watch(
 					.item-key {
 						font-weight: 500;
 						color: var(--el-text-color-primary);
+						display: flex;
+						align-items: center;
+						gap: 8px;
+
+						.original {
+							font-size: 14px;
+							color: var(--el-text-color-primary);
+							font-weight: 500;
+						}
+
+						.translated {
+							font-size: 12px;
+							color: var(--el-text-color-secondary);
+							font-weight: 400;
+						}
+					}
+
+					.item-tags {
+						display: flex;
+						align-items: center;
+						gap: 8px;
+
+						:deep(.sensitive-tag) {
+							display: inline-flex;
+							align-items: center;
+							gap: 4px;
+
+							.el-icon {
+								display: inline-flex;
+								align-items: center;
+							}
+						}
 					}
 				}
 

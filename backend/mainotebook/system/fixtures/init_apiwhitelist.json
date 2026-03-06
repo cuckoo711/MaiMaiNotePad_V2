@@ -3,5 +3,15 @@
         "url": "/api/system/dept_lazy_tree/",
         "method": 0,
         "enable_datasource": true
+    },
+    {
+        "url": "/api/system/translation/",
+        "method": 0,
+        "enable_datasource": false
+    },
+    {
+        "url": "/api/system/translation/get_by_type/",
+        "method": 0,
+        "enable_datasource": false
     }
 ]

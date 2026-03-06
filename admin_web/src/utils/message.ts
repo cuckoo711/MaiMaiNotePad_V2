@@ -4,13 +4,13 @@ export function message(message: string, option?: MessageOptions) {
 	ElMessage({ message, ...option });
 }
 export function successMessage(message: string, option?: MessageOptions) {
-	ElMessage({ message, type: 'success' });
+	ElMessage({ message, type: 'success', duration: 2000, ...option });
 }
 export function warningMessage(message: string, option?: MessageOptions) {
-	ElMessage({ message, ...option, type: 'warning' });
+	ElMessage({ message, type: 'warning', duration: 3000, ...option });
 }
 export function errorMessage(message: string, option?: MessageOptions) {
-	ElMessage({ message, ...option, type: 'error' });
+	ElMessage({ message, type: 'error', duration: 5000, ...option });
 }
 export function infoMessage(message: string, option?: MessageOptions) {
 	ElMessage({ message, ...option, type: 'info' });

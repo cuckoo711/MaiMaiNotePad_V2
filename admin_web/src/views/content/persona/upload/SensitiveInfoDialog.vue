@@ -45,14 +45,7 @@
 			<!-- 确认声明 -->
 			<div class="confirmation-section">
 				<h4>确认声明：</h4>
-				<el-input
-					v-model="confirmationText"
-					type="textarea"
-					:rows="3"
-					readonly
-					class="confirmation-text"
-				/>
-				<p class="tip">请在下方输入框中输入上述确认声明：</p>
+				<p class="confirmation-required">请在下方输入框中输入：<strong>{{ confirmationText }}</strong></p>
 				<el-input
 					v-model="userInput"
 					placeholder="请输入确认声明"
@@ -64,20 +57,19 @@
 			<div class="captcha-section">
 				<h4>验证码验证：</h4>
 				<div class="captcha-container">
+					<el-input
+						v-model="captchaValue"
+						placeholder="请输入验证码"
+						clearable
+					/>
 					<img
 						v-if="captchaImage"
 						:src="captchaImage"
 						alt="验证码"
 						class="captcha-image"
 						@click="refreshCaptcha"
+						title="点击刷新验证码"
 					/>
-					<el-input
-						v-model="captchaValue"
-						placeholder="请输入验证码"
-						style="width: 200px"
-						clearable
-					/>
-					<el-button @click="refreshCaptcha" :icon="RefreshRight">刷新</el-button>
 				</div>
 				<p class="tip">点击验证码图片可刷新</p>
 			</div>
@@ -120,7 +112,7 @@
 <script lang="ts" setup>
 import { ref, computed, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import { RefreshRight } from '@element-plus/icons-vue';
+import { getBaseURL } from '/@/utils/baseUrl';
 import type { SensitiveItem } from '/@/stores/personaUpload';
 
 /**
@@ -161,13 +153,9 @@ const dialogVisible = computed({
 	set: (value: boolean) => emit('update:visible', value),
 });
 
-// 确认声明文本（自动生成）
+// 确认声明文本（固定文本）
 const confirmationText = computed(() => {
-	if (props.sensitiveItems.length === 0) {
-		return '';
-	}
-	const paths = props.sensitiveItems.map((item) => item.path).join('、');
-	return `我已确认该文件在 ${paths} 的内容不涉及个人隐私信息`;
+	return '我确认这些内容不涉及个人隐私信息';
 });
 
 // 用户输入的确认声明
@@ -202,15 +190,28 @@ const canConfirm = computed(() => {
  */
 const refreshCaptcha = async () => {
 	try {
-		// TODO: 调用后端 API 获取验证码
-		// 这里使用模拟数据
-		captchaKey.value = `captcha_${Date.now()}`;
-		captchaImage.value = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+		// 使用 getBaseURL 构建完整的API路径
+		const apiUrl = getBaseURL('api/captcha/');
 		
-		// 实际应该调用类似这样的 API：
-		// const response = await getCaptcha();
-		// captchaKey.value = response.data.key;
-		// captchaImage.value = response.data.image;
+		const response = await fetch(apiUrl, {
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+		});
+		
+		if (!response.ok) {
+			throw new Error('获取验证码失败');
+		}
+		
+		const data = await response.json();
+		
+		if (data.code === 2000 && data.data) {
+			captchaKey.value = String(data.data.key);
+			captchaImage.value = data.data.image_base; // 后端返回的字段是 image_base
+		} else {
+			throw new Error(data.msg || '获取验证码失败');
+		}
 	} catch (error) {
 		console.error('刷新验证码失败:', error);
 		ElMessage.error('刷新验证码失败，请稍后重试');
@@ -350,6 +351,20 @@ watch(
 			color: var(--el-text-color-primary);
 		}
 
+		.confirmation-required {
+			font-size: 14px;
+			color: var(--el-text-color-regular);
+			margin: 10px 0;
+			padding: 12px;
+			background-color: var(--el-fill-color-light);
+			border-radius: 4px;
+
+			strong {
+				color: var(--el-color-danger);
+				font-weight: 600;
+			}
+		}
+
 		.confirmation-text {
 			margin-bottom: 10px;
 
@@ -380,14 +395,18 @@ watch(
 			display: flex;
 			align-items: center;
 			gap: 10px;
-			margin-bottom: 5px;
+
+			.el-input {
+				flex: 1;
+			}
 
 			.captcha-image {
-				height: 40px;
+				height: 32px;
 				border: 1px solid var(--el-border-color);
 				border-radius: 4px;
 				cursor: pointer;
 				transition: opacity 0.3s;
+				flex-shrink: 0;
 
 				&:hover {
 					opacity: 0.8;

@@ -1165,6 +1165,132 @@
                         "model": "FileList"
                     }
                 ]
+            },
+            {
+                "name": "翻译管理",
+                "icon": "ele-ChatDotSquare",
+                "sort": 4,
+                "is_link": false,
+                "is_catalog": false,
+                "web_path": "/translation",
+                "component": "system/translation/index",
+                "component_name": "translation",
+                "status": true,
+                "cache": false,
+                "visible": true,
+                "parent": 10,
+                "children": [],
+                "menu_button": [
+                    {
+                        "name": "查询",
+                        "value": "translation:Search",
+                        "api": "/api/system/translation/",
+                        "method": 0
+                    },
+                    {
+                        "name": "详情",
+                        "value": "translation:Retrieve",
+                        "api": "/api/system/translation/{id}/",
+                        "method": 0
+                    },
+                    {
+                        "name": "新增",
+                        "value": "translation:Create",
+                        "api": "/api/system/translation/",
+                        "method": 1
+                    },
+                    {
+                        "name": "编辑",
+                        "value": "translation:Update",
+                        "api": "/api/system/translation/{id}/",
+                        "method": 2
+                    },
+                    {
+                        "name": "删除",
+                        "value": "translation:Delete",
+                        "api": "/api/system/translation/{id}/",
+                        "method": 3
+                    },
+                    {
+                        "name": "批量更新状态",
+                        "value": "translation:BatchUpdateStatus",
+                        "api": "/api/system/translation/batch_update_status/",
+                        "method": 1
+                    },
+                    {
+                        "name": "获取翻译类型",
+                        "value": "translation:GetTypes",
+                        "api": "/api/system/translation/get_types/",
+                        "method": 0
+                    }
+                ],
+                "menu_field": [
+                    {
+                        "field_name": "id",
+                        "title": "ID",
+                        "model": "Translation"
+                    },
+                    {
+                        "field_name": "source_text",
+                        "title": "原文",
+                        "model": "Translation"
+                    },
+                    {
+                        "field_name": "translated_text",
+                        "title": "译文",
+                        "model": "Translation"
+                    },
+                    {
+                        "field_name": "translation_type",
+                        "title": "翻译类型",
+                        "model": "Translation"
+                    },
+                    {
+                        "field_name": "source_language",
+                        "title": "源语言",
+                        "model": "Translation"
+                    },
+                    {
+                        "field_name": "target_language",
+                        "title": "目标语言",
+                        "model": "Translation"
+                    },
+                    {
+                        "field_name": "sort",
+                        "title": "排序",
+                        "model": "Translation"
+                    },
+                    {
+                        "field_name": "status",
+                        "title": "状态",
+                        "model": "Translation"
+                    },
+                    {
+                        "field_name": "create_datetime",
+                        "title": "创建时间",
+                        "model": "Translation"
+                    },
+                    {
+                        "field_name": "update_datetime",
+                        "title": "修改时间",
+                        "model": "Translation"
+                    },
+                    {
+                        "field_name": "creator",
+                        "title": "创建人",
+                        "model": "Translation"
+                    },
+                    {
+                        "field_name": "modifier",
+                        "title": "修改人",
+                        "model": "Translation"
+                    },
+                    {
+                        "field_name": "dept_belong_id",
+                        "title": "数据归属部门",
+                        "model": "Translation"
+                    }
+                ]
             }
         ],
         "menu_button": [],

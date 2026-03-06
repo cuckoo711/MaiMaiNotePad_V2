@@ -1439,8 +1439,12 @@ class PersonaCardViewSet(CustomModelViewSet):
                     include_deleted=False
                 )
                 
-                # 按配置块分组返回数据
-                formatted_data = PersonaCardConfigService.format_configs_as_dict(configs)
+                # 按配置块分组返回数据，启用翻译
+                formatted_data = PersonaCardConfigService.format_configs_as_dict(
+                    configs,
+                    translate=True,
+                    translation_type='toml_visualizer_blocks'
+                )
                 
                 # 检测敏感信息
                 from mainotebook.content.services.sensitive_info_detector_service import SensitiveInfoDetectorService

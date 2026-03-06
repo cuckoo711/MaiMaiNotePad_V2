@@ -201,9 +201,9 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted } from 'vue';
 import { Download, InfoFilled } from '@element-plus/icons-vue';
-import { DictionaryStore } from '/@/stores/dictionary';
+import { useTranslationStore } from '/@/stores/translation';
 
-const dictStore = DictionaryStore();
+const translationStore = useTranslationStore();
 
 const props = defineProps({
   visible: {
@@ -254,10 +254,25 @@ const loading = ref(false);
 const activeTab = ref('detail');
 const activeBlocks = ref<number[]>([]);
 
-// 组件挂载时加载字典数据
-onMounted(() => {
-  if (!dictStore.data || Object.keys(dictStore.data).length === 0) {
-    dictStore.getSystemDictionarys();
+// 翻译数据
+let blockTranslations = new Map<string, string>();
+let tokenTranslations = new Map<string, string>();
+
+// 组件挂载时加载翻译数据
+onMounted(async () => {
+  try {
+    // 加载块翻译
+    blockTranslations = await translationStore.getTranslationsByType(
+      'toml_visualizer_blocks'
+    );
+    
+    // 加载 Token 翻译
+    tokenTranslations = await translationStore.getTranslationsByType(
+      'toml_visualizer_tokens'
+    );
+  } catch (error) {
+    console.error('加载翻译数据失败:', error);
+    // 降级方案：使用原始英文文本
   }
 });
 
@@ -491,36 +506,15 @@ const cleanStringValue = (value: any) => {
   return String(value);
 };
 
-// 获取键名的翻译（如果字典中有对应翻译）
+// 获取键名的翻译（带原文）
 const getKeyLabel = (key: string) => {
   try {
-    const allDicts = dictStore.data;
-    
-    // 如果字典数据还未加载，返回原始键名
-    if (!allDicts || Object.keys(allDicts).length === 0) {
-      return key;
-    }
-    
-    // 优先从 toml_visualizer_tokens 字典查找键名翻译
-    if (allDicts.toml_visualizer_tokens && Array.isArray(allDicts.toml_visualizer_tokens)) {
-      const found = allDicts.toml_visualizer_tokens.find((item: any) => item.value === key);
-      if (found && found.label) {
-        return `${found.label} (${key})`;
-      }
-    }
-    
-    // 如果没找到，再从所有字典中查找
-    for (const dictName in allDicts) {
-      const dictItems = allDicts[dictName];
-      if (Array.isArray(dictItems)) {
-        const found = dictItems.find((item: any) => item.value === key);
-        if (found && found.label) {
-          return `${found.label} (${key})`;
-        }
-      }
+    const translation = tokenTranslations.get(key);
+    if (translation) {
+      return `${translation} (${key})`;
     }
   } catch (e) {
-    console.error('字典翻译错误:', e);
+    console.error('翻译查找错误:', e);
   }
   return key;
 };
@@ -528,32 +522,12 @@ const getKeyLabel = (key: string) => {
 // 只获取键名的中文标签（不带英文键名）
 const getKeyLabelOnly = (key: string) => {
   try {
-    const allDicts = dictStore.data;
-    
-    if (!allDicts || Object.keys(allDicts).length === 0) {
-      return key;
-    }
-    
-    // 优先从 toml_visualizer_tokens 字典查找键名翻译
-    if (allDicts.toml_visualizer_tokens && Array.isArray(allDicts.toml_visualizer_tokens)) {
-      const found = allDicts.toml_visualizer_tokens.find((item: any) => item.value === key);
-      if (found && found.label) {
-        return found.label;
-      }
-    }
-    
-    // 如果没找到，再从所有字典中查找
-    for (const dictName in allDicts) {
-      const dictItems = allDicts[dictName];
-      if (Array.isArray(dictItems)) {
-        const found = dictItems.find((item: any) => item.value === key);
-        if (found && found.label) {
-          return found.label;
-        }
-      }
+    const translation = tokenTranslations.get(key);
+    if (translation) {
+      return translation;
     }
   } catch (e) {
-    console.error('字典翻译错误:', e);
+    console.error('翻译查找错误:', e);
   }
   return key;
 };
@@ -561,18 +535,9 @@ const getKeyLabelOnly = (key: string) => {
 // 获取块名的翻译
 const getBlockLabel = (blockName: string) => {
   try {
-    const allDicts = dictStore.data;
-    
-    if (!allDicts || Object.keys(allDicts).length === 0) {
-      return blockName;
-    }
-    
-    // 从 toml_visualizer_blocks 字典查找块名翻译
-    if (allDicts.toml_visualizer_blocks && Array.isArray(allDicts.toml_visualizer_blocks)) {
-      const found = allDicts.toml_visualizer_blocks.find((item: any) => item.value === blockName);
-      if (found && found.label) {
-        return `${found.label} (${blockName})`;
-      }
+    const translation = blockTranslations.get(blockName);
+    if (translation) {
+      return `${translation} (${blockName})`;
     }
   } catch (e) {
     console.error('块名翻译错误:', e);

@@ -28,6 +28,7 @@
 				<ConfigEditor
 					v-if="parsedConfig"
 					v-model:sections="parsedConfig.sections"
+					@update:sensitiveInfo="handleSensitiveInfoUpdate"
 					@prev="handlePrevStep"
 					@submit="handleSubmit"
 				/>
@@ -108,6 +109,15 @@ const parsedConfig = computed({
 });
 const sensitiveItems = computed(() => uploadStore.sensitiveItems);
 const hasSensitiveInfo = computed(() => uploadStore.hasSensitiveInfo);
+
+/**
+ * 处理敏感信息更新
+ */
+const handleSensitiveInfoUpdate = (sensitiveItems: any[]) => {
+	// 更新 store 中的敏感信息
+	uploadStore.setSensitiveItems(sensitiveItems);
+	console.log('检测到敏感信息:', sensitiveItems);
+};
 
 /**
  * 处理下一步

@@ -90,6 +90,7 @@
 						:sensitive-info="sensitiveInfo"
 						:readonly="!canEdit"
 						@update:sections="handleConfigChange"
+						@update:sensitiveInfo="handleSensitiveInfoUpdate"
 					/>
 				</div>
 			</el-card>
@@ -99,6 +100,13 @@
 		<el-empty v-else description="加载失败或人设卡不存在">
 			<el-button type="primary" @click="handleBack">返回列表</el-button>
 		</el-empty>
+
+		<!-- 敏感信息确认对话框 -->
+		<SimpleSensitiveDialog
+			v-model:visible="showSensitiveDialog"
+			:sensitive-items="sensitiveInfo"
+			@confirm="handleSensitiveConfirm"
+		/>
 	</div>
 </template>
 
@@ -108,6 +116,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { ArrowLeft, Check } from '@element-plus/icons-vue';
 import ConfigEditor from '../upload/ConfigEditor.vue';
+import SimpleSensitiveDialog from './SimpleSensitiveDialog.vue';
 import TagInput from '/@/components/TagInput.vue';
 import { getPersonaCardDetail, getPersonaCardConfig, updatePersonaCardBasicInfo, updatePersonaCardConfig } from '../api';
 import type { ConfigSection } from '/@/stores/personaUpload';
@@ -150,6 +159,9 @@ const configSections = ref<ConfigSection[]>([]);
 
 // 敏感信息数据
 const sensitiveInfo = ref<any[]>([]);
+
+// 敏感信息对话框显示状态
+const showSensitiveDialog = ref(false);
 
 /**
  * 是否可以编辑
@@ -212,6 +224,14 @@ const handleConfigChange = (sections: ConfigSection[]) => {
 };
 
 /**
+ * 处理敏感信息更新
+ */
+const handleSensitiveInfoUpdate = (items: any[]) => {
+	sensitiveInfo.value = items;
+	console.log('检测到敏感信息:', items);
+};
+
+/**
  * 验证基本信息
  */
 const validateBasicInfo = (): boolean => {
@@ -242,6 +262,30 @@ const handleSave = async () => {
 		return;
 	}
 
+	// 检查是否有敏感信息
+	if (sensitiveInfo.value && sensitiveInfo.value.length > 0) {
+		// 显示敏感信息确认对话框
+		showSensitiveDialog.value = true;
+		return;
+	}
+
+	// 没有敏感信息，直接保存
+	await performSave();
+};
+
+/**
+ * 处理敏感信息确认
+ */
+const handleSensitiveConfirm = async () => {
+	showSensitiveDialog.value = false;
+	// 继续执行保存
+	await performSave();
+};
+
+/**
+ * 执行保存操作
+ */
+const performSave = async () => {
 	try {
 		await ElMessageBox.confirm(
 			'确定要保存修改吗？',

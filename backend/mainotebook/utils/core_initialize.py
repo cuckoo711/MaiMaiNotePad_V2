@@ -73,7 +73,39 @@ class CoreInitialize:
                     m2m_dict[key] = value
                 else:
                     new_data[key] = value
-            object, _ = obj.objects.get_or_create(id=ele.get("id"), defaults=new_data)
+            
+            # 修复：先尝试通过 id 获取，如果不存在则创建（处理唯一约束冲突）
+            record_id = ele.get("id")
+            try:
+                object = obj.objects.get(id=record_id)
+                # 更新现有记录
+                for key, value in new_data.items():
+                    if key != 'id':
+                        setattr(object, key, value)
+                object.save()
+            except obj.DoesNotExist:
+                # 记录不存在，创建新记录
+                # 如果有唯一字段冲突，先删除旧记录
+                try:
+                    object = obj.objects.create(id=record_id, **{k: v for k, v in new_data.items() if k != 'id'})
+                except Exception as e:
+                    # 处理唯一约束冲突：查找并删除冲突记录
+                    if 'unique constraint' in str(e).lower() or 'duplicate key' in str(e).lower():
+                        # 尝试找到唯一字段并删除冲突记录
+                        unique_fields = {}
+                        for field in obj._meta.get_fields():
+                            if hasattr(field, 'unique') and field.unique and field.name in new_data:
+                                unique_fields[field.name] = new_data[field.name]
+                        
+                        if unique_fields:
+                            # 删除具有相同唯一字段值的旧记录
+                            obj.objects.filter(**unique_fields).delete()
+                            # 重新创建
+                            object = obj.objects.create(id=record_id, **{k: v for k, v in new_data.items() if k != 'id'})
+                        else:
+                            raise
+                    else:
+                        raise
             for key, m2m in m2m_dict.items():
                 m2m = list(set(m2m))
                 if m2m and len(m2m) > 0 and m2m[0]:

@@ -12,7 +12,8 @@ from mainotebook.utils.core_initialize import CoreInitialize
 from mainotebook.system.fixtures.initSerializer import (
     UsersInitSerializer, DeptInitSerializer, RoleInitSerializer,
     MenuInitSerializer, ApiWhiteListInitSerializer, DictionaryInitSerializer,
-    SystemConfigInitSerializer, RoleMenuInitSerializer, RoleMenuButtonInitSerializer
+    SystemConfigInitSerializer, RoleMenuInitSerializer, RoleMenuButtonInitSerializer,
+    InitTranslationSerializer
 )
 
 
@@ -57,6 +58,10 @@ class Initialize(CoreInitialize):
     def init_system_config(self):
         """初始化系统配置表"""
         self.init_base(SystemConfigInitSerializer, unique_fields=['key', 'parent'])
+
+    def init_translation(self):
+        """初始化翻译数据"""
+        self.init_base(InitTranslationSerializer, unique_fields=['translation_type', 'source_text'])
 
     def init_celery_plugin(self):
         """初始化 Celery 定时任务插件菜单
@@ -113,6 +118,7 @@ class Initialize(CoreInitialize):
         self.init_api_white_list()
         self.init_dictionary()
         self.init_system_config()
+        self.init_translation()
         # 初始化插件（如 Celery 定时任务）
         self.init_celery_plugin()
 

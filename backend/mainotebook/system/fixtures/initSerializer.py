@@ -10,7 +10,8 @@ django.setup()
 from mainotebook.system.models import (
     Role, Dept, Users, Menu, MenuButton,
     ApiWhiteList, Dictionary, SystemConfig,
-    RoleMenuPermission, RoleMenuButtonPermission, MenuField
+    RoleMenuPermission, RoleMenuButtonPermission, MenuField,
+    Translation
 )
 from mainotebook.utils.serializers import CustomModelSerializer
 
@@ -468,3 +469,76 @@ class SystemConfigInitSerializer(CustomModelSerializer):
             'creator': {'write_only': True},
             'dept_belong_id': {'write_only': True}
         }
+
+
+class InitTranslationSerializer(CustomModelSerializer):
+    """初始化翻译序列化器
+    
+    用于系统初始化时加载翻译数据。
+    """
+    
+    class Meta:
+        model = Translation
+        fields = [
+            'source_text', 'translated_text',
+            'source_language', 'target_language',
+            'translation_type', 'sort', 'status',
+            'creator', 'dept_belong_id'
+        ]
+        extra_kwargs = {
+            'creator': {'write_only': True},
+            'dept_belong_id': {'write_only': True}
+        }
+    
+    def validate_source_text(self, value: str) -> str:
+        """验证并清理原文字段"""
+        if value:
+            return value.strip()
+        return value
+    
+    def validate_translated_text(self, value: str) -> str:
+        """验证并清理译文字段"""
+        if value:
+            return value.strip()
+        return value
+    
+    def validate_translation_type(self, value: str) -> str:
+        """验证并清理翻译类型字段"""
+        if value:
+            return value.strip()
+        return value
+    
+    def validate_source_language(self, value: str) -> str:
+        """验证并清理源语言字段"""
+        if value:
+            return value.strip()
+        return value
+    
+    def validate_target_language(self, value: str) -> str:
+        """验证并清理目标语言字段"""
+        if value:
+            return value.strip()
+        return value
+    
+    def create(self, validated_data: dict) -> Translation:
+        """创建翻译记录，跳过已存在的记录
+        
+        Args:
+            validated_data: 验证后的数据字典
+            
+        Returns:
+            Translation: 翻译记录实例（新创建或已存在）
+        """
+        translation_type = validated_data.get('translation_type')
+        source_text = validated_data.get('source_text')
+        
+        # 检查是否已存在
+        existing = Translation.objects.filter(
+            translation_type=translation_type,
+            source_text=source_text
+        ).first()
+        
+        if existing:
+            return existing
+        
+        return super().create(validated_data)
