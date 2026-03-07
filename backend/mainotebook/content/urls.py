@@ -27,6 +27,7 @@ from mainotebook.content.views import (
     ModerationLogViewSet,
     AIModelViewSet,
     TagViewSet,
+    UserModerationViewSet,
 )
 from mainotebook.content.views.moderation import check_content, health_check
 
@@ -142,17 +143,36 @@ router.register(r'ai-models', AIModelViewSet, basename='ai-model')
 # - POST /api/content/tags/clear_cache/ - 清除标签缓存（管理员）
 router.register(r'tags', TagViewSet, basename='tag')
 
+# 注册用户禁言封禁管理视图集
+# Django 路径: /api/content/moderation/*
+# 提供的端点：
+# - POST /api/content/moderation/mute/ - 禁言用户
+# - POST /api/content/moderation/unmute/ - 解除禁言
+# - POST /api/content/moderation/ban/ - 封禁用户
+# - POST /api/content/moderation/unban/ - 解除封禁
+# - PUT /api/content/moderation/modify-duration/ - 修改时长
+# - POST /api/content/moderation/batch-mute/ - 批量禁言
+# - POST /api/content/moderation/batch-ban/ - 批量封禁
+# - POST /api/content/moderation/batch-unmute/ - 批量解除禁言
+# - POST /api/content/moderation/batch-unban/ - 批量解除封禁
+# - GET /api/content/moderation/mute-list/ - 禁言列表
+# - GET /api/content/moderation/ban-list/ - 封禁列表
+# - GET /api/content/moderation/auto-mute-list/ - AI自动禁言列表
+# - GET /api/content/moderation/logs/ - 操作日志
+# - GET /api/content/moderation/export/ - 导出数据
+router.register(r'moderation', UserModerationViewSet, basename='user-moderation')
+
 # URL 模式
 # 注意：路由器会自动生成标准的 REST 端点
 # 自定义 action 通过 @action 装饰器在 ViewSet 中定义
 urlpatterns = [
     # AI 内容审核端点
     # FastAPI 路径: /api/moderation/check
-    # Django 路径: /api/content/moderation/check/
-    path('moderation/check/', check_content, name='moderation-check'),
+    # Django 路径: /api/content/ai-moderation/check/
+    path('ai-moderation/check/', check_content, name='moderation-check'),
     
     # AI 审核服务健康检查
     # FastAPI 路径: /api/moderation/health
-    # Django 路径: /api/content/moderation/health/
-    path('moderation/health/', health_check, name='moderation-health'),
+    # Django 路径: /api/content/ai-moderation/health/
+    path('ai-moderation/health/', health_check, name='moderation-health'),
 ] + router.urls

@@ -1434,3 +1434,284 @@ class SensitiveInfoConfirmation(CoreModel):
     
     def __str__(self) -> str:
         return f"{self.user.username} - {self.persona_card.name}"
+
+
+
+class CommentRejectionLog(CoreModel):
+    """评论拒绝记录表
+    
+    记录评论被AI审核拒绝的详细信息，用于统计触发自动禁言。
+    """
+    
+    user = models.ForeignKey(
+        to=Users,
+        on_delete=models.PROTECT,
+        db_constraint=False,
+        related_name='comment_rejection_logs',
+        verbose_name="用户",
+        help_text="被拒绝评论的用户"
+    )
+    
+    comment_content = models.TextField(
+        verbose_name="评论内容",
+        help_text="被拒绝的评论内容"
+    )
+    
+    rejection_reason = models.TextField(
+        verbose_name="拒绝原因",
+        help_text="AI审核拒绝的原因"
+    )
+    
+    violation_types = models.JSONField(
+        default=list,
+        verbose_name="违规类型",
+        help_text="违规类型列表，如['spam', 'offensive']"
+    )
+    
+    moderation_detail = models.JSONField(
+        default=dict,
+        verbose_name="审核详情",
+        help_text="AI审核的详细信息"
+    )
+    
+    is_counted = models.BooleanField(
+        default=True,
+        verbose_name="是否计入统计",
+        help_text="是否计入自动禁言统计"
+    )
+    
+    ip_address = models.CharField(
+        max_length=45,
+        verbose_name="IP地址",
+        help_text="用户IP地址"
+    )
+    
+    user_agent = models.TextField(
+        verbose_name="用户代理",
+        help_text="浏览器User-Agent"
+    )
+    
+    target_type = models.CharField(
+        max_length=50,
+        verbose_name="目标类型",
+        help_text="评论目标类型，如'note'、'comment'"
+    )
+    
+    target_id = models.CharField(
+        max_length=255,
+        verbose_name="目标ID",
+        help_text="评论目标的ID"
+    )
+    
+    class Meta:
+        db_table = table_prefix + "content_comment_rejection_log"
+        verbose_name = "评论拒绝记录"
+        verbose_name_plural = verbose_name
+        ordering = ["-create_datetime"]
+        indexes = [
+            models.Index(fields=['user', 'create_datetime']),
+            models.Index(fields=['is_counted']),
+        ]
+    
+    def __str__(self) -> str:
+        return f"{self.user.username} 的评论被拒绝: {self.comment_content[:30]}"
+
+
+class UserMuteRecord(CoreModel):
+    """用户禁言记录表
+    
+    记录用户禁言的完整生命周期，包括自动解封任务管理。
+    """
+    
+    MUTE_TYPE_CHOICES = [
+        ('manual', '手动禁言'),
+        ('auto', 'AI自动禁言'),
+    ]
+    
+    user = models.ForeignKey(
+        to=Users,
+        on_delete=models.PROTECT,
+        db_constraint=False,
+        related_name='user_mute_records',
+        verbose_name="用户",
+        help_text="被禁言的用户"
+    )
+    
+    mute_type = models.CharField(
+        max_length=10,
+        choices=MUTE_TYPE_CHOICES,
+        verbose_name="禁言类型",
+        help_text="手动禁言或AI自动禁言"
+    )
+    
+    muted_by = models.ForeignKey(
+        to=Users,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_constraint=False,
+        related_name='muted_users',
+        verbose_name="操作人",
+        help_text="执行禁言的管理员，自动禁言时为空"
+    )
+    
+    mute_reason = models.TextField(
+        verbose_name="禁言原因",
+        help_text="禁言的具体原因"
+    )
+    
+    muted_until = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="禁言截止时间",
+        help_text="NULL表示永久禁言"
+    )
+    
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="是否生效中",
+        help_text="True表示禁言中，False表示已解除"
+    )
+    
+    is_manually_modified = models.BooleanField(
+        default=False,
+        verbose_name="是否被人工修改",
+        help_text="标识自动禁言是否被管理员修改过"
+    )
+    
+    auto_unmute_task_id = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="自动解封任务ID",
+        help_text="Celery任务ID"
+    )
+    
+    unmuted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="解除时间",
+        help_text="禁言解除的时间"
+    )
+    
+    unmuted_by = models.ForeignKey(
+        to=Users,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_constraint=False,
+        related_name='unmuted_users',
+        verbose_name="解除人",
+        help_text="执行解除操作的管理员"
+    )
+    
+    unmute_reason = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name="解除原因",
+        help_text="解除禁言的原因"
+    )
+    
+    class Meta:
+        db_table = table_prefix + "content_user_mute_record"
+        verbose_name = "用户禁言记录"
+        verbose_name_plural = verbose_name
+        ordering = ["-create_datetime"]
+        indexes = [
+            models.Index(fields=['user', 'is_active']),
+            models.Index(fields=['mute_type']),
+            models.Index(fields=['muted_until']),
+        ]
+    
+    def __str__(self) -> str:
+        return f"{self.user.username} - {self.get_mute_type_display()}"
+
+
+class UserModerationLog(CoreModel):
+    """用户管理操作日志表
+    
+    记录所有禁言封禁操作的完整日志，用于审计追溯。
+    """
+    
+    OPERATION_TYPE_CHOICES = [
+        ('mute', '禁言'),
+        ('unmute', '解除禁言'),
+        ('ban', '封禁'),
+        ('unban', '解除封禁'),
+        ('modify_duration', '修改时长'),
+    ]
+    
+    operator = models.ForeignKey(
+        to=Users,
+        on_delete=models.PROTECT,
+        db_constraint=False,
+        related_name='moderation_operations',
+        verbose_name="操作人",
+        help_text="执行操作的管理员"
+    )
+    
+    target_user = models.ForeignKey(
+        to=Users,
+        on_delete=models.PROTECT,
+        db_constraint=False,
+        related_name='moderation_records',
+        verbose_name="目标用户",
+        help_text="被操作的用户"
+    )
+    
+    operation_type = models.CharField(
+        max_length=20,
+        choices=OPERATION_TYPE_CHOICES,
+        verbose_name="操作类型",
+        help_text="操作类型"
+    )
+    
+    reason = models.TextField(
+        verbose_name="操作原因",
+        help_text="操作的具体原因"
+    )
+    
+    duration_hours = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name="时长（小时）",
+        help_text="禁言或封禁的时长，NULL表示永久"
+    )
+    
+    old_duration_hours = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name="原时长（小时）",
+        help_text="修改时长操作时的原时长"
+    )
+    
+    ip_address = models.CharField(
+        max_length=45,
+        verbose_name="IP地址",
+        help_text="操作人的IP地址"
+    )
+    
+    user_agent = models.TextField(
+        verbose_name="用户代理",
+        help_text="操作人的User-Agent"
+    )
+    
+    extra_data = models.JSONField(
+        default=dict,
+        verbose_name="额外数据",
+        help_text="额外数据，如批量操作的用户ID列表"
+    )
+    
+    class Meta:
+        db_table = table_prefix + "content_user_moderation_log"
+        verbose_name = "用户管理操作日志"
+        verbose_name_plural = verbose_name
+        ordering = ["-create_datetime"]
+        indexes = [
+            models.Index(fields=['operator', 'create_datetime']),
+            models.Index(fields=['target_user', 'create_datetime']),
+            models.Index(fields=['operation_type']),
+        ]
+    
+    def __str__(self) -> str:
+        return f"{self.operator.username} {self.get_operation_type_display()} {self.target_user.username}"

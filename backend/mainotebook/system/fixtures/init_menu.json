@@ -2006,9 +2006,228 @@
         "menu_field": []
     },
     {
+        "name": "违规处理",
+        "icon": "ele-User",
+        "sort": 5,
+        "is_link": false,
+        "is_catalog": true,
+        "web_path": "/moderation",
+        "component": "",
+        "component_name": "",
+        "status": true,
+        "cache": false,
+        "visible": true,
+        "children": [
+            {
+                "name": "处罚操作",
+                "icon": "ele-Operation",
+                "sort": 1,
+                "is_link": false,
+                "is_catalog": false,
+                "web_path": "/moderation/punish",
+                "component": "content/moderation/punish/index",
+                "component_name": "punish",
+                "status": true,
+                "cache": true,
+                "visible": true,
+                "children": [],
+                "menu_button": [
+                    {
+                        "name": "查询用户",
+                        "value": "punish:SearchUser",
+                        "api": "/api/system/user/",
+                        "method": 0
+                    },
+                    {
+                        "name": "禁言",
+                        "value": "punish:Mute",
+                        "api": "/api/content/moderation/mute/",
+                        "method": 1
+                    },
+                    {
+                        "name": "封禁",
+                        "value": "punish:Ban",
+                        "api": "/api/content/moderation/ban/",
+                        "method": 1
+                    },
+                    {
+                        "name": "批量禁言",
+                        "value": "punish:BatchMute",
+                        "api": "/api/content/moderation/batch-mute/",
+                        "method": 1
+                    },
+                    {
+                        "name": "批量封禁",
+                        "value": "punish:BatchBan",
+                        "api": "/api/content/moderation/batch-ban/",
+                        "method": 1
+                    },
+                    {
+                        "name": "查看详情",
+                        "value": "punish:Detail",
+                        "api": "/api/content/moderation/logs/",
+                        "method": 0
+                    }
+                ]
+            },
+            {
+                "name": "禁言列表",
+                "icon": "ele-MuteNotification",
+                "sort": 2,
+                "is_link": false,
+                "is_catalog": false,
+                "web_path": "/moderation/mute-list",
+                "component": "content/moderation/mute/index",
+                "component_name": "muteList",
+                "status": true,
+                "cache": true,
+                "visible": true,
+                "children": [],
+                "menu_button": [
+                    {
+                        "name": "查询",
+                        "value": "mute:Search",
+                        "api": "/api/content/moderation/mute-list/",
+                        "method": 0
+                    },
+                    {
+                        "name": "解除禁言",
+                        "value": "mute:Unmute",
+                        "api": "/api/content/moderation/unmute/",
+                        "method": 1
+                    },
+                    {
+                        "name": "修改时长",
+                        "value": "mute:ModifyDuration",
+                        "api": "/api/content/moderation/modify-duration/",
+                        "method": 2
+                    },
+                    {
+                        "name": "批量解除",
+                        "value": "mute:BatchUnmute",
+                        "api": "/api/content/moderation/batch-unmute/",
+                        "method": 1
+                    },
+                    {
+                        "name": "查看详情",
+                        "value": "mute:Detail",
+                        "api": "/api/content/moderation/logs/",
+                        "method": 0
+                    },
+                    {
+                        "name": "导出",
+                        "value": "mute:Export",
+                        "api": "/api/content/moderation/export/",
+                        "method": 0
+                    }
+                ]
+            },
+            {
+                "name": "封禁列表",
+                "icon": "ele-CircleClose",
+                "sort": 3,
+                "is_link": false,
+                "is_catalog": false,
+                "web_path": "/moderation/ban-list",
+                "component": "content/moderation/ban/index",
+                "component_name": "banList",
+                "status": true,
+                "cache": true,
+                "visible": true,
+                "children": [],
+                "menu_button": [
+                    {
+                        "name": "查询",
+                        "value": "ban:Search",
+                        "api": "/api/content/moderation/ban-list/",
+                        "method": 0
+                    },
+                    {
+                        "name": "解除封禁",
+                        "value": "ban:Unban",
+                        "api": "/api/content/moderation/unban/",
+                        "method": 1
+                    },
+                    {
+                        "name": "修改时长",
+                        "value": "ban:ModifyDuration",
+                        "api": "/api/content/moderation/modify-duration/",
+                        "method": 2
+                    },
+                    {
+                        "name": "批量解除",
+                        "value": "ban:BatchUnban",
+                        "api": "/api/content/moderation/batch-unban/",
+                        "method": 1
+                    },
+                    {
+                        "name": "查看详情",
+                        "value": "ban:Detail",
+                        "api": "/api/content/moderation/logs/",
+                        "method": 0
+                    },
+                    {
+                        "name": "导出",
+                        "value": "ban:Export",
+                        "api": "/api/content/moderation/export/",
+                        "method": 0
+                    }
+                ]
+            },
+            {
+                "name": "AI自动禁言",
+                "icon": "ele-Monitor",
+                "sort": 4,
+                "is_link": false,
+                "is_catalog": false,
+                "web_path": "/moderation/auto-mute-list",
+                "component": "content/moderation/auto-mute/index",
+                "component_name": "autoMuteList",
+                "status": true,
+                "cache": true,
+                "visible": true,
+                "children": [],
+                "menu_button": [
+                    {
+                        "name": "查询",
+                        "value": "autoMute:Search",
+                        "api": "/api/content/moderation/auto-mute-list/",
+                        "method": 0
+                    },
+                    {
+                        "name": "解除禁言",
+                        "value": "autoMute:Unmute",
+                        "api": "/api/content/moderation/unmute/",
+                        "method": 1
+                    },
+                    {
+                        "name": "修改时长",
+                        "value": "autoMute:ModifyDuration",
+                        "api": "/api/content/moderation/modify-duration/",
+                        "method": 2
+                    },
+                    {
+                        "name": "查看详情",
+                        "value": "autoMute:Detail",
+                        "api": "/api/content/moderation/logs/",
+                        "method": 0
+                    },
+                    {
+                        "name": "导出",
+                        "value": "autoMute:Export",
+                        "api": "/api/content/moderation/export/",
+                        "method": 0
+                    }
+                ]
+            }
+        ],
+        "menu_button": [],
+        "menu_field": []
+    },
+    {
         "name": "广场",
         "icon": "ele-ShoppingCart",
-        "sort": 4,
+        "sort": 6,
         "is_link": false,
         "is_catalog": true,
         "web_path": "/square",

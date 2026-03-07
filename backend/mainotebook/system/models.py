@@ -55,6 +55,7 @@ class Users(CoreModel, AbstractUser):
     USER_TYPE = (
         (0, "后台用户"),
         (1, "前台用户"),
+        (2, "系统账号"),
     )
     user_type = models.IntegerField(
         choices=USER_TYPE, default=0, verbose_name="用户类型", null=True, blank=True, help_text="用户类型"
@@ -146,6 +147,34 @@ class Users(CoreModel, AbstractUser):
     )
     
     objects = CustomUserManager()
+
+    def is_system_account(self) -> bool:
+        """判断是否为系统账号
+        
+        Returns:
+            bool: 如果是系统账号返回 True，否则返回 False
+        """
+        return self.user_type == 2
+
+    def can_be_moderated(self) -> bool:
+        """判断是否可以被处罚（禁言/封禁）
+        
+        系统账号不能被处罚
+        
+        Returns:
+            bool: 如果可以被处罚返回 True，否则返回 False
+        """
+        return not self.is_system_account()
+
+    def can_be_deleted(self) -> bool:
+        """判断是否可以被删除
+        
+        系统账号不能被删除
+        
+        Returns:
+            bool: 如果可以被删除返回 True，否则返回 False
+        """
+        return not self.is_system_account()
 
     def set_password(self, raw_password):
         if raw_password:

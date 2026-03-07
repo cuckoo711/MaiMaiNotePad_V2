@@ -247,6 +247,11 @@ class CommentService:
         Raises:
             ValidationError: 当用户被禁言、父评论无效或评论被 AI 拒绝时
         """
+        from django.db import transaction
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
         # 验证评论内容
         content = data.get('content', '')
         if not content or not content.strip():
@@ -257,8 +262,48 @@ class CommentService:
 
         # 验证用户是否被禁言
         if user.is_muted:
-            if user.muted_until is None or user.muted_until > timezone.now():
-                raise ValidationError("您已被禁言，无法发表评论")
+            # 检查是否为永久禁言
+            if user.muted_until is None:
+                raise ValidationError(f"您已被永久禁言，无法发表评论。原因：{user.mute_reason or '违反社区规则'}")
+            
+            # 检查禁言是否未过期
+            if user.muted_until > timezone.now():
+                # 格式化剩余时间
+                remaining = user.muted_until - timezone.now()
+                days = remaining.days
+                hours = remaining.seconds // 3600
+                if days > 0:
+                    time_str = f"{days}天{hours}小时" if hours > 0 else f"{days}天"
+                else:
+                    time_str = f"{hours}小时"
+                
+                raise ValidationError(
+                    f"您已被禁言至 {user.muted_until.strftime('%Y-%m-%d %H:%M')}（还剩{time_str}），无法发表评论。"
+                    f"原因：{user.mute_reason or '违反社区规则'}"
+                )
+            
+            # 禁言已过期，自动解除
+            try:
+                with transaction.atomic():
+                    # 更新用户表
+                    user.is_muted = False
+                    user.save(update_fields=['is_muted'])
+                    
+                    # 更新禁言记录表
+                    from mainotebook.content.models import UserMuteRecord
+                    active_mute_records = UserMuteRecord.objects.filter(
+                        user=user,
+                        is_active=True
+                    )
+                    active_mute_records.update(
+                        is_active=False,
+                        unmuted_at=timezone.now()
+                    )
+                    
+                    logger.info(f"自动解除过期禁言：user_id={user.id}")
+            except Exception as e:
+                logger.error(f"自动解除禁言失败：user_id={user.id}, error={str(e)}")
+                # 即使解除失败，也允许用户继续发表评论（因为禁言已过期）
 
         # 验证父评论（如果是回复）
         parent_id = data.get('parent')

@@ -129,3 +129,36 @@ class CanComment(permissions.BasePermission):
                 return False
         
         return True
+
+
+class IsModerationAdmin(permissions.BasePermission):
+    """禁言封禁管理员权限
+    
+    该权限类用于禁言封禁管理功能，只有拥有moderation_admin角色的管理员
+    或超级管理员可以访问。
+    """
+    
+    def has_permission(self, request, view):
+        """检查用户级权限
+        
+        Args:
+            request: HTTP 请求对象
+            view: 视图对象
+            
+        Returns:
+            bool: 是否有权限访问禁言封禁管理功能
+        """
+        # 检查用户是否已认证
+        if not request.user or not request.user.is_authenticated:
+            return False
+        
+        # 超级管理员自动拥有权限
+        if getattr(request.user, 'is_superuser', False):
+            return True
+        
+        # 检查用户是否拥有moderation_admin角色
+        # 通过用户的role多对多关系查询
+        try:
+            return request.user.role.filter(key='moderation_admin').exists()
+        except Exception:
+            return False

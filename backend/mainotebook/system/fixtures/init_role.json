@@ -21,9 +21,16 @@
         "remark": "内容审核权限，可审核知识库、人设卡、评论等内容"
     },
     {
+        "name": "封禁/禁言管理员",
+        "key": "moderation_admin",
+        "sort": 4,
+        "status": true,
+        "remark": "拥有用户禁言和封禁管理权限"
+    },
+    {
         "name": "普通用户",
         "key": "user",
-        "sort": 4,
+        "sort": 5,
         "status": true,
         "remark": "普通用户权限，可创建和管理自己的内容"
     }

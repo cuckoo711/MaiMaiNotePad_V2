@@ -569,3 +569,21 @@ class UserViewSet(CustomModelViewSet):
             return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(queryset, many=True, request=request)
         return SuccessResponse(data=serializer.data, msg="获取成功")
+
+    def destroy(self, request, *args, **kwargs):
+        """删除用户
+        
+        系统账号不能被删除。
+        
+        Returns:
+            Response: 删除结果
+        """
+        instance = self.get_object()
+        
+        # 检查是否为系统账号
+        if not instance.can_be_deleted():
+            return ErrorResponse(msg="系统账号不能被删除")
+        
+        # 执行删除
+        self.perform_destroy(instance)
+        return DetailResponse(data=None, msg="删除成功")

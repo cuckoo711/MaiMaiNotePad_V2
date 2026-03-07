@@ -97,8 +97,44 @@ class LoginSerializer(TokenObtainPairSerializer):
             raise CustomValidationError("您登录的账号不存在")
         except Users.MultipleObjectsReturned:
             raise CustomValidationError("您登录的账号存在多个,请联系管理员检查登录账号唯一性")
+        
+        # 检查账号封禁状态
         if not user.is_active:
-            raise CustomValidationError("账号已被锁定,联系管理员解锁")
+            # 检查是否为永久封禁
+            if user.locked_until is None:
+                raise CustomValidationError(
+                    f"您的账号已被永久封禁，无法登录。原因：{user.ban_reason or '违反平台规则'}。如有疑问请联系管理员"
+                )
+            
+            # 检查封禁是否未过期
+            if user.locked_until > timezone.now():
+                # 格式化剩余时间
+                from datetime import timezone as dt_timezone
+                remaining = user.locked_until - timezone.now()
+                days = remaining.days
+                hours = remaining.seconds // 3600
+                if days > 0:
+                    time_str = f"{days}天{hours}小时" if hours > 0 else f"{days}天"
+                else:
+                    time_str = f"{hours}小时"
+                
+                raise CustomValidationError(
+                    f"您的账号已被封禁至 {user.locked_until.strftime('%Y-%m-%d %H:%M')}（还剩{time_str}），无法登录。"
+                    f"原因：{user.ban_reason or '违反平台规则'}。如有疑问请联系管理员"
+                )
+            
+            # 封禁已过期，自动解除
+            import logging
+            logger = logging.getLogger(__name__)
+            try:
+                from django.db import transaction
+                with transaction.atomic():
+                    user.is_active = True
+                    user.save(update_fields=['is_active'])
+                    logger.info(f"自动解除过期封禁：user_id={user.id}")
+            except Exception as e:
+                logger.error(f"自动解除封禁失败：user_id={user.id}, error={str(e)}")
+                # 即使解除失败，也允许用户继续登录（因为封禁已过期）
             
         # 允许普通用户登录管理后台
         # 通过视图层的 get_queryset 方法控制数据权限，普通用户只能看到自己的数据

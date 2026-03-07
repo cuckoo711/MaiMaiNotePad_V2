@@ -36,5 +36,24 @@
         "password": "pbkdf2_sha256$260000$g17x5wlSiW1FZAh1Eudchw$ZeSAqj3Xak0io8v/pmPW0BX9EX5R2zFXDwbbD68oBFk=",
         "last_login": null,
         "is_superuser": false
+    },
+    {
+        "username": "ai_reviewer",
+        "email": "ai_reviewer@system.mainotebook.com",
+        "mobile": "",
+        "avatar": null,
+        "name": "AI 审核员",
+        "gender": 0,
+        "user_type": 2,
+        "role": [],
+        "role_key": [],
+        "dept_key": "mainotebook",
+        "first_name": "",
+        "last_name": "",
+        "is_staff": false,
+        "is_active": false,
+        "password": "!",
+        "last_login": null,
+        "is_superuser": false
     }
 ]
