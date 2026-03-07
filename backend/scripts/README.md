@@ -66,6 +66,51 @@ python scripts/setup_config.py --gen-password
 
 ---
 
+### clear_rejection_counts.py
+
+**用途**：清空AI评论审核拒绝次数和自动禁言记录脚本
+
+**功能**：
+- 清空 CommentRejectionLog 表中的评论拒绝记录
+- 可选清空 AI 自动禁言记录（UserMuteRecord）
+- 可选清空 AI 禁言操作日志（UserModerationLog）
+- 支持按用户ID清空特定用户的记录
+- 支持按时间范围清空记录
+- 提供安全确认机制
+- 显示当前统计信息
+
+**使用方法**：
+```bash
+conda activate mai_notebook
+cd backend
+
+# 查看当前统计
+python scripts/clear_rejection_counts.py --stats
+
+# 清空所有拒绝记录
+python scripts/clear_rejection_counts.py --all
+
+# 清空所有拒绝记录和AI自动禁言记录
+python scripts/clear_rejection_counts.py --all --include-mute
+
+# 清空特定用户的记录（包括禁言记录）
+python scripts/clear_rejection_counts.py --user-id 123 --include-mute
+
+# 清空30天前的记录
+python scripts/clear_rejection_counts.py --days 30
+
+# 跳过确认（危险操作）
+python scripts/clear_rejection_counts.py --all --force
+```
+
+**注意事项**：
+- 此操作不可逆，请谨慎使用
+- 清空记录后，用户的拒绝次数统计将重置为0
+- 使用 `--include-mute` 会同时清空AI自动禁言记录
+- 建议在执行前先备份数据库
+
+---
+
 ### backup_database.sh
 
 **用途**：数据库备份脚本

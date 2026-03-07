@@ -235,7 +235,11 @@ class TranslationViewSet(CustomModelViewSet):
         
         if not translation_type:
             return Response(
-                {'error': '缺少 translation_type 参数'},
+                {
+                    'code': 400,
+                    'msg': '缺少 translation_type 参数',
+                    'data': None
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -245,4 +249,8 @@ class TranslationViewSet(CustomModelViewSet):
         ).order_by('sort')
         
         serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+        return Response({
+            'code': 2000,
+            'msg': '获取成功',
+            'data': serializer.data
+        })

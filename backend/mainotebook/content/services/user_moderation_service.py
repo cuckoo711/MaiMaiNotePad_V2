@@ -190,22 +190,31 @@ class UserModerationService:
                     mute_record.id, user_id, mute_type
                 )
                 
-                # 创建操作日志（仅手动操作记录）
-                if mute_type == 'manual' and operator_id is not None:
-                    UserModerationLog.objects.create(
-                        operator_id=operator_id,
-                        target_user_id=user_id,
-                        operation_type='mute',
-                        reason=reason,
-                        duration_hours=hours,
-                        ip_address=ip_address,
-                        user_agent=user_agent
-                    )
-                    
-                    logger.info(
-                        "操作日志已创建: operator_id=%s, target_user_id=%s, operation_type=mute",
-                        operator_id, user_id
-                    )
+                # 获取或创建AI审核员用户
+                ai_reviewer, _ = Users.objects.get_or_create(
+                    username='ai_reviewer',
+                    defaults={
+                        'name': 'AI 审核员',
+                        'user_type': 2  # 系统账号
+                    }
+                )
+                
+                # 创建操作日志（手动和自动操作都记录）
+                UserModerationLog.objects.create(
+                    operator_id=operator_id if mute_type == 'manual' else ai_reviewer.id,
+                    target_user_id=user_id,
+                    operation_type='mute',
+                    reason=reason,
+                    duration_hours=hours,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    extra_data={'mute_type': mute_type}  # 记录禁言类型
+                )
+                
+                logger.info(
+                    "操作日志已创建: operator_id=%s, target_user_id=%s, operation_type=mute, mute_type=%s",
+                    operator_id if mute_type == 'manual' else ai_reviewer.id, user_id, mute_type
+                )
                 
                 # 发送通知
                 try:

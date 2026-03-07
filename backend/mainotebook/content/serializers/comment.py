@@ -316,10 +316,57 @@ class CommentCreateSerializer(CustomModelSerializer):
             _logger.info("评论审核拒绝详情: %s", moderation_detail)
             violation_types = moderation_detail.get('violation_types', [])
             violation_labels = [violation_label_map.get(v, v) for v in violation_types]
+            
+            # 记录评论拒绝日志
+            from mainotebook.content.services.comment_rejection_service import CommentRejectionService
+            from django.conf import settings
+            
+            # 构建拒绝原因
             if violation_labels:
-                msg = f"您的评论未通过内容审核（违规类型：{'、'.join(violation_labels)}），请修改后重试"
+                rejection_reason = f"违规类型：{'、'.join(violation_labels)}"
             else:
-                msg = "您的评论未通过内容审核，请修改后重试"
+                rejection_reason = "内容审核未通过"
+            
+            # 获取请求信息
+            ip_address = request.META.get('REMOTE_ADDR', '') if request else ''
+            user_agent = request.META.get('HTTP_USER_AGENT', '') if request else ''
+            
+            # 记录拒绝日志（这会触发自动禁言检查和警告通知）
+            try:
+                CommentRejectionService.record_rejection(
+                    user_id=current_user.id,
+                    comment_content=validated_data.get('content', ''),
+                    rejection_reason=rejection_reason,
+                    violation_types=violation_types,
+                    moderation_detail=moderation_detail,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    target_type=validated_data.get('target_type', ''),
+                    target_id=str(validated_data.get('target_id', ''))
+                )
+            except Exception as e:
+                _logger.error(f"记录评论拒绝失败: user_id={current_user.id}, error={str(e)}")
+            
+            # 获取用户当前违规次数和阈值（用于前端提示）
+            window_hours = getattr(settings, 'AUTO_MUTE_WINDOW_HOURS', 24)
+            threshold = getattr(settings, 'AUTO_MUTE_THRESHOLD', 6)
+            current_count = CommentRejectionService.get_rejection_count_in_window(
+                current_user.id, window_hours
+            )
+            remaining = threshold - current_count
+            
+            # 构建错误消息
+            if violation_labels:
+                msg = f"您的评论未通过内容审核（违规类型：{'、'.join(violation_labels)}），请修改后重试。"
+            else:
+                msg = "您的评论未通过内容审核，请修改后重试。"
+            
+            # 添加违规次数提醒
+            if remaining > 0:
+                msg += f" 当前已累计 {current_count} 次违规，再违规 {remaining} 次将被自动禁言 {getattr(settings, 'AUTO_MUTE_DURATION_HOURS', 24)} 小时。"
+            else:
+                msg += f" 您已累计 {current_count} 次违规，已达到自动禁言阈值。"
+            
             raise serializers.ValidationError(msg)
         
         validated_data['moderation_status'] = moderation_status

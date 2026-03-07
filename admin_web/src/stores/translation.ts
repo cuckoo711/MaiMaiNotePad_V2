@@ -55,8 +55,10 @@ export const useTranslationStore = defineStore('Translation', {
         
         // 转换为 Map 结构
         const translationMap = new Map<string, string>();
-        if (response.data && Array.isArray(response.data)) {
-          response.data.forEach((item: TranslationItem) => {
+        // 响应格式：{ code: 2000, msg: '获取成功', data: [...] }
+        const data = response.data;
+        if (data && Array.isArray(data)) {
+          data.forEach((item: TranslationItem) => {
             translationMap.set(item.source_text, item.translated_text);
           });
         }
