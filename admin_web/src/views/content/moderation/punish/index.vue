@@ -39,48 +39,17 @@
 				</template>
 
 				<template #cell_is_active="scope">
-					<el-tag v-if="!scope.row.is_active" type="danger" size="small">
+					<!-- 系统账号显示特殊状态 -->
+					<el-tag v-if="scope.row.user_type === 2" type="info" size="small">
+						系统账号
+					</el-tag>
+					<!-- 普通用户显示封禁状态 -->
+					<el-tag v-else-if="!scope.row.is_active" type="danger" size="small">
 						已封禁
 					</el-tag>
 					<el-tag v-else type="success" size="small">
 						正常
 					</el-tag>
-				</template>
-
-				<!-- 自定义行操作按钮 -->
-				<template #row-handle="{ row }">
-					<!-- 系统账号不显示任何操作按钮 -->
-					<template v-if="row.user_type !== 2">
-						<el-button
-							v-if="auth('punish:Mute') && !row.is_muted"
-							link
-							size="small"
-							type="warning"
-							@click="handleMute(row)"
-						>
-							禁言
-						</el-button>
-						<el-button
-							v-if="auth('punish:Ban') && row.is_active"
-							link
-							size="small"
-							type="danger"
-							@click="handleBan(row)"
-						>
-							封禁
-						</el-button>
-						<el-button
-							v-if="auth('punish:Detail')"
-							link
-							size="small"
-							@click="handleViewDetail(row)"
-						>
-							查看详情
-						</el-button>
-					</template>
-					<template v-else>
-						<el-tag type="info" size="small">系统账号</el-tag>
-					</template>
 				</template>
 			</fs-crud>
 		</el-card>
@@ -132,7 +101,9 @@ import { ref, onMounted } from 'vue';
 import { useExpose, useCrud } from '@fast-crud/fast-crud';
 import { createCrudOptions } from './crud';
 import { auth } from '/@/utils/authFunction';
-import { errorMessage } from '/@/utils/message';
+import { successMessage, errorMessage } from '/@/utils/message';
+import { ElMessageBox } from 'element-plus';
+import * as api from '/@/api/moderation';
 import ModerationDialog from '../components/ModerationDialog.vue';
 import BatchOperationDialog from '../components/BatchOperationDialog.vue';
 import ModerationLogDrawer from '../components/ModerationLogDrawer.vue';
@@ -143,10 +114,6 @@ const crudRef = ref();
 const crudBinding = ref();
 // 暴露的方法
 const { crudExpose } = useExpose({ crudRef, crudBinding });
-// crud 配置
-const { crudOptions } = createCrudOptions({ crudExpose });
-// 初始化 crud 配置
-const { resetCrudOptions } = useCrud({ crudExpose, crudOptions });
 
 // 选中的行
 const selectedRows = ref<any[]>([]);
@@ -162,7 +129,7 @@ const logDrawerVisible = ref(false);
 
 // 当前操作的用户
 const selectedUser = ref<any>(null);
-const currentUserId = ref(0);
+const currentUserId = ref('');
 
 /**
  * 处理选择变化
@@ -187,6 +154,56 @@ const handleMute = (row: any) => {
 const handleBan = (row: any) => {
 	selectedUser.value = row;
 	banDialogVisible.value = true;
+};
+
+/**
+ * 解除禁言
+ */
+const handleUnmute = async (row: any) => {
+	try {
+		await ElMessageBox.confirm(
+			`确定要解除用户 ${row.username} 的禁言吗？`,
+			'确认解除禁言',
+			{
+				confirmButtonText: '确定',
+				cancelButtonText: '取消',
+				type: 'warning',
+			}
+		);
+		
+		await api.unmuteUser({ user_id: row.id });
+		successMessage('解除禁言成功');
+		crudExpose.doRefresh();
+	} catch (error: any) {
+		if (error !== 'cancel') {
+			errorMessage('解除禁言失败：' + (error.message || '未知错误'));
+		}
+	}
+};
+
+/**
+ * 解除封禁
+ */
+const handleUnban = async (row: any) => {
+	try {
+		await ElMessageBox.confirm(
+			`确定要解除用户 ${row.username} 的封禁吗？`,
+			'确认解除封禁',
+			{
+				confirmButtonText: '确定',
+				cancelButtonText: '取消',
+				type: 'warning',
+			}
+		);
+		
+		await api.unbanUser({ user_id: row.id });
+		successMessage('解除封禁成功');
+		crudExpose.doRefresh();
+	} catch (error: any) {
+		if (error !== 'cancel') {
+			errorMessage('解除封禁失败：' + (error.message || '未知错误'));
+		}
+	}
 };
 
 /**
@@ -226,6 +243,18 @@ const handleViewDetail = (row: any) => {
 	currentUserId.value = row.id;
 	logDrawerVisible.value = true;
 };
+
+// crud 配置（必须在函数定义之后）
+const { crudOptions } = createCrudOptions({ 
+	crudExpose,
+	onMute: handleMute,
+	onBan: handleBan,
+	onUnmute: handleUnmute,
+	onUnban: handleUnban,
+	onViewDetail: handleViewDetail,
+});
+// 初始化 crud 配置
+const { resetCrudOptions } = useCrud({ crudExpose, crudOptions });
 
 /**
  * 对话框成功回调

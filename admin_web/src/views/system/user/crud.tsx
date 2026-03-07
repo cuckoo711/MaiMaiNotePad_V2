@@ -104,7 +104,13 @@ export const createCrudOptions = function ({ crudExpose }: CreateCrudOptionsProp
                     remove: {
                         iconRight: 'Delete',
                         type: 'text',
-                        show: auth('user:Delete'),
+                        show: compute(({ row }) => {
+                            // 系统账号不显示删除按钮
+                            if (row.user_type === 2) {
+                                return false;
+                            }
+                            return auth('user:Delete');
+                        }),
                     },
                     resetDefaultPwd: {
                         text: '重置密码',
@@ -396,8 +402,16 @@ export const createCrudOptions = function ({ crudExpose }: CreateCrudOptionsProp
                             activeText: '',
                             inactiveText: '',
                             style: '--el-switch-on-color: var(--el-color-primary); --el-switch-off-color: #dcdfe6',
+                            disabled: compute((context) => {
+                                // 系统账号禁用开关
+                                return context.row.user_type === 2;
+                            }),
                             onChange: compute((context) => {
                                 return () => {
+                                    // 系统账号不允许修改状态
+                                    if (context.row.user_type === 2) {
+                                        return;
+                                    }
                                     api.UpdateObj(context.row).then((res: APIResponseData) => {
                                         successMessage(res.msg as string);
                                     });

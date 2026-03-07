@@ -102,6 +102,8 @@ class CanComment(permissions.BasePermission):
     被禁言的用户无法发表评论或回复。
     """
     
+    message = '您已被禁言，无法发表评论'  # 默认错误消息
+    
     def has_permission(self, request, view):
         """检查用户级权限
         
@@ -114,6 +116,7 @@ class CanComment(permissions.BasePermission):
         """
         # 检查用户是否已认证
         if not request.user or not request.user.is_authenticated:
+            self.message = '请先登录'
             return False
         
         # 检查用户是否被禁言
@@ -123,9 +126,21 @@ class CanComment(permissions.BasePermission):
             if muted_until:
                 # 如果禁言时间未过期，拒绝访问
                 if muted_until > timezone.now():
+                    # 格式化禁言截止时间
+                    muted_until_str = muted_until.strftime('%Y年%m月%d日 %H:%M')
+                    mute_reason = getattr(request.user, 'mute_reason', '')
+                    if mute_reason:
+                        self.message = f'您已被禁言至 {muted_until_str}，原因：{mute_reason}'
+                    else:
+                        self.message = f'您已被禁言至 {muted_until_str}'
                     return False
             else:
                 # 如果没有设置截止时间，表示永久禁言
+                mute_reason = getattr(request.user, 'mute_reason', '')
+                if mute_reason:
+                    self.message = f'您已被永久禁言，原因：{mute_reason}'
+                else:
+                    self.message = '您已被永久禁言'
                 return False
         
         return True

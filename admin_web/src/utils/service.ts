@@ -73,7 +73,7 @@ function createService() {
 					case 400:
 						// Local.clear();
 						// Session.clear();
-						errorCreate(`${dataAxios.msg}: ${response.config.url}`);
+						errorCreate(`${dataAxios.msg}`);
 						// window.location.reload();
 						break;
 					case 401:
@@ -86,7 +86,7 @@ function createService() {
 								// window.location.reload();
 							},
 						});
-						errorCreate(`${dataAxios.msg}: ${response.config.url}`);
+						errorCreate(`${dataAxios.msg}`);
 						break;
 					case 2000:
 						// @ts-ignore
@@ -96,11 +96,11 @@ function createService() {
 						}
 						return dataAxios;
 					case 4000:
-						errorCreate(`${dataAxios.msg}: ${response.config.url}`);
+						errorCreate(`${dataAxios.msg}`);
 						break;
 					default:
 						// 不是正确的 code
-						errorCreate(`${dataAxios.msg}: ${response.config.url}`);
+						errorCreate(`${dataAxios.msg}`);
 						break;
 				}
 				return Promise.reject(dataAxios);
@@ -111,7 +111,7 @@ function createService() {
 			switch (status) {
 				case 400:
 					// 优先使用后端返回的错误消息
-					error.message = error.response?.data?.msg || '请求错误';
+					error.message = error.response?.data?.msg || error.response?.data?.detail || '请求错误';
 					break;
 				case 401:
 					// Local.clear();
@@ -125,7 +125,8 @@ function createService() {
 					});
 					break;
 				case 403:
-					error.message = '拒绝访问';
+					// 权限错误，使用后端返回的详细消息（如禁言提示）
+					error.message = error.response?.data?.detail || '拒绝访问';
 					break;
 				case 404:
 					error.message = `请求地址出错: ${error.response.config.url}`;

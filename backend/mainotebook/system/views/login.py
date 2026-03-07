@@ -8,6 +8,7 @@ from django.contrib.auth.hashers import check_password, make_password
 from django.db.models import Q
 from django.shortcuts import redirect
 from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import serializers
@@ -109,7 +110,6 @@ class LoginSerializer(TokenObtainPairSerializer):
             # 检查封禁是否未过期
             if user.locked_until > timezone.now():
                 # 格式化剩余时间
-                from datetime import timezone as dt_timezone
                 remaining = user.locked_until - timezone.now()
                 days = remaining.days
                 hours = remaining.seconds // 3600

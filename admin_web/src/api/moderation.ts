@@ -94,7 +94,7 @@ export function getMuteList(query: PageQuery) {
  * @param data 禁言参数
  */
 export function muteUser(data: {
-	user_id: number;
+	user_id: string | number;
 	duration: string;
 	reason: string;
 }) {
@@ -110,7 +110,7 @@ export function muteUser(data: {
  * @param data 解除禁言参数
  */
 export function unmuteUser(data: {
-	user_id: number;
+	user_id: string | number;
 	reason?: string;
 }) {
 	return request({
@@ -170,7 +170,7 @@ export function getBanList(query: PageQuery) {
  * @param data 封禁参数
  */
 export function banUser(data: {
-	user_id: number;
+	user_id: string | number;
 	duration: string;
 	reason: string;
 }) {
@@ -186,7 +186,7 @@ export function banUser(data: {
  * @param data 解除封禁参数
  */
 export function unbanUser(data: {
-	user_id: number;
+	user_id: string | number;
 	reason?: string;
 }) {
 	return request({
@@ -248,7 +248,7 @@ export function getAutoMuteList(query: PageQuery) {
  * @param data 修改时长参数
  */
 export function modifyDuration(data: {
-	user_id: number;
+	user_id: string | number;
 	operation_type: 'mute' | 'ban';
 	new_duration: string;
 	reason: string;
@@ -265,8 +265,8 @@ export function modifyDuration(data: {
  * @param query 查询参数
  */
 export function getModerationLogs(query: {
-	target_user_id?: number;
-	operator_id?: number;
+	target_user_id?: string | number;
+	operator_id?: string | number;
 	operation_type?: string;
 	start_date?: string;
 	end_date?: string;

@@ -14,23 +14,23 @@
 		>
 			<el-form-item label="用户" prop="user_id">
 				<el-input
-					v-model.number="form.user_id"
+					v-model="form.user_id"
 					placeholder="请输入用户ID"
-					type="number"
+					disabled
 				/>
 			</el-form-item>
 			
 			<el-form-item label="时长" prop="duration">
 				<el-radio-group v-model="durationPreset" @change="handlePresetChange">
-					<el-radio label="1h">1小时</el-radio>
-					<el-radio label="3h">3小时</el-radio>
-					<el-radio label="1d">1天</el-radio>
-					<el-radio label="3d">3天</el-radio>
-					<el-radio label="7d">7天</el-radio>
-					<el-radio label="1w">1周</el-radio>
-					<el-radio label="1m">1个月</el-radio>
-					<el-radio label="permanent">永久</el-radio>
-					<el-radio label="custom">自定义</el-radio>
+					<el-radio value="1h">1小时</el-radio>
+					<el-radio value="3h">3小时</el-radio>
+					<el-radio value="1d">1天</el-radio>
+					<el-radio value="3d">3天</el-radio>
+					<el-radio value="7d">7天</el-radio>
+					<el-radio value="1w">1周</el-radio>
+					<el-radio value="1m">1个月</el-radio>
+					<el-radio value="permanent">永久</el-radio>
+					<el-radio value="custom">自定义</el-radio>
 				</el-radio-group>
 				
 				<div v-if="durationPreset === 'custom'" style="margin-top: 12px; display: flex; gap: 8px;">
@@ -70,7 +70,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import * as api from '/@/api/moderation';
 import { successMessage, errorMessage } from '/@/utils/message';
@@ -90,7 +90,7 @@ const loading = ref(false);
 
 // 表单数据
 const form = ref({
-	user_id: undefined as number | undefined,
+	user_id: undefined as string | undefined,
 	duration: '',
 	reason: '',
 });
@@ -112,7 +112,6 @@ const dialogTitle = computed(() => {
 const rules: FormRules = {
 	user_id: [
 		{ required: true, message: '请输入用户ID', trigger: 'blur' },
-		{ type: 'number', message: '用户ID必须是数字', trigger: 'blur' },
 	],
 	duration: [
 		{ required: true, message: '请选择时长', trigger: 'change' },
@@ -144,13 +143,23 @@ watch([customDurationValue, customDurationUnit], () => {
 });
 
 /**
- * 监听预选用户变化
+ * 监听对话框打开，自动填充预选用户
  */
-watch(() => props.preSelectedUser, (newUser) => {
-	if (newUser && props.visible) {
-		form.value.user_id = newUser.id;
+watch(() => props.visible, async (isVisible) => {
+	if (isVisible) {
+		// 先重置表单
+		await nextTick();
+		formRef.value?.clearValidate();
+		
+		// 如果有预选用户，填充用户ID
+		if (props.preSelectedUser) {
+			form.value.user_id = props.preSelectedUser.id;
+		}
+		
+		// 设置默认时长
+		form.value.duration = '1d';
 	}
-}, { immediate: true });
+});
 
 /**
  * 关闭对话框

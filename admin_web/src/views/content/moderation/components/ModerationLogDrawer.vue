@@ -10,42 +10,42 @@
 				<el-timeline-item
 					v-for="log in logs"
 					:key="log.id"
-					:timestamp="formatDateTime(log.create_datetime)"
+					:timestamp="log.created_at ? formatDateTime(log.created_at) : '-'"
 					placement="top"
 					:color="getOperationColor(log.operation_type)"
 				>
-					<el-card>
+					<el-card shadow="hover" style="margin-bottom: 8px;">
 						<template #header>
-							<div style="display: flex; align-items: center; justify-content: space-between;">
+							<div style="display: flex; align-items: center; justify-content: space-between; padding: 4px 0;">
 								<span>
-									<el-tag :type="getOperationTagType(log.operation_type)" size="small">
+									<el-tag :type="getOperationTagType(log.operation_type)" size="default">
 										{{ getOperationText(log.operation_type) }}
 									</el-tag>
 								</span>
-								<span style="font-size: 12px; color: #909399;">
-									操作人：{{ log.operator_name || '未知' }}
+								<span style="font-size: 13px; color: #606266;">
+									操作人：<strong>{{ log.operator?.username || '未知' }}</strong>
 								</span>
 							</div>
 						</template>
 						
-						<el-descriptions :column="1" size="small">
-							<el-descriptions-item label="目标用户">
-								{{ log.target_user_name || log.target_user }}
+						<el-descriptions :column="1" size="default" border>
+							<el-descriptions-item label="目标用户" label-align="right" label-class-name="desc-label">
+								<strong>{{ log.target_user?.username || log.target_user?.id || '-' }}</strong>
 							</el-descriptions-item>
-							<el-descriptions-item label="操作原因">
-								{{ log.reason || '-' }}
+							<el-descriptions-item label="操作原因" label-align="right" label-class-name="desc-label">
+								<div style="white-space: pre-wrap; word-break: break-word;">{{ log.reason || '-' }}</div>
 							</el-descriptions-item>
-							<el-descriptions-item v-if="log.duration_hours !== undefined" label="时长">
-								{{ formatDuration(log.duration_hours) }}
+							<el-descriptions-item v-if="log.duration_hours !== null && log.duration_hours !== undefined" label="时长" label-align="right" label-class-name="desc-label">
+								<el-tag type="info" size="small">{{ log.duration_display || formatDuration(log.duration_hours) }}</el-tag>
 							</el-descriptions-item>
-							<el-descriptions-item v-if="log.old_duration_hours !== undefined" label="原时长">
-								{{ formatDuration(log.old_duration_hours) }}
+							<el-descriptions-item v-if="log.old_duration_hours !== null && log.old_duration_hours !== undefined" label="原时长" label-align="right" label-class-name="desc-label">
+								<el-tag type="warning" size="small">{{ log.old_duration_display || formatDuration(log.old_duration_hours) }}</el-tag>
 							</el-descriptions-item>
-							<el-descriptions-item v-if="log.extra_data && log.extra_data.user_ids" label="批量操作">
-								共 {{ log.extra_data.user_ids.length }} 个用户
+							<el-descriptions-item v-if="log.extra_data && log.extra_data.user_ids" label="批量操作" label-align="right" label-class-name="desc-label">
+								共 <strong>{{ log.extra_data.user_ids.length }}</strong> 个用户
 							</el-descriptions-item>
-							<el-descriptions-item label="IP地址">
-								{{ log.ip_address || '-' }}
+							<el-descriptions-item label="IP地址" label-align="right" label-class-name="desc-label">
+								<code style="font-size: 12px;">{{ log.ip_address || '-' }}</code>
 							</el-descriptions-item>
 						</el-descriptions>
 					</el-card>
@@ -79,7 +79,7 @@ import dayjs from 'dayjs';
 
 interface Props {
 	visible: boolean;
-	userId: number;
+	userId: string;
 }
 
 const props = defineProps<Props>();
@@ -104,8 +104,9 @@ const fetchLogs = async () => {
 			page: currentPage.value,
 			page_size: pageSize.value,
 		});
-		logs.value = response.data || [];
-		total.value = response.total || 0;
+		
+		logs.value = response.data?.results || [];
+		total.value = response.data?.total || 0;
 	} catch (error: any) {
 		errorMessage('获取操作日志失败：' + (error.message || '未知错误'));
 	} finally {
@@ -200,5 +201,65 @@ const getOperationColor = (type: string) => {
 :deep(.el-timeline-item__timestamp) {
 	color: #909399;
 	font-size: 12px;
+}
+</style>
+
+<style lang="scss" scoped>
+:deep(.el-drawer__body) {
+	padding: 20px;
+}
+
+:deep(.el-timeline) {
+	padding-left: 20px;
+	margin-top: 10px;
+}
+
+:deep(.el-timeline-item__wrapper) {
+	padding-left: 32px;
+}
+
+:deep(.el-timeline-item__tail) {
+	left: 6px;
+}
+
+:deep(.el-timeline-item__node) {
+	left: 0;
+}
+
+:deep(.el-timeline-item__timestamp) {
+	font-size: 13px;
+	color: #909399;
+	margin-bottom: 12px;
+	font-weight: 500;
+}
+
+:deep(.el-card__header) {
+	padding: 12px 16px;
+	background-color: #f5f7fa;
+}
+
+:deep(.el-card__body) {
+	padding: 16px;
+}
+
+:deep(.el-descriptions__label) {
+	width: 80px;
+	font-weight: 500;
+	color: #606266;
+}
+
+:deep(.el-descriptions__content) {
+	color: #303133;
+}
+
+:deep(.desc-label) {
+	background-color: #fafafa;
+}
+
+code {
+	padding: 2px 6px;
+	background-color: #f5f7fa;
+	border-radius: 3px;
+	color: #e96900;
 }
 </style>
